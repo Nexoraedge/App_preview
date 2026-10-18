@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,11 @@ import {
   Award,
   Globe,
   Tag,
+  Heart,
+  Video,
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react-native';
 import { fetchNearbyHospitals, getSupabaseClient, SEED_HOSPITALS } from '@adityam/supabase';
 import type { Hospital, HospitalBranch, Doctor, Booking } from '@adityam/types';
@@ -74,11 +80,32 @@ export default function BranchDoctorsScreen() {
     params.specialty && params.specialty !== 'All' ? params.specialty : 'All'
   );
 
-  // Booking Modal State
+  // Booking Modal State & Favorites
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
+  const [branchDropdownVisible, setBranchDropdownVisible] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  const toggleFavorite = (doctorId: string) => {
+    setFavorites((prev) => ({ ...prev, [doctorId]: !prev[doctorId] }));
+  };
+
+  // Helper to ensure all doctors have crisp, high-res clinical portraits
+  const getDoctorAvatar = (doctor: Doctor) => {
+    if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
+      return doctor.avatar_url;
+    }
+    const nameLower = doctor.name.toLowerCase();
+    if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
+      return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
+    }
+    if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
+      return 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
+  };
 
   // DYNAMIC CATEGORIES: ONLY show categories that are ACTUALLY available at this specific branch!
   const availableCategories: BranchCategoryItem[] = useMemo(() => {
@@ -180,6 +207,21 @@ export default function BranchDoctorsScreen() {
     );
   }, [activeBranch, selectedSpecialty]);
 
+  // Screen dimensions for Image 2 Top Doctor Card sizing
+  const screenWidth = Dimensions.get('window').width;
+  const topDoctorCardWidth = Math.min(screenWidth - 40, 330);
+
+  // Top / Preferred Doctors list sorted by rating & reviews (Reference Image 2)
+  const topDoctors = useMemo(() => {
+    if (!filteredDoctors.length) return [];
+    return [...filteredDoctors].sort(
+      (a, b) => b.rating - a.rating || b.total_reviews - a.total_reviews || b.experience_years - a.experience_years
+    );
+  }, [filteredDoctors]);
+
+  // Primary preferred doctor
+  const preferredDoctor = topDoctors[0] || null;
+
   const handleInitiateDoctorBooking = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
     setConfirmedBooking(null);
@@ -228,23 +270,30 @@ export default function BranchDoctorsScreen() {
 
   return (
     <View className="flex-1 bg-[#F8FAFC]">
-      {/* Top Header Banner in Royal Medical Blue */}
+      {/* Top Header Banner in Royal Medical Blue (Image 3 Inspiration with Curved Bottom) */}
       <LinearGradient
-        colors={['#1E40AF', '#2563EB', '#3B82F6']}
+        colors={['#172554', '#1E40AF', '#2563EB']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
-          paddingTop: Math.max(insets.top, 24) + 8,
+          paddingTop: Math.max(insets.top, 24) + 6,
           paddingHorizontal: 18,
-          paddingBottom: 20,
+          paddingBottom: 22,
+          borderBottomLeftRadius: 28,
+          borderBottomRightRadius: 28,
+          shadowColor: '#1E3A8A',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.22,
+          shadowRadius: 14,
+          elevation: 6,
         }}
       >
         {/* Navigation & Title Row */}
-        <View className="flex-row items-center space-x-3 mb-3">
+        <View className="flex-row items-center space-x-3 mb-2.5">
           <TouchableOpacity
             onPress={() => router.back()}
             activeOpacity={0.7}
-            className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md items-center justify-center border border-white/30"
+            className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md items-center justify-center border border-white/25"
           >
             <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2.5} />
           </TouchableOpacity>
@@ -253,12 +302,9 @@ export default function BranchDoctorsScreen() {
             <Text className="text-white text-lg font-black tracking-tight" numberOfLines={1}>
               {hospital?.name}
             </Text>
-            <View className="flex-row items-center space-x-1.5 mt-0.5">
-              <Building2 size={12} color="#93C5FD" />
-              <Text className="text-blue-100 text-xs font-bold" numberOfLines={1}>
-                {activeBranch?.name}
-              </Text>
-            </View>
+            <Text className="text-blue-200 text-xs font-semibold" numberOfLines={1}>
+              Verified Hospital Partner • Adityam Network
+            </Text>
           </View>
 
           {/* Rating Pill */}
@@ -270,17 +316,49 @@ export default function BranchDoctorsScreen() {
           </View>
         </View>
 
-        {/* Location & Masked Badge */}
-        <View className="flex-row items-center justify-between pt-1">
-          <View className="flex-row items-center space-x-1 flex-1 mr-2">
-            <MapPin size={12} color="#BFDBFE" />
-            <Text className="text-blue-100 text-[11px] font-medium" numberOfLines={1}>
-              {activeBranch?.address}
-            </Text>
-          </View>
-          <View className="bg-white/20 px-2.5 py-0.5 rounded-full border border-white/30">
+        {/* Branch Selector Dropdown (Replaces horizontal pills as requested) */}
+        {branches.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setBranchDropdownVisible(true)}
+            activeOpacity={0.85}
+            className="mt-2.5 bg-white/15 border border-white/25 rounded-2xl px-3.5 py-2.5 flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center space-x-2.5 flex-1 mr-2">
+              <View className="w-8 h-8 rounded-xl bg-white/20 items-center justify-center">
+                <Building2 size={16} color="#FFFFFF" />
+              </View>
+              <View className="flex-1">
+                <View className="flex-row items-center space-x-1.5">
+                  <Text className="text-[10px] uppercase font-bold text-blue-200 tracking-wider">
+                    Select Branch
+                  </Text>
+                  {branches.length > 1 && (
+                    <View className="bg-white/20 px-1.5 py-0.2 rounded">
+                      <Text className="text-[9px] font-bold text-white">{branches.length} branches</Text>
+                    </View>
+                  )}
+                </View>
+                <Text className="text-white text-sm font-black mt-0.5" numberOfLines={1}>
+                  {activeBranch?.name} {activeBranch?.distance_km ? `• ${activeBranch.distance_km} km` : ''}
+                </Text>
+              </View>
+            </View>
+
+            <View className="w-7 h-7 rounded-full bg-white/20 items-center justify-center">
+              <ChevronDown size={15} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Address Row */}
+        <View className="flex-row items-center space-x-1.5 mt-2.5 px-0.5">
+          <MapPin size={11} color="#BFDBFE" />
+          <Text className="text-blue-100 text-[11px] font-medium flex-1" numberOfLines={1}>
+            {activeBranch?.address}
+          </Text>
+          <View className="bg-white/20 px-2 py-0.5 rounded-full border border-white/30">
             <Text className="text-white text-[10px] font-bold">
-              {activeBranch?.distance_km ? `${activeBranch.distance_km} km away` : 'Nearby'}
+              {activeBranch?.distance_km ? `${activeBranch.distance_km} km` : 'Nearby'}
             </Text>
           </View>
         </View>
@@ -294,65 +372,17 @@ export default function BranchDoctorsScreen() {
           paddingBottom: Math.max(insets.bottom, 16) + 40,
         }}
       >
-        {/* Branch Selector Tabs (if hospital has multiple branches) */}
-        {branches.length > 1 && (
-          <View className="bg-white py-3 px-4 border-b border-slate-200/80">
-            <Text className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Select Branch Location ({branches.length})
+        {/* CATEGORIES CAPSULE ROW (Image 3 Reference: Sleek Horizontal Pills) */}
+        <View className="py-4 px-4">
+          <View className="flex-row items-center justify-between mb-2.5 px-0.5">
+            <Text className="text-base font-black text-[#182F3B] tracking-tight">
+              Specialties
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {branches.map((branch) => {
-                const isSelected = activeBranch?.id === branch.id;
-                return (
-                  <TouchableOpacity
-                    key={branch.id}
-                    onPress={() => {
-                      setActiveBranch(branch);
-                      setSelectedSpecialty('All');
-                    }}
-                    activeOpacity={0.8}
-                    className={`mr-2.5 px-3.5 py-2 rounded-xl border flex-row items-center space-x-1.5 ${
-                      isSelected
-                        ? 'bg-[#3B82F6] border-[#3B82F6] shadow-sm shadow-blue-500/25'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <Building2
-                      size={12}
-                      color={isSelected ? '#FFFFFF' : '#3B82F6'}
-                    />
-                    <Text
-                      className={`text-xs font-bold ${
-                        isSelected ? 'text-white' : 'text-slate-800'
-                      }`}
-                    >
-                      {branch.name}
-                    </Text>
-                    {branch.distance_km && (
-                      <Text
-                        className={`text-[10px] ${
-                          isSelected ? 'text-blue-100' : 'text-slate-500'
-                        }`}
-                      >
-                        • {branch.distance_km} km
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* CATEGORIES SQUIRCLE ROW (Image 3 Reference: Only show available categories at this branch!) */}
-        <View className="bg-white py-3.5 px-4 border-b border-slate-200/70">
-          <View className="flex-row items-center justify-between mb-3 px-0.5">
-            <Text className="text-base font-bold text-[#182F3B] tracking-tight">
-              Categories
-            </Text>
-            <Text className="text-xs font-semibold text-slate-500">
-              {filteredDoctors.length} Specialists Available
-            </Text>
+            <View className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
+              <Text className="text-xs font-bold text-[#2563EB]">
+                {filteredDoctors.length} {filteredDoctors.length === 1 ? 'Specialist' : 'Specialists'}
+              </Text>
+            </View>
           </View>
 
           <ScrollView
@@ -367,75 +397,61 @@ export default function BranchDoctorsScreen() {
                   key={cat.id}
                   onPress={() => setSelectedSpecialty(cat.id)}
                   activeOpacity={0.8}
-                  className="items-center mr-3"
-                  style={{ width: 72 }}
+                  className="mr-2"
                 >
                   {isSelected ? (
                     <LinearGradient
-                      colors={['#5E94F6', '#3B82F6']}
+                      colors={['#2563EB', '#1D4ED8']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 20,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 16,
+                        flexDirection: 'row',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        shadowColor: '#3B82F6',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.35,
-                        shadowRadius: 8,
-                        elevation: 5,
+                        shadowColor: '#2563EB',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.28,
+                        shadowRadius: 6,
+                        elevation: 4,
                       }}
                     >
-                      {cat.icon('#FFFFFF')}
+                      <View className="mr-2">{cat.icon('#FFFFFF')}</View>
+                      <Text className="text-white text-xs font-black tracking-tight">
+                        {cat.label}
+                      </Text>
                     </LinearGradient>
                   ) : (
                     <View
                       style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 20,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 16,
+                        flexDirection: 'row',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         backgroundColor: '#FFFFFF',
                         borderWidth: 1,
                         borderColor: '#E2E8F0',
                         shadowColor: '#0F172A',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 4,
-                        elevation: 2,
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 3,
+                        elevation: 1,
                       }}
                     >
-                      {cat.icon(cat.accentColor)}
+                      <View className="mr-2">{cat.icon(cat.accentColor)}</View>
+                      <Text className="text-[#334155] text-xs font-bold">
+                        {cat.label}
+                      </Text>
                     </View>
-                  )}
-
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: isSelected ? '700' : '600',
-                      color: isSelected ? '#182F3B' : '#64748B',
-                      textAlign: 'center',
-                      marginTop: 6,
-                      width: 72,
-                    }}
-                  >
-                    {cat.label}
-                  </Text>
-
-                  {isSelected && (
-                    <View className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] mt-1" />
                   )}
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
-
-        {/* Doctor Cards List */}
+        {/* Doctor Content Section */}
         <View className="px-4 pt-4">
           {filteredDoctors.length === 0 ? (
             <View className="bg-white p-8 rounded-3xl border border-slate-200 items-center my-6 shadow-sm">
@@ -448,125 +464,605 @@ export default function BranchDoctorsScreen() {
               </Text>
               <TouchableOpacity
                 onPress={() => setSelectedSpecialty('All')}
-                className="mt-4 bg-[#3B82F6] px-5 py-2.5 rounded-xl shadow-sm shadow-blue-500/20"
+                className="mt-4 bg-[#2563EB] px-5 py-2.5 rounded-xl shadow-sm shadow-blue-500/20"
               >
                 <Text className="text-white text-xs font-bold">Show All Specialists</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            filteredDoctors.map((doctor) => (
-              <View
-                key={doctor.id}
-                className="bg-white rounded-3xl border border-slate-200/90 shadow-sm mb-4 p-4 overflow-hidden"
-              >
-                {/* Doctor Top Row: Avatar + Info */}
-                <View className="flex-row items-start space-x-3.5">
-                  <View className="relative">
-                    <Image
-                      source={{
-                        uri:
-                          doctor.avatar_url ||
-                          'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
+            <>
+              {/* TOP DOCTORS: Image 2 Reference Card Design */}
+              {topDoctors.length > 0 && (
+                <View className="mb-6">
+                  {/* Clean Section Title - NO sparkles, NO crown, NO star emojis! */}
+                  <View className="flex-row items-center justify-between mb-3 px-1">
+                    <Text className="text-xl font-black text-[#182F3B] tracking-tight">
+                      {t.preferredDoctorTitle || 'Top Doctors'}
+                    </Text>
+                    {topDoctors.length > 1 && (
+                      <Text className="text-xs font-semibold text-slate-500">
+                        Swipe to explore
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Horizontal Scroll or Single Featured Card */}
+                  {topDoctors.length === 1 ? (
+                    // Single Top Doctor Card (Full Width - Image 2 Design)
+                    <LinearGradient
+                      colors={['#5A8EF7', '#3B82F6', '#2563EB']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{
+                        borderRadius: 24,
+                        padding: 14,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        shadowColor: '#2563EB',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.18,
+                        shadowRadius: 10,
+                        elevation: 4,
                       }}
-                      style={{ width: 64, height: 64, borderRadius: 32 }}
-                      className="bg-slate-200 border border-slate-100"
-                    />
-                    <View className="absolute -bottom-1 -right-1 bg-[#3B82F6] rounded-full p-1 border-2 border-white shadow-sm">
-                      <Check size={10} color="#FFFFFF" strokeWidth={3} />
-                    </View>
-                  </View>
+                    >
+                      {/* Subtle ambient light orb */}
+                      <View
+                        pointerEvents="none"
+                        style={{
+                          position: 'absolute',
+                          top: -30,
+                          right: -30,
+                          width: 140,
+                          height: 140,
+                          borderRadius: 70,
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        }}
+                      />
 
-                  <View className="flex-1">
-                    <View className="flex-row items-start justify-between">
-                      <Text className="text-base font-bold text-[#182F3B] flex-1 leading-tight mr-1">
-                        {doctor.name}
-                      </Text>
-                      {/* Rating Badge */}
-                      <View className="bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/70 flex-row items-center space-x-1">
-                        <Star size={11} color="#CF8A40" fill="#CF8A40" />
-                        <Text className="text-xs font-black text-slate-800">
-                          {doctor.rating}
-                        </Text>
-                        <Text className="text-[10px] text-slate-500">
-                          ({doctor.total_reviews})
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+                        {/* Left: Doctor Portrait Cutout (Image 2) */}
+                        <View style={{ width: 106, position: 'relative' }}>
+                          <Image
+                            source={{
+                              uri: getDoctorAvatar(topDoctors[0]),
+                            }}
+                            style={{
+                              width: 106,
+                              height: 168,
+                              borderRadius: 18,
+                              backgroundColor: '#DBEAFE',
+                            }}
+                            resizeMode="cover"
+                          />
+                          <View
+                            style={{
+                              position: 'absolute',
+                              bottom: 6,
+                              right: 6,
+                              backgroundColor: '#2563EB',
+                              borderRadius: 12,
+                              padding: 3,
+                              borderWidth: 2,
+                              borderColor: '#FFFFFF',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.2,
+                              shadowRadius: 2,
+                              elevation: 2,
+                            }}
+                          >
+                            <Check size={9} color="#FFFFFF" strokeWidth={3} />
+                          </View>
+                        </View>
+
+                        {/* Right: Doctor Info + Frosted Glass Box + 3 Circular Action Buttons */}
+                        <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'space-between' }}>
+                          <View>
+                            <View className="flex-row items-start justify-between">
+                              <View className="flex-1 mr-1">
+                                <Text
+                                  className="text-white text-base font-black tracking-tight leading-tight"
+                                  numberOfLines={1}
+                                >
+                                  {topDoctors[0].name}
+                                </Text>
+                                <Text className="text-blue-100 text-xs font-semibold mt-0.5">
+                                  {topDoctors[0].specialty}
+                                </Text>
+                              </View>
+
+                              <TouchableOpacity
+                                onPress={() => toggleFavorite(topDoctors[0].id)}
+                                activeOpacity={0.7}
+                                className="w-7 h-7 rounded-full bg-white/20 items-center justify-center -mt-0.5"
+                              >
+                                <Heart
+                                  size={13}
+                                  color={favorites[topDoctors[0].id] ? '#EF4444' : '#FFFFFF'}
+                                  fill={favorites[topDoctors[0].id] ? '#EF4444' : 'transparent'}
+                                />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Star Rating Row */}
+                            <View className="flex-row items-center space-x-1 mt-1">
+                              <Star size={11} color="#FBBF24" fill="#FBBF24" />
+                              <Text className="text-white text-xs font-bold">
+                                {topDoctors[0].rating} ({topDoctors[0].total_reviews} Reviews)
+                              </Text>
+                            </View>
+
+                            {/* Frosted Glass Box (Image 2 Signature Element) */}
+                            <View
+                              style={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                                borderRadius: 12,
+                                paddingHorizontal: 9,
+                                paddingVertical: 7,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255, 255, 255, 0.22)',
+                                marginTop: 8,
+                              }}
+                            >
+                              <Text
+                                className="text-white text-[10.5px] font-semibold leading-tight"
+                                numberOfLines={2}
+                              >
+                                {topDoctors[0].qualification}
+                              </Text>
+                              <View className="flex-row items-center space-x-1 mt-1">
+                                <Clock size={10} color="#BFDBFE" />
+                                <Text className="text-blue-100 text-[10px] font-semibold">
+                                  Slot: {topDoctors[0].next_available_slot}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* Bottom Row: 3 White Circular Action Buttons + Consultation Fee Pill */}
+                          <View className="flex-row items-center justify-between mt-3">
+                            <View className="flex-row items-center space-x-1.5">
+                              {/* 1. Phone Call */}
+                              <TouchableOpacity
+                                onPress={() => handleInitiateDoctorBooking(topDoctors[0])}
+                                activeOpacity={0.8}
+                                className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                              >
+                                <PhoneCall size={13} color="#2563EB" />
+                              </TouchableOpacity>
+
+                              {/* 2. Video Call */}
+                              <TouchableOpacity
+                                onPress={() => handleInitiateDoctorBooking(topDoctors[0])}
+                                activeOpacity={0.8}
+                                className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                              >
+                                <Video size={13} color="#2563EB" />
+                              </TouchableOpacity>
+
+                              {/* 3. Message / Inquiry */}
+                              <TouchableOpacity
+                                onPress={() => handleInitiateDoctorBooking(topDoctors[0])}
+                                activeOpacity={0.8}
+                                className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                              >
+                                <MessageSquare size={13} color="#2563EB" />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Fee / Book Pill */}
+                            <TouchableOpacity
+                              onPress={() => handleInitiateDoctorBooking(topDoctors[0])}
+                              activeOpacity={0.85}
+                              className="bg-white/20 border border-white/30 px-2.5 py-1.5 rounded-full flex-row items-center space-x-1"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <Text className="text-white text-[11px] font-black">
+                                ₹{topDoctors[0].discounted_fee}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
-                    </View>
+                    </LinearGradient>
+                  ) : (
+                    // Horizontal Scroll for Multiple Top Doctors (Image 2 style)
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: 8 }}
+                    >
+                      {topDoctors.map((doc, idx) => {
+                        const isFav = !!favorites[doc.id];
+                        return (
+                          <View
+                            key={doc.id}
+                            style={{
+                              width: topDoctorCardWidth,
+                              marginRight: idx === topDoctors.length - 1 ? 0 : 12,
+                            }}
+                          >
+                            <LinearGradient
+                              colors={['#5A8EF7', '#3B82F6', '#2563EB']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={{
+                                borderRadius: 24,
+                                padding: 14,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                shadowColor: '#2563EB',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.18,
+                                shadowRadius: 10,
+                                elevation: 4,
+                              }}
+                            >
+                              <View
+                                pointerEvents="none"
+                                style={{
+                                  position: 'absolute',
+                                  top: -30,
+                                  right: -30,
+                                  width: 140,
+                                  height: 140,
+                                  borderRadius: 70,
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                }}
+                              />
 
-                    {/* Department Tag */}
-                    <View className="self-start bg-[#EFF6FF] px-2.5 py-0.5 rounded-md border border-blue-200/50 mt-1">
-                      <Text className="text-[11px] font-bold text-[#2563EB]">
-                        {doctor.specialty}
-                      </Text>
-                    </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+                                {/* Left: Doctor Portrait */}
+                                <View style={{ width: 106, position: 'relative' }}>
+                                  <Image
+                                    source={{
+                                      uri: getDoctorAvatar(doc),
+                                    }}
+                                    style={{
+                                      width: 106,
+                                      height: 168,
+                                      borderRadius: 18,
+                                      backgroundColor: '#DBEAFE',
+                                    }}
+                                    resizeMode="cover"
+                                  />
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: 6,
+                                      right: 6,
+                                      backgroundColor: '#2563EB',
+                                      borderRadius: 12,
+                                      padding: 3,
+                                      borderWidth: 2,
+                                      borderColor: '#FFFFFF',
+                                    }}
+                                  >
+                                    <Check size={9} color="#FFFFFF" strokeWidth={3} />
+                                  </View>
+                                </View>
 
-                    {/* Qualifications & Experience */}
-                    <Text className="text-xs text-slate-600 mt-1 leading-snug">
-                      {doctor.qualification}
-                    </Text>
-                    <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                      {doctor.experience_years} years clinical experience
-                    </Text>
-                  </View>
+                                {/* Right: Doctor Info + Frosted Glass Box + 3 Circular Action Buttons */}
+                                <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'space-between' }}>
+                                  <View>
+                                    <View className="flex-row items-start justify-between">
+                                      <View className="flex-1 mr-1">
+                                        <Text
+                                          className="text-white text-base font-black tracking-tight leading-tight"
+                                          numberOfLines={1}
+                                        >
+                                          {doc.name}
+                                        </Text>
+                                        <Text className="text-blue-100 text-xs font-semibold mt-0.5">
+                                          {doc.specialty}
+                                        </Text>
+                                      </View>
+
+                                      <TouchableOpacity
+                                        onPress={() => toggleFavorite(doc.id)}
+                                        activeOpacity={0.7}
+                                        className="w-7 h-7 rounded-full bg-white/20 items-center justify-center -mt-0.5"
+                                      >
+                                        <Heart
+                                          size={13}
+                                          color={isFav ? '#EF4444' : '#FFFFFF'}
+                                          fill={isFav ? '#EF4444' : 'transparent'}
+                                        />
+                                      </TouchableOpacity>
+                                    </View>
+
+                                    {/* Star Rating Row */}
+                                    <View className="flex-row items-center space-x-1 mt-1">
+                                      <Star size={11} color="#FBBF24" fill="#FBBF24" />
+                                      <Text className="text-white text-xs font-bold">
+                                        {doc.rating} ({doc.total_reviews} Review)
+                                      </Text>
+                                    </View>
+
+                                    {/* Frosted Glass Box */}
+                                    <View
+                                      style={{
+                                        backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                                        borderRadius: 12,
+                                        paddingHorizontal: 9,
+                                        paddingVertical: 7,
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(255, 255, 255, 0.22)',
+                                        marginTop: 8,
+                                      }}
+                                    >
+                                      <Text
+                                        className="text-white text-[10.5px] font-semibold leading-tight"
+                                        numberOfLines={2}
+                                      >
+                                        {doc.qualification}
+                                      </Text>
+                                      <View className="flex-row items-center space-x-1 mt-1">
+                                        <Clock size={10} color="#BFDBFE" />
+                                        <Text className="text-blue-100 text-[10px] font-semibold">
+                                          Slot: {doc.next_available_slot}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                  </View>
+
+                                  {/* Bottom Row: 3 White Circular Action Buttons + Consultation Fee */}
+                                  <View className="flex-row items-center justify-between mt-3">
+                                    <View className="flex-row items-center space-x-1.5">
+                                      <TouchableOpacity
+                                        onPress={() => handleInitiateDoctorBooking(doc)}
+                                        activeOpacity={0.8}
+                                        className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                                      >
+                                        <PhoneCall size={13} color="#2563EB" />
+                                      </TouchableOpacity>
+
+                                      <TouchableOpacity
+                                        onPress={() => handleInitiateDoctorBooking(doc)}
+                                        activeOpacity={0.8}
+                                        className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                                      >
+                                        <Video size={13} color="#2563EB" />
+                                      </TouchableOpacity>
+
+                                      <TouchableOpacity
+                                        onPress={() => handleInitiateDoctorBooking(doc)}
+                                        activeOpacity={0.8}
+                                        className="w-8 h-8 rounded-full bg-white items-center justify-center shadow-xs"
+                                      >
+                                        <MessageSquare size={13} color="#2563EB" />
+                                      </TouchableOpacity>
+                                    </View>
+
+                                    <TouchableOpacity
+                                      onPress={() => handleInitiateDoctorBooking(doc)}
+                                      activeOpacity={0.85}
+                                      className="bg-white/20 border border-white/30 px-2.5 py-1.5 rounded-full flex-row items-center space-x-1"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      <Text className="text-white text-[11px] font-black">
+                                        ₹{doc.discounted_fee}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              </View>
+                            </LinearGradient>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
                 </View>
+              )}
 
-                {/* Additional Clinical Badges */}
-                <View className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex-row items-center justify-between">
-                  <View className="flex-row items-center space-x-1.5">
-                    <Clock size={12} color="#16A34A" />
-                    <Text className="text-[11px] font-bold text-emerald-700">
-                      {doctor.next_available_slot}
-                    </Text>
-                  </View>
-
-                  <View className="flex-row items-center space-x-1">
-                    <Globe size={12} color="#64748B" />
-                    <Text className="text-[10px] text-slate-500 font-medium">
-                      {doctor.languages?.join(', ') || 'English, Hindi'}
-                    </Text>
-                  </View>
-                </View>
-
-                {doctor.opd_timing && (
-                  <Text className="text-[10px] text-slate-400 mt-1.5 px-0.5">
-                    OPD Hours: {doctor.opd_timing}
+              {/* Section Heading for All Department Specialists */}
+              <View className="flex-row items-center justify-between mb-3 px-0.5">
+                <Text className="text-base font-black text-[#182F3B] tracking-tight">
+                  {selectedSpecialty === 'All'
+                    ? (t.topSpecialistsTitle || 'All Specialists')
+                    : `${selectedSpecialty} Specialists`}
+                </Text>
+                <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
+                  <Text className="text-xs font-bold text-[#2563EB]">
+                    {filteredDoctors.length} {filteredDoctors.length === 1 ? 'Specialist' : 'Specialists'}
                   </Text>
-                )}
-
-                {/* Bottom Fee & Book Consultation Row */}
-                <View className="mt-3.5 pt-3 border-t border-slate-100 flex-row items-center justify-between">
-                  <View>
-                    <Text className="text-[10px] text-slate-400 uppercase font-semibold">
-                      Consultation Fee
-                    </Text>
-                    <View className="flex-row items-center space-x-1.5 mt-0.5">
-                      <Text className="text-base font-black text-[#182F3B]">
-                        ₹{doctor.discounted_fee}
-                      </Text>
-                      <Text className="text-xs text-slate-400 line-through">
-                        ₹{doctor.consultation_fee}
-                      </Text>
-                      <View className="bg-[#FFF9F0] border border-[#CF8A40]/40 px-1.5 py-0.2 rounded">
-                        <Text className="text-[10px] font-bold text-[#CF8A40]">
-                          25% OFF
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => handleInitiateDoctorBooking(doctor)}
-                    activeOpacity={0.85}
-                    className="bg-[#3B82F6] active:bg-[#2563EB] px-4 py-2.5 rounded-xl flex-row items-center space-x-1.5 shadow-sm shadow-blue-500/25"
-                  >
-                    <PhoneCall size={14} color="#FFFFFF" />
-                    <Text className="text-white text-xs font-bold">
-                      Book Consultation
-                    </Text>
-                  </TouchableOpacity>
                 </View>
               </View>
-            ))
+
+              {/* Upgraded Doctor Cards List (High-Design Modern Clinical White Card) */}
+              {filteredDoctors.map((doctor) => {
+                const isPreferred = doctor.id === preferredDoctor?.id || doctor.rating >= 4.9;
+                const isFav = !!favorites[doctor.id];
+                const avatar = getDoctorAvatar(doctor);
+
+                return (
+                  <View
+                    key={doctor.id}
+                    className="bg-white rounded-[24px] border border-slate-200/90 mb-4 p-4 overflow-hidden"
+                    style={{
+                      shadowColor: '#1E3A8A',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.06,
+                      shadowRadius: 12,
+                      elevation: 3,
+                    }}
+                  >
+                    {/* Top Status & Verification Row */}
+                    <View className="flex-row items-center justify-between pb-2.5 mb-3 border-b border-slate-100">
+                      {isPreferred ? (
+                        <View className="bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-full flex-row items-center space-x-1.5">
+                          <Award size={12} color="#2563EB" />
+                          <Text className="text-[10px] font-black text-[#2563EB] uppercase tracking-wider">
+                            Top Specialist
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="bg-slate-100 px-2.5 py-1 rounded-full flex-row items-center space-x-1">
+                          <Building2 size={11} color="#64748B" />
+                          <Text className="text-[10px] font-bold text-slate-600">
+                            {activeBranch?.name}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View className="flex-row items-center space-x-1 bg-emerald-50 border border-emerald-200/70 px-2.5 py-1 rounded-full">
+                        <ShieldCheck size={12} color="#16A34A" />
+                        <Text className="text-[10.5px] font-bold text-emerald-700">Verified Partner</Text>
+                      </View>
+                    </View>
+
+                    {/* Doctor Profile Info Row */}
+                    <View className="flex-row items-start space-x-3.5">
+                      {/* Avatar with clean clinical frame */}
+                      <View className="relative">
+                        <Image
+                          source={{ uri: avatar }}
+                          style={{ width: 80, height: 80, borderRadius: 22 }}
+                          className="bg-blue-50 border-2 border-white shadow-xs"
+                          resizeMode="cover"
+                        />
+                        <View className="absolute -bottom-1 -right-1 bg-[#2563EB] rounded-full p-1 border-2 border-white shadow-sm">
+                          <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                        </View>
+                      </View>
+
+                      {/* Doctor Identity & Credentials */}
+                      <View className="flex-1">
+                        <View className="flex-row items-start justify-between">
+                          <Text className="text-[16px] font-black text-[#0F172A] flex-1 leading-tight mr-1">
+                            {doctor.name}
+                          </Text>
+                          {/* Favorite Heart Toggle */}
+                          <TouchableOpacity
+                            onPress={() => toggleFavorite(doctor.id)}
+                            activeOpacity={0.7}
+                            className="w-7 h-7 rounded-full bg-slate-50 items-center justify-center -mt-0.5 -mr-0.5"
+                          >
+                            <Heart
+                              size={15}
+                              color={isFav ? '#EF4444' : '#94A3B8'}
+                              fill={isFav ? '#EF4444' : 'transparent'}
+                            />
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Specialty Pill & Star Rating Row */}
+                        <View className="flex-row items-center space-x-2 mt-1">
+                          <View className="bg-[#EFF6FF] px-2.5 py-0.5 rounded-md border border-blue-200/70">
+                            <Text className="text-[11px] font-black text-[#2563EB]">
+                              {doctor.specialty}
+                            </Text>
+                          </View>
+
+                          <View className="bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/80 flex-row items-center space-x-1">
+                            <Star size={11} color="#D97706" fill="#D97706" />
+                            <Text className="text-xs font-black text-slate-800">
+                              {doctor.rating}
+                            </Text>
+                            <Text className="text-[10px] text-slate-500">
+                              ({doctor.total_reviews})
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Qualifications & Experience */}
+                        <Text className="text-xs text-slate-600 font-semibold mt-1 leading-snug">
+                          {doctor.qualification}
+                        </Text>
+                        <Text className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          {doctor.experience_years} years clinical practice
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Schedule Band (Soft Emerald / Clinical Slate) */}
+                    <View className="mt-3.5 bg-emerald-50/50 p-2.5 rounded-2xl border border-emerald-100/80">
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center space-x-1.5">
+                          <View className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <Text className="text-xs font-black text-emerald-800">
+                            Available: {doctor.next_available_slot}
+                          </Text>
+                        </View>
+
+                        <View className="flex-row items-center space-x-1">
+                          <Globe size={11} color="#059669" />
+                          <Text className="text-[10.5px] font-bold text-emerald-700">
+                            {doctor.languages?.join(', ') || 'English, Hindi'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {doctor.opd_timing && (
+                        <View className="flex-row items-center space-x-1 mt-1.5 pt-1.5 border-t border-emerald-100/60">
+                          <Calendar size={11} color="#059669" />
+                          <Text className="text-[10.5px] text-emerald-800/80 font-semibold">
+                            OPD Schedule: {doctor.opd_timing}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Bottom Fee & Quick Action Row */}
+                    <View className="mt-3.5 pt-3 border-t border-slate-100 flex-row items-center justify-between">
+                      {/* Left: Consultation Fee */}
+                      <View>
+                        <Text className="text-[9.5px] text-slate-400 uppercase font-black tracking-wider">
+                          Consultation Fee
+                        </Text>
+                        <View className="flex-row items-center space-x-1.5 mt-0.5">
+                          <Text className="text-lg font-black text-[#0F172A]">
+                            ₹{doctor.discounted_fee}
+                          </Text>
+                          <Text className="text-xs text-slate-400 line-through">
+                            ₹{doctor.consultation_fee}
+                          </Text>
+                          <View className="bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded">
+                            <Text className="text-[9.5px] font-black text-amber-700">
+                              25% OFF
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Right: Quick Action Buttons & Book Consultation */}
+                      <View className="flex-row items-center space-x-1.5">
+                        {/* Direct Call Button */}
+                        <TouchableOpacity
+                          onPress={() => handleInitiateDoctorBooking(doctor)}
+                          activeOpacity={0.8}
+                          className="w-10 h-10 rounded-2xl bg-[#EFF6FF] border border-blue-200/80 items-center justify-center active:scale-95"
+                        >
+                          <PhoneCall size={15} color="#2563EB" />
+                        </TouchableOpacity>
+
+                        {/* Video Consult Button */}
+                        <TouchableOpacity
+                          onPress={() => handleInitiateDoctorBooking(doctor)}
+                          activeOpacity={0.8}
+                          className="w-10 h-10 rounded-2xl bg-[#EFF6FF] border border-blue-200/80 items-center justify-center active:scale-95"
+                        >
+                          <Video size={15} color="#2563EB" />
+                        </TouchableOpacity>
+
+                        {/* Primary Book Consultation CTA */}
+                        <TouchableOpacity
+                          onPress={() => handleInitiateDoctorBooking(doctor)}
+                          activeOpacity={0.85}
+                          className="bg-[#2563EB] active:bg-[#1D4ED8] px-3.5 py-2.5 rounded-2xl flex-row items-center space-x-1 shadow-sm shadow-blue-500/25"
+                        >
+                          <Text className="text-white text-xs font-black">
+                            Book Consult
+                          </Text>
+                          <ChevronRight size={13} color="#FFFFFF" strokeWidth={3} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
           )}
         </View>
       </ScrollView>
@@ -694,6 +1190,106 @@ export default function BranchDoctorsScreen() {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* Branch Selection Dropdown Modal */}
+      <Modal
+        visible={branchDropdownVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBranchDropdownVisible(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setBranchDropdownVisible(false)}
+          className="flex-1 bg-black/50 justify-end"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="bg-white rounded-t-3xl p-5 shadow-2xl max-h-[75%]"
+          >
+            {/* Header */}
+            <View className="flex-row items-center justify-between pb-3.5 border-b border-slate-100">
+              <View>
+                <Text className="text-base font-black text-[#182F3B]">
+                  Select Hospital Branch
+                </Text>
+                <Text className="text-xs text-slate-500 font-medium mt-0.5">
+                  {hospital?.name} • {branches.length} Locations
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setBranchDropdownVisible(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center"
+              >
+                <X size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Branches List */}
+            <ScrollView className="py-2 mt-1" showsVerticalScrollIndicator={false}>
+              {branches.map((b) => {
+                const isSelected = activeBranch?.id === b.id;
+                return (
+                  <TouchableOpacity
+                    key={b.id}
+                    onPress={() => {
+                      setActiveBranch(b);
+                      setSelectedSpecialty('All');
+                      setBranchDropdownVisible(false);
+                    }}
+                    activeOpacity={0.8}
+                    className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
+                      isSelected
+                        ? 'bg-[#EFF6FF] border-[#2563EB]'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <View className="flex-1 mr-3">
+                      <View className="flex-row items-center space-x-1.5">
+                        <Building2 size={14} color={isSelected ? '#2563EB' : '#64748B'} />
+                        <Text
+                          className={`text-sm font-black ${
+                            isSelected ? 'text-[#2563EB]' : 'text-[#182F3B]'
+                          }`}
+                        >
+                          {b.name}
+                        </Text>
+                      </View>
+                      <Text className="text-xs text-slate-500 mt-1" numberOfLines={1}>
+                        {b.address}
+                      </Text>
+                      <View className="flex-row items-center space-x-2 mt-2">
+                        {b.distance_km && (
+                          <View className="bg-slate-100 px-2 py-0.5 rounded-full">
+                            <Text className="text-[10px] font-bold text-slate-700">
+                              {b.distance_km} km away
+                            </Text>
+                          </View>
+                        )}
+                        <View className="bg-blue-50 px-2 py-0.5 rounded-full">
+                          <Text className="text-[10px] font-bold text-[#2563EB]">
+                            {b.doctors.length} Specialists
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View
+                      className={`w-6 h-6 rounded-full items-center justify-center border-2 ${
+                        isSelected
+                          ? 'bg-[#2563EB] border-[#2563EB]'
+                          : 'border-slate-300'
+                      }`}
+                    >
+                      {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

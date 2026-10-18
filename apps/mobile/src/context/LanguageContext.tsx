@@ -126,6 +126,10 @@ interface Translations {
   experience: string;
   nextSlot: string;
   consultFee: string;
+  preferredDoctorTitle: string;
+  topSpecialistsTitle: string;
+  quickCall: string;
+  videoConsult: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -241,6 +245,10 @@ const translations: Record<Language, Translations> = {
     experience: 'yrs exp',
     nextSlot: 'Next Slot',
     consultFee: 'Consult Fee',
+    preferredDoctorTitle: 'Top Doctors',
+    topSpecialistsTitle: 'All Specialists',
+    quickCall: 'Call',
+    videoConsult: 'Video',
   },
   hi: {
     appName: 'आदित्यम् निरामया:',
@@ -354,6 +362,10 @@ const translations: Record<Language, Translations> = {
     experience: 'वर्ष अनुभव',
     nextSlot: 'अगला स्लॉट',
     consultFee: 'परामर्श शुल्क',
+    preferredDoctorTitle: 'शीर्ष डॉक्टर',
+    topSpecialistsTitle: 'सभी विशेषज्ञ डॉक्टर',
+    quickCall: 'कॉल करें',
+    videoConsult: 'वीडियो परामर्श',
   },
 };
 

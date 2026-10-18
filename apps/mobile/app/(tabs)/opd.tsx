@@ -236,42 +236,65 @@ export default function OpdConciergeScreen() {
           paddingBottom: Math.max(insets.bottom, 16) + 85,
         }}
       >
-        {/* Modern Header Section matching user reference in Royal Medical Blue */}
+        {/* Modern Header Section matching user reference in Royal Medical Blue (Image 3 Inspiration) */}
         <LinearGradient
-          colors={['#EBF4FF', '#F1F7FF', '#F8FAFC']}
+          colors={['#172554', '#1E40AF', '#2563EB']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          end={{ x: 1, y: 1 }}
           style={{
             paddingTop: Math.max(insets.top, 24) + 12,
             paddingHorizontal: 20,
             paddingBottom: 22,
+            borderBottomLeftRadius: 28,
+            borderBottomRightRadius: 28,
+            shadowColor: '#1E3A8A',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.22,
+            shadowRadius: 14,
+            elevation: 6,
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
+          {/* Ambient light glow */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -40,
+              right: -30,
+              width: 160,
+              height: 160,
+              borderRadius: 80,
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            }}
+          />
+
           {/* Top Status & Geolocation Pill */}
           <View className="flex-row items-center justify-between mb-3.5">
-            <View className="flex-row items-center space-x-1.5 bg-white/95 border border-blue-100 px-3 py-1 rounded-full shadow-sm">
-              <MapPin size={12} color="#3B82F6" />
-              <Text className="text-[11px] font-bold text-[#1D4ED8]">
+            <View className="flex-row items-center space-x-1.5 bg-white/15 border border-white/25 px-3 py-1 rounded-full">
+              <MapPin size={12} color="#BFDBFE" />
+              <Text className="text-[11px] font-bold text-white">
                 South Delhi NCR • 50 km radius
               </Text>
             </View>
 
-            <View className="flex-row items-center space-x-1 bg-[#EFF6FF] px-2.5 py-1 rounded-full border border-blue-200/80">
-              <ShieldCheck size={12} color="#3B82F6" />
-              <Text className="text-[10px] font-bold text-[#1D4ED8]">NABH Accredited</Text>
+            <View className="flex-row items-center space-x-1 bg-white/20 px-2.5 py-1 rounded-full border border-white/30">
+              <ShieldCheck size={12} color="#FFFFFF" />
+              <Text className="text-[10px] font-bold text-white">NABH Accredited</Text>
             </View>
           </View>
 
-          {/* Heading: "Find Your Health\nSpecialist" */}
-          <Text className="text-[30px] font-black text-[#182F3B] tracking-tight leading-[36px]">
+          {/* Heading: "Find Your Health Specialist" */}
+          <Text className="text-[28px] font-black text-white tracking-tight leading-[34px]">
             {t.opdPageTitle}
           </Text>
-          <Text className="text-xs font-medium text-slate-500 mt-1 mb-4">
+          <Text className="text-xs font-medium text-blue-100 mt-1 mb-4">
             {t.opdPageSub}
           </Text>
 
-          {/* Search Doctor Pill Container */}
-          <View className="bg-white rounded-full flex-row items-center pl-4 pr-1.5 py-1.5 shadow-md shadow-slate-200/90 border border-slate-200/60 mb-5">
+          {/* Image 3 Floating Search Doctor Pill */}
+          <View className="bg-white rounded-full flex-row items-center pl-4 pr-1.5 py-1.5 shadow-lg shadow-blue-950/20 mb-1">
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -293,118 +316,105 @@ export default function OpdConciergeScreen() {
               className="overflow-hidden rounded-full shadow-sm"
             >
               <LinearGradient
-                colors={['#5E94F6', '#3B82F6']}
+                colors={['#2563EB', '#1D4ED8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
+                <Search size={17} color="#FFFFFF" strokeWidth={2.5} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
+        </LinearGradient>
 
-          {/* Categories Section matching reference squircle row */}
-          <View>
-            <View className="flex-row items-center justify-between mb-3 px-0.5">
-              <Text className="text-lg font-bold text-[#182F3B] tracking-tight">
-                {t.categoriesTitle}
-              </Text>
-              {selectedSpecialty !== 'All' && (
+        {/* Categories Capsule Pills Section (Image 3 Inspiration) */}
+        <View className="pt-4 px-5">
+          <View className="flex-row items-center justify-between mb-2.5 px-0.5">
+            <Text className="text-base font-black text-[#182F3B] tracking-tight">
+              {t.categoriesTitle}
+            </Text>
+            {selectedSpecialty !== 'All' && (
+              <TouchableOpacity
+                onPress={() => setSelectedSpecialty('All')}
+                className="flex-row items-center space-x-1"
+              >
+                <Text className="text-xs font-bold text-[#2563EB]">Reset to All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 10 }}
+          >
+            {categories.map((cat) => {
+              const isSelected = selectedSpecialty === cat.id;
+              return (
                 <TouchableOpacity
-                  onPress={() => setSelectedSpecialty('All')}
-                  className="flex-row items-center space-x-1"
+                  key={cat.id}
+                  onPress={() => setSelectedSpecialty(cat.id)}
+                  activeOpacity={0.8}
+                  className="mr-2"
                 >
-                  <Text className="text-xs font-bold text-[#3B82F6]">Reset to All</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 10 }}
-            >
-              {categories.map((cat) => {
-                const isSelected = selectedSpecialty === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setSelectedSpecialty(cat.id)}
-                    activeOpacity={0.8}
-                    className="items-center mr-3.5"
-                    style={{ width: 72 }}
-                  >
-                    {isSelected ? (
-                      <LinearGradient
-                        colors={['#5E94F6', '#3B82F6']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{
-                          width: 66,
-                          height: 66,
-                          borderRadius: 20,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          shadowColor: '#3B82F6',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.35,
-                          shadowRadius: 8,
-                          elevation: 5,
-                        }}
-                      >
-                        {cat.icon('#FFFFFF')}
-                      </LinearGradient>
-                    ) : (
-                      <View
-                        style={{
-                          width: 66,
-                          height: 66,
-                          borderRadius: 20,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#FFFFFF',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                          shadowColor: '#0F172A',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 4,
-                          elevation: 2,
-                        }}
-                      >
-                        {cat.icon(cat.accentColor)}
-                      </View>
-                    )}
-
-                    <Text
-                      numberOfLines={1}
+                  {isSelected ? (
+                    <LinearGradient
+                      colors={['#2563EB', '#1D4ED8']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
                       style={{
-                        fontSize: 11,
-                        fontWeight: isSelected ? '700' : '600',
-                        color: isSelected ? '#182F3B' : '#64748B',
-                        textAlign: 'center',
-                        marginTop: 6,
-                        width: 72,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        shadowColor: '#2563EB',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.28,
+                        shadowRadius: 6,
+                        elevation: 4,
                       }}
                     >
-                      {cat.label}
-                    </Text>
-
-                    {isSelected && (
-                      <View className="w-1.5 h-1.5 rounded-full bg-[#3B82F6] mt-1" />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </LinearGradient>
+                      <View className="mr-2">{cat.icon('#FFFFFF')}</View>
+                      <Text className="text-white text-xs font-black tracking-tight">
+                        {cat.label}
+                      </Text>
+                    </LinearGradient>
+                  ) : (
+                    <View
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        shadowColor: '#0F172A',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 3,
+                        elevation: 1,
+                      }}
+                    >
+                      <View className="mr-2">{cat.icon(cat.accentColor)}</View>
+                      <Text className="text-[#334155] text-xs font-bold">
+                        {cat.label}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Hospital Cards Section with Luxury Image Curve & Horizontal Branch Scroll */}
         <View className="px-5 pt-4">
@@ -421,7 +431,7 @@ export default function OpdConciergeScreen() {
 
           {isLoading ? (
             <View className="py-16 items-center">
-              <ActivityIndicator size="large" color="#087F83" />
+              <ActivityIndicator size="large" color="#2563EB" />
               <Text className="text-xs text-slate-500 font-medium mt-3">
                 {t.loadingSpecialists}
               </Text>
