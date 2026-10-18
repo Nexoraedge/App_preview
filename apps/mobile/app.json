@@ -17,9 +17,9 @@
       "bundleIdentifier": "com.adityam.niramayaa"
     },
     "androidStatusBar": {
-      "barStyle": "dark-content",
-      "backgroundColor": "#F7FBFA",
-      "translucent": true
+      "barStyle": "light-content",
+      "backgroundColor": "#172554",
+      "translucent": false
     },
     "androidNavigationBar": {
       "visible": "always",

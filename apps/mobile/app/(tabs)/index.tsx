@@ -11,6 +11,7 @@ import {
   Linking,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';

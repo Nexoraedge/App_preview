@@ -22,9 +22,9 @@ export default function RootLayout() {
         <AuthProvider>
           <LanguageProvider>
             <RNStatusBar
-              barStyle="dark-content"
-              backgroundColor="transparent"
-              translucent={true}
+              barStyle="light-content"
+              backgroundColor="#172554"
+              translucent={false}
             />
             <Stack
               screenOptions={{
