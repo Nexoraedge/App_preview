@@ -1,0 +1,14 @@
+{
+  "name": "adityam-niramayaa-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Adityam Niramayaa - High-Traffic Healthcare Aggregator Monorepo",
+  "scripts": {
+    "dev:mobile": "pnpm --filter @adityam/mobile dev",
+    "dev:admin": "pnpm --filter @adityam/admin dev",
+    "build:admin": "pnpm --filter @adityam/admin build",
+    "start:admin": "pnpm --filter @adityam/admin start",
+    "lint": "pnpm -r run lint"
+  },
+  "packageManager": "pnpm@12.3.4"
+}

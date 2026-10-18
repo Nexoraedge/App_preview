@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Adityam Niramayaa",
+    "slug": "adityam-niramayaa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo_AN.png",
+    "scheme": "adityam",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logo_AN.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7FBFA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.adityam.niramayaa"
+    },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#F7FBFA",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "visible": "always",
+      "barStyle": "dark-content",
+      "backgroundColor": "#FFFFFF"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F7FBFA"
+      },
+      "package": "com.adityam.niramayaa"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Adityam Niramayaa to access your camera to scan pharmacy QR codes and capture bill receipts."
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}
