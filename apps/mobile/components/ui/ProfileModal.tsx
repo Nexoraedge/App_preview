@@ -197,7 +197,7 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
             <TouchableOpacity
               onPress={() => {
                 onClose();
-                router.push('/opd');
+                router.push('/appointments');
               }}
               style={{
                 flexDirection: 'row',
@@ -222,7 +222,9 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
                   borderRadius: 10,
                 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: '800', color: '#2563EB' }}>1 Active</Text>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#2563EB' }}>
+                  {language === 'hi' ? '2 सक्रिय' : '2 Active'}
+                </Text>
               </View>
             </TouchableOpacity>
 

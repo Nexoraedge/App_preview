@@ -854,7 +854,7 @@ export default function HomeScreen() {
             <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B' }}>
               {t.quickAccessTitle}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/opd')}>
+            <TouchableOpacity onPress={() => router.push('/appointments')}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                 {t.viewAll}
               </Text>
@@ -863,7 +863,7 @@ export default function HomeScreen() {
 
           {/* Quick Access Card */}
           <TouchableOpacity
-            onPress={() => router.push('/opd')}
+            onPress={() => router.push('/appointments')}
             activeOpacity={0.9}
             style={{
               backgroundColor: '#FFFFFF',
