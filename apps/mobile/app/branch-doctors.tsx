@@ -9,9 +9,10 @@ import {
   Dimensions,
   useWindowDimensions,
   StatusBar as RNStatusBar,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
@@ -356,9 +357,9 @@ export default function BranchDoctorsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#172554' }}>
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <RNStatusBar barStyle="light-content" backgroundColor="#172554" translucent={false} />
-      <View className="flex-1 bg-[#F8FAFC]">
+      <View style={{ height: insets.top, backgroundColor: '#172554' }} />
         {/* Top Header Banner in Royal Medical Blue */}
         <LinearGradient
           colors={['#172554', '#1E40AF', '#2563EB']}
@@ -378,20 +379,29 @@ export default function BranchDoctorsScreen() {
           }}
         >
           {/* Navigation & Title Row */}
-          <View className="flex-row items-center space-x-3 mb-2.5">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <TouchableOpacity
               onPress={() => router.back()}
               activeOpacity={0.7}
-              className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md items-center justify-center border border-white/25"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.25)',
+              }}
             >
               <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2.5} />
             </TouchableOpacity>
 
-            <View className="flex-1">
-              <Text className="text-white text-lg font-black tracking-tight" numberOfLines={2}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }} numberOfLines={2}>
                 {translateHospitalName(hospital?.name || '', language === 'hi')}
               </Text>
-              <Text className="text-blue-200 text-xs font-semibold" numberOfLines={1}>
+              <Text style={{ color: '#BFDBFE', fontSize: 12, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
                 {hospital?.featured
                   ? (language === 'hi' ? 'आदित्यम पार्टनर नेटवर्क' : 'Adityam Partner Network')
                   : (language === 'hi' ? 'अस्पताल नेटवर्क' : 'Hospital Network')}
@@ -399,9 +409,9 @@ export default function BranchDoctorsScreen() {
             </View>
 
             {/* Rating Pill */}
-            <View className="bg-white/95 px-2.5 py-1 rounded-xl flex-row items-center space-x-1 shadow-sm">
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Star size={11} color="#CF8A40" fill="#CF8A40" />
-              <Text className="text-slate-900 text-xs font-black">
+              <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '900' }}>
                 {hospital?.rating}
               </Text>
             </View>
@@ -412,45 +422,56 @@ export default function BranchDoctorsScreen() {
             <TouchableOpacity
               onPress={() => setBranchDropdownVisible(true)}
               activeOpacity={0.85}
-              className="mt-2.5 bg-white/15 border border-white/25 rounded-2xl px-3.5 py-2.5 flex-row items-center justify-between"
+              style={{
+                marginTop: 10,
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.25)',
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
             >
-              <View className="flex-row items-center space-x-2.5 flex-1 mr-2">
-                <View className="w-8 h-8 rounded-xl bg-white/20 items-center justify-center">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
                   <Building2 size={16} color="#FFFFFF" />
                 </View>
-                <View className="flex-1">
-                  <View className="flex-row items-center space-x-1.5">
-                    <Text className="text-[10px] uppercase font-bold text-blue-200 tracking-wider">
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: '700', color: '#BFDBFE', letterSpacing: 0.5 }}>
                       {language === 'hi' ? 'शाखा चुनें' : 'Select Branch'}
                     </Text>
                     {branches.length > 1 && (
-                      <View className="bg-white/20 px-1.5 py-0.2 rounded">
-                        <Text className="text-[9px] font-bold text-white">
+                      <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>
                           {branches.length} {language === 'hi' ? 'शाखाएं' : 'branches'}
                         </Text>
                       </View>
                     )}
                   </View>
-                  <Text className="text-white text-sm font-black mt-0.5" numberOfLines={2}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', marginTop: 2 }} numberOfLines={2}>
                     {translateBranchName(activeBranch?.name || '', language === 'hi')}
                   </Text>
                 </View>
               </View>
 
-              <View className="w-7 h-7 rounded-full bg-white/20 items-center justify-center">
+              <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronDown size={15} color="#FFFFFF" strokeWidth={2.5} />
               </View>
             </TouchableOpacity>
           )}
 
           {/* Address Row */}
-          <View className="flex-row items-center space-x-1.5 mt-2.5 px-0.5">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
             <MapPin size={11} color="#BFDBFE" />
-            <Text className="text-blue-100 text-[11px] font-medium flex-1" numberOfLines={1}>
+            <Text style={{ color: '#DBEAFE', fontSize: 11, fontWeight: '500', flex: 1 }} numberOfLines={1}>
               {translateAddress(activeBranch?.address || '', language === 'hi')}
             </Text>
-            <View className="bg-white/20 px-2 py-0.5 rounded-full border border-white/30">
-              <Text className="text-white text-[10px] font-bold">
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
                 {activeBranch?.distance_km
                   ? `${activeBranch.distance_km} ${language === 'hi' ? 'किमी' : 'km'}`
                   : language === 'hi'
@@ -463,20 +484,21 @@ export default function BranchDoctorsScreen() {
 
         {/* Main Body Content */}
         <ScrollView
-          className="flex-1"
+          style={{ flex: 1, backgroundColor: '#F8FAFC' }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: Math.max(insets.bottom, 16) + (selectedSlotDoctor ? 135 : 45),
+            backgroundColor: '#F8FAFC',
           }}
         >
           {/* CATEGORIES CAPSULE ROW (Image 3 Reference: Sleek Horizontal Pills) */}
-          <View className="py-4 px-4">
-            <View className="flex-row items-center justify-between mb-2.5 px-0.5">
-              <Text className="text-base font-black text-[#182F3B] tracking-tight">
+          <View style={{ paddingVertical: 16, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
                 {language === 'hi' ? 'विशेषज्ञताएं' : 'Specialties'}
               </Text>
-              <View className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
-                <Text className="text-xs font-bold text-[#2563EB]">
+              <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.6)' }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                   {filteredDoctors.length}{' '}
                   {language === 'hi'
                     ? 'विशेषज्ञ'
@@ -499,7 +521,7 @@ export default function BranchDoctorsScreen() {
                     key={cat.id}
                     onPress={() => setSelectedSpecialty(cat.id)}
                     activeOpacity={0.8}
-                    className="mr-2"
+                    style={{ marginRight: 8 }}
                   >
                     {isSelected ? (
                       <LinearGradient
@@ -519,8 +541,8 @@ export default function BranchDoctorsScreen() {
                           elevation: 4,
                         }}
                       >
-                        <View className="mr-2">{cat.icon('#FFFFFF')}</View>
-                        <Text className="text-white text-xs font-black tracking-tight">
+                        <View style={{ marginRight: 8 }}>{cat.icon('#FFFFFF')}</View>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: -0.2 }}>
                           {cat.label}
                         </Text>
                       </LinearGradient>
@@ -542,8 +564,8 @@ export default function BranchDoctorsScreen() {
                           elevation: 1,
                         }}
                       >
-                        <View className="mr-2">{cat.icon(cat.accentColor)}</View>
-                        <Text className="text-[#334155] text-xs font-bold">
+                        <View style={{ marginRight: 8 }}>{cat.icon(cat.accentColor)}</View>
+                        <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>
                           {cat.label}
                         </Text>
                       </View>
@@ -554,34 +576,34 @@ export default function BranchDoctorsScreen() {
             </ScrollView>
           </View>
           {/* Doctor Content Section */}
-          <View className="px-4 pt-4">
+          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
             {filteredDoctors.length === 0 ? (
-              <View className="bg-white p-8 rounded-3xl border border-slate-200 items-center my-6 shadow-sm">
+              <View style={{ backgroundColor: '#FFFFFF', padding: 32, borderRadius: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', marginVertical: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
                 <Award size={36} color="#94A3B8" />
-                <Text className="text-base font-bold text-[#182F3B] mt-2">
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B', marginTop: 8 }}>
                   No specialists in this department
                 </Text>
-                <Text className="text-xs text-slate-500 text-center mt-1">
+                <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
                   Please switch to "All" or select another category squircle above.
                 </Text>
                 <TouchableOpacity
                   onPress={() => setSelectedSpecialty('All')}
-                  className="mt-4 bg-[#2563EB] px-5 py-2.5 rounded-xl shadow-sm shadow-blue-500/20"
+                  style={{ marginTop: 16, backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}
                 >
-                  <Text className="text-white text-xs font-bold">Show All Specialists</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Show All Specialists</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <>
                 {/* TOP DOCTORS: Spotlight (ONLY shown when department/branch has >= 4 doctors) */}
                 {showTopDoctors && topDoctors.length > 0 && (
-                  <View className="mb-6">
-                    <View className="flex-row items-center justify-between mb-3 px-1">
-                      <Text className="text-xl font-black text-[#182F3B] tracking-tight">
+                  <View style={{ marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
                         {language === 'hi' ? 'शीर्ष डॉक्टर' : (t.preferredDoctorTitle || 'Top Doctors')}
                       </Text>
                       {topDoctors.length > 1 && (
-                        <Text className="text-xs font-semibold text-slate-500">
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>
                           {language === 'hi' ? 'खोजने के लिए स्वाइप करें' : 'Swipe to explore'}
                         </Text>
                       )}
@@ -637,15 +659,21 @@ export default function BranchDoctorsScreen() {
                                 {/* Doctor Info & Slots */}
                                 <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'space-between' }}>
                                   <View>
-                                    <View className="flex-row items-start justify-between">
-                                      <View className="flex-1 mr-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                      <View style={{ flex: 1, marginRight: 4 }}>
                                         <Text
-                                          className="text-white text-base font-black tracking-tight leading-tight"
+                                          style={{
+                                            color: '#FFFFFF',
+                                            fontSize: 15,
+                                            fontWeight: '900',
+                                            letterSpacing: -0.3,
+                                            lineHeight: 19,
+                                          }}
                                           numberOfLines={1}
                                         >
                                           {translateDoctorName(doc.name, language === 'hi')}
                                         </Text>
-                                        <Text className="text-blue-100 text-xs font-semibold mt-0.5">
+                                        <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
                                           {translateSpecialty(doc.specialty, language === 'hi')} • {doc.experience_years} {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
                                         </Text>
                                       </View>
@@ -653,7 +681,15 @@ export default function BranchDoctorsScreen() {
                                       <TouchableOpacity
                                         onPress={() => toggleFavorite(doc.id)}
                                         activeOpacity={0.7}
-                                        className="w-7 h-7 rounded-full bg-white/20 items-center justify-center -mt-0.5"
+                                        style={{
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: 14,
+                                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          marginTop: -2,
+                                        }}
                                       >
                                         <Heart
                                           size={13}
@@ -664,15 +700,15 @@ export default function BranchDoctorsScreen() {
                                     </View>
 
                                     {/* Star Rating & Qualification */}
-                                    <View className="flex-row items-center space-x-1 mt-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                       <Star size={11} color="#FBBF24" fill="#FBBF24" />
-                                      <Text className="text-white text-xs font-bold">
+                                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
                                         {doc.rating} ({doc.total_reviews})
                                       </Text>
                                     </View>
 
                                     <Text
-                                      className="text-blue-100 text-[10.5px] font-semibold mt-1"
+                                      style={{ color: '#DBEAFE', fontSize: 10.5, fontWeight: '600', marginTop: 4 }}
                                       numberOfLines={1}
                                     >
                                       {translateQualification(doc.qualification, language === 'hi')}
@@ -1097,37 +1133,37 @@ export default function BranchDoctorsScreen() {
           animationType="slide"
           onRequestClose={() => setBookingModalVisible(false)}
         >
-          <View className="flex-1 bg-black/60 justify-end">
-            <View className="bg-white rounded-t-3xl p-6 shadow-2xl">
-              <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
-                <Text className="text-base font-bold text-[#182F3B]">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
                   {confirmedBooking
                     ? (language === 'hi' ? 'परामर्श की पुष्टि हुई!' : 'Consultation Confirmed!')
                     : (language === 'hi' ? 'प्राथमिकता ओपीडी डॉक्टर बुकिंग' : 'Priority OPD Doctor Booking')}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setBookingModalVisible(false)}
-                  className="p-1"
+                  style={{ padding: 4 }}
                 >
                   <X size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
               {confirmedBooking ? (
-                <View className="py-6 items-center">
-                  <View className="w-16 h-16 rounded-full bg-[#EFF6FF] items-center justify-center mb-3">
+                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                     <CheckCircle2 size={32} color="#3B82F6" />
                   </View>
-                  <Text className="text-xl font-bold text-[#182F3B]">
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: '#182F3B' }}>
                     {language === 'hi' ? 'कंसीयर्ज कॉल शुरू हुई' : 'Concierge Dispatched'}
                   </Text>
-                  <Text className="text-xs font-mono font-bold text-[#3B82F6] mt-1">
+                  <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#3B82F6', marginTop: 4 }}>
                     {language === 'hi' ? 'संदर्भ आईडी: ' : 'Reference: '}{confirmedBooking.booking_ref}
                   </Text>
-                  <Text className="text-xs text-slate-600 text-center mt-3 px-4 leading-relaxed">
+                  <Text style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 12, paddingHorizontal: 16, lineHeight: 18 }}>
                     {language === 'hi' ? (
                       <>
-                        <Text className="font-bold text-[#182F3B]">
+                        <Text style={{ fontWeight: '700', color: '#182F3B' }}>
                           {translateDoctorName(confirmedBooking.doctor_name || '', true)}
                         </Text>{' '}
                         के लिए आपका प्राथमिकता स्लॉट {translateHospitalName(confirmedBooking.hospital_name || '', true)} ({translateBranchName(confirmedBooking.branch_name || '', true)}) में दर्ज कर दिया गया है। हमारे समन्वयक आपसे संपर्क कर रहे हैं!
@@ -1135,7 +1171,7 @@ export default function BranchDoctorsScreen() {
                     ) : (
                       <>
                         Your priority slot for{' '}
-                        <Text className="font-bold text-[#182F3B]">
+                        <Text style={{ fontWeight: '700', color: '#182F3B' }}>
                           {confirmedBooking.doctor_name}
                         </Text>{' '}
                         at {confirmedBooking.hospital_name} ({confirmedBooking.branch_name}) has been submitted to the real-time CRM. Our desk coordinator is connecting you now!
@@ -1143,14 +1179,14 @@ export default function BranchDoctorsScreen() {
                     )}
                   </Text>
 
-                  <View className="w-full bg-[#F8FAFC] p-4 rounded-xl border border-slate-200 mt-5">
-                    <Text className="text-[11px] font-bold text-[#182F3B] uppercase">
+                  <View style={{ width: '100%', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 20 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#182F3B', textTransform: 'uppercase' }}>
                       {language === 'hi' ? 'एक्सोटेल वर्चुअल टेलीफोनी' : 'Exotel Virtual Telephony Route'}
                     </Text>
-                    <Text className="text-xs font-mono font-bold text-slate-800 mt-0.5">
+                    <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#1E293B', marginTop: 2 }}>
                       +91 11 4000 8800 ➔ {user?.phone || '+91 99999 99999'}
                     </Text>
-                    <Text className="text-[10px] text-[#3B82F6] font-semibold mt-1">
+                    <Text style={{ fontSize: 10, color: '#3B82F6', fontWeight: '600', marginTop: 4 }}>
                       {language === 'hi'
                         ? '✓ आपका नंबर और व्यक्तिगत पहचान 100% गोपनीय रहती है।'
                         : '✓ Masked calling protects your identity and number.'}
@@ -1159,39 +1195,39 @@ export default function BranchDoctorsScreen() {
 
                   <TouchableOpacity
                     onPress={() => setBookingModalVisible(false)}
-                    className="w-full bg-[#3B82F6] py-3.5 rounded-xl items-center mt-5 shadow-sm shadow-blue-500/30"
+                    style={{ width: '100%', backgroundColor: '#3B82F6', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 }}
                   >
-                    <Text className="text-white font-bold text-xs">{language === 'hi' ? 'पूर्ण' : 'Done'}</Text>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>{language === 'hi' ? 'पूर्ण' : 'Done'}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View className="py-4">
+                <View style={{ paddingVertical: 16 }}>
                   {/* Doctor Summary */}
                   {selectedDoctor && (
-                    <View className="mb-3">
-                      <Text className="text-base font-bold text-[#182F3B]">
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
                         {translateDoctorName(selectedDoctor.name, language === 'hi')}
                       </Text>
-                      <Text className="text-xs font-semibold text-[#2563EB] mt-0.5">
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563EB', marginTop: 2 }}>
                         {translateSpecialty(selectedDoctor.specialty, language === 'hi')} • {translateHospitalName(hospital?.name || '', language === 'hi')} ({translateBranchName(activeBranch?.name || '', language === 'hi')})
                       </Text>
                       {selectedDoctor.qualification && (
-                        <Text className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
                           {translateQualification(selectedDoctor.qualification, language === 'hi')}
                         </Text>
                       )}
 
                       {/* Doctor's OPD Consultation Timings / Schedule */}
                       {selectedDoctor.opd_timing && (
-                        <View className="bg-blue-50/80 p-3 rounded-2xl border border-blue-200/70 mt-3 mb-1 flex-row items-center">
-                          <View className="w-8 h-8 rounded-xl bg-[#2563EB]/10 items-center justify-center mr-2.5">
+                        <View style={{ backgroundColor: 'rgba(239, 246, 255, 0.8)', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.7)', marginTop: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={{ width: 32, height: 32, borderRadius: 12, backgroundColor: 'rgba(37, 99, 235, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
                             <Clock size={16} color="#2563EB" strokeWidth={2.2} />
                           </View>
-                          <View className="flex-1">
-                            <Text className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wide">
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                               {language === 'hi' ? 'डॉक्टर का ओपीडी समय (शेड्यूल):' : 'Doctor OPD Schedule:'}
                             </Text>
-                            <Text className="text-xs font-bold text-[#0F172A] mt-0.5">
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginTop: 2 }}>
                               {translateTiming(selectedDoctor.opd_timing, language === 'hi')}
                             </Text>
                           </View>
@@ -1199,21 +1235,21 @@ export default function BranchDoctorsScreen() {
                       )}
 
                       {/* Booking Timing: Selectable Time Slots */}
-                      <View className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-slate-200 my-2.5">
-                        <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-xs font-bold text-slate-700">
+                      <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginVertical: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
                             {language === 'hi' ? 'बुकिंग का समय (स्लॉट) चुनें:' : 'Select Booking Slot:'}
                           </Text>
-                          <View className="flex-row items-center gap-1 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(219, 234, 254, 0.7)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
                             <Clock size={11} color="#1D4ED8" />
-                            <Text className="text-[11px] font-bold text-[#1D4ED8]">
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
                               {selectedModalSlot || selectedDoctor.next_available_slot}
                             </Text>
                           </View>
                         </View>
 
                         {/* Interactive slot chips */}
-                        <View className="flex-row flex-wrap gap-2">
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                           {getDoctorSlots(selectedDoctor, language === 'hi').map((slot) => {
                             const isSelected = (selectedModalSlot || selectedDoctor.next_available_slot) === slot;
                             return (
@@ -1221,17 +1257,30 @@ export default function BranchDoctorsScreen() {
                                 key={slot}
                                 onPress={() => setSelectedModalSlot(slot)}
                                 activeOpacity={0.8}
-                                className={`px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${
-                                  isSelected
-                                    ? 'bg-[#2563EB] border-[#1D4ED8] shadow-sm'
-                                    : 'bg-white border-slate-200'
-                                }`}
+                                style={{
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  borderRadius: 12,
+                                  borderWidth: 1,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  backgroundColor: isSelected ? '#2563EB' : '#FFFFFF',
+                                  borderColor: isSelected ? '#1D4ED8' : '#E2E8F0',
+                                  shadowColor: isSelected ? '#2563EB' : 'transparent',
+                                  shadowOffset: { width: 0, height: 1 },
+                                  shadowOpacity: isSelected ? 0.2 : 0,
+                                  shadowRadius: 2,
+                                  elevation: isSelected ? 2 : 0,
+                                }}
                               >
                                 <Clock size={12} color={isSelected ? '#FFFFFF' : '#64748B'} />
                                 <Text
-                                  className={`text-xs font-bold ${
-                                    isSelected ? 'text-white' : 'text-slate-700'
-                                  }`}
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: '700',
+                                    color: isSelected ? '#FFFFFF' : '#334155',
+                                  }}
                                 >
                                   {slot}
                                 </Text>
@@ -1241,15 +1290,15 @@ export default function BranchDoctorsScreen() {
                         </View>
 
                         {/* Consultation Fee Breakdown */}
-                        <View className="flex-row items-center justify-between mt-3 pt-2.5 border-t border-slate-200/80">
-                          <Text className="text-xs text-slate-600 font-semibold">
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(226, 232, 240, 0.8)' }}>
+                          <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>
                             {language === 'hi' ? 'परामर्श शुल्क (ऐप में दर):' : 'Consultation Fee (In-App):'}
                           </Text>
-                          <View className="flex-row items-center gap-1.5">
-                            <Text className="text-xs text-slate-400 line-through">
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 12, color: '#94A3B8', textDecorationLine: 'line-through' }}>
                               ₹{selectedDoctor.consultation_fee}
                             </Text>
-                            <Text className="text-sm font-black text-[#16A34A]">
+                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#16A34A' }}>
                               ₹{selectedDoctor.discounted_fee}
                             </Text>
                           </View>
@@ -1259,25 +1308,39 @@ export default function BranchDoctorsScreen() {
                   )}
 
                   {/* Patient Information */}
-                  <View className="bg-[#FFF9F0] p-3.5 rounded-xl border border-[#CF8A40]/30 mb-4">
-                    <Text className="text-xs font-bold text-[#182F3B]">
+                  <View style={{ backgroundColor: '#FFF9F0', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(207, 138, 64, 0.3)', marginBottom: 16 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#182F3B' }}>
                       {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
                     </Text>
-                    <Text className="text-xs text-slate-700 mt-1">
-                      {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Rahul Jain'}</Text>
+                    <Text style={{ fontSize: 12, color: '#334155', marginTop: 4 }}>
+                      {language === 'hi' ? 'नाम: ' : 'Name: '}<Text style={{ fontWeight: '700' }}>{user?.full_name || 'Rahul Jain'}</Text>
                     </Text>
-                    <Text className="text-xs text-slate-700">
-                      {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
+                    <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
+                      {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text style={{ fontWeight: '700' }}>{user?.phone || '+91 99999 99999'}</Text>
                     </Text>
                   </View>
 
                   <TouchableOpacity
                     onPress={handleConfirmExotelBooking}
                     disabled={isSubmitting}
-                    className="w-full bg-[#2563EB] active:bg-[#1D4ED8] py-3.5 rounded-xl items-center flex-row justify-center space-x-2 shadow-sm shadow-blue-500/30"
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#2563EB',
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                      gap: 8,
+                      shadowColor: '#2563EB',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      elevation: 2,
+                    }}
                   >
                     <Calendar size={16} color="#FFFFFF" />
-                    <Text className="text-white font-bold text-sm">
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
                       {isSubmitting
                         ? (language === 'hi' ? 'स्लॉट बुक किया जा रहा है...' : 'Reserving OPD Slot...')
                         : (language === 'hi' ? 'पुष्टि करें और ओपीडी स्लॉट बुक करें' : 'Confirm & Reserve OPD Slot')}
@@ -1299,32 +1362,43 @@ export default function BranchDoctorsScreen() {
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => setBranchDropdownVisible(false)}
-            className="flex-1 bg-black/50 justify-end"
+            style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' }}
           >
             <TouchableOpacity
               activeOpacity={1}
-              className="bg-white rounded-t-3xl p-5 shadow-2xl max-h-[75%]"
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 20,
+                maxHeight: '75%',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                elevation: 16,
+              }}
             >
               {/* Header */}
-              <View className="flex-row items-center justify-between pb-3.5 border-b border-slate-100">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
                 <View>
-                  <Text className="text-base font-black text-[#182F3B]">
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B' }}>
                     {language === 'hi' ? 'अस्पताल शाखा चुनें' : 'Select Hospital Branch'}
                   </Text>
-                  <Text className="text-xs text-slate-500 font-medium mt-0.5">
+                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
                     {translateHospitalName(hospital?.name || '', language === 'hi')} • {branches.length} {language === 'hi' ? 'शाखाएं' : 'Locations'}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => setBranchDropdownVisible(false)}
-                  className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center"
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <X size={16} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
               {/* Branches List */}
-              <ScrollView className="py-2 mt-1" showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ paddingVertical: 8, marginTop: 4 }} showsVerticalScrollIndicator={false}>
                 {branches.map((b) => {
                   const isSelected = activeBranch?.id === b.id;
                   return (
@@ -1336,34 +1410,44 @@ export default function BranchDoctorsScreen() {
                         setBranchDropdownVisible(false);
                       }}
                       activeOpacity={0.8}
-                      className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${isSelected
-                          ? 'bg-[#EFF6FF] border-[#2563EB]'
-                          : 'bg-white border-slate-200'
-                        }`}
+                      style={{
+                        padding: 14,
+                        borderRadius: 16,
+                        marginBottom: 10,
+                        borderWidth: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                        borderColor: isSelected ? '#2563EB' : '#E2E8F0',
+                      }}
                     >
-                      <View className="flex-1 mr-3">
-                        <View className="flex-row items-center space-x-1.5">
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Building2 size={14} color={isSelected ? '#2563EB' : '#64748B'} />
                           <Text
-                            className={`text-sm font-black ${isSelected ? 'text-[#2563EB]' : 'text-[#182F3B]'
-                              }`}
+                            style={{
+                              fontSize: 14,
+                              fontWeight: '900',
+                              color: isSelected ? '#2563EB' : '#182F3B',
+                            }}
                           >
                             {translateBranchName(b.name, language === 'hi')}
                           </Text>
                         </View>
-                        <Text className="text-xs text-slate-500 mt-1" numberOfLines={1}>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }} numberOfLines={1}>
                           {translateAddress(b.address, language === 'hi')}
                         </Text>
-                        <View className="flex-row items-center space-x-2 mt-2">
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
                           {b.distance_km && (
-                            <View className="bg-slate-100 px-2 py-0.5 rounded-full">
-                              <Text className="text-[10px] font-bold text-slate-700">
+                            <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>
                                 {b.distance_km} {language === 'hi' ? 'किमी दूर' : 'km away'}
                               </Text>
                             </View>
                           )}
-                          <View className="bg-blue-50 px-2 py-0.5 rounded-full">
-                            <Text className="text-[10px] font-bold text-[#2563EB]">
+                          <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>
                               {b.doctors.length} {language === 'hi' ? 'विशेषज्ञ' : 'Specialists'}
                             </Text>
                           </View>
@@ -1371,10 +1455,16 @@ export default function BranchDoctorsScreen() {
                       </View>
 
                       <View
-                        className={`w-6 h-6 rounded-full items-center justify-center border-2 ${isSelected
-                            ? 'bg-[#2563EB] border-[#2563EB]'
-                            : 'border-slate-300'
-                          }`}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 2,
+                          backgroundColor: isSelected ? '#2563EB' : 'transparent',
+                          borderColor: isSelected ? '#2563EB' : '#CBD5E1',
+                        }}
                       >
                         {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
                       </View>
@@ -1385,7 +1475,6 @@ export default function BranchDoctorsScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }

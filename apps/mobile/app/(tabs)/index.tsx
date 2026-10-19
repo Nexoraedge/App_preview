@@ -971,7 +971,7 @@ export default function HomeScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}
           >
             {/* All */}
             <TouchableOpacity onPress={() => router.push('/opd')} activeOpacity={0.8}>
@@ -980,8 +980,9 @@ export default function HomeScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
+                  height: 54,
+                  justifyContent: 'center',
+                  paddingHorizontal: 16,
                   borderRadius: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -994,7 +995,7 @@ export default function HomeScreen() {
                 }}
               >
                 <AllCategoriesIcon size={18} color="#FFFFFF" />
-                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900' }}>
                   {isHi ? 'सभी' : 'All'}
                 </Text>
               </LinearGradient>
@@ -1005,19 +1006,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'Cardiology' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <HeartPulseIcon size={18} color="#E87869" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.cardiologist}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.cardiologist}</Text>
             </TouchableOpacity>
 
             {/* General Physician */}
@@ -1025,19 +1032,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'General Medicine' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <OpdStethoscopeIcon size={18} color="#2563EB" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.generalPhysician}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.generalPhysician}</Text>
             </TouchableOpacity>
 
             {/* Orthopedics */}
@@ -1045,19 +1058,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'Orthopedics' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <BoneJointIcon size={18} color="#4F6BED" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.orthopedic}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.orthopedic}</Text>
             </TouchableOpacity>
 
             {/* Pediatrics */}
@@ -1065,19 +1084,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'Pediatrics' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <ChildCareIcon size={18} color="#CF8A40" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.pediatrician}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.pediatrician}</Text>
             </TouchableOpacity>
 
             {/* Dermatology */}
@@ -1085,19 +1110,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'Dermatology' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <DermatologyIcon size={18} color="#8B70D6" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.dermatologist}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.dermatologist}</Text>
             </TouchableOpacity>
 
             {/* Dental */}
@@ -1105,19 +1136,25 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/opd', params: { specialty: 'Dentistry' } })}
               activeOpacity={0.8}
               style={{
+                height: 54,
+                justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
                 paddingHorizontal: 13,
-                paddingVertical: 10,
                 borderRadius: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 8,
                 borderWidth: 1,
                 borderColor: '#E2E8F0',
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
               <DentalToothIcon size={18} color="#12AFA5" />
-              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>{t.dentist}</Text>
+              <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700', lineHeight: 16 }}>{t.dentist}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
