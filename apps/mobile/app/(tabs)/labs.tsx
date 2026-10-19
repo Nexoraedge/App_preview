@@ -426,7 +426,7 @@ export default function LabsScreen() {
   }, []);
 
   const allCartIds = useMemo(() => Array.from(new Set([...carts.lab, ...carts.scan, ...carts.package])), [carts]);
-  const cartIds = segment === 'all' ? allCartIds : carts[segment];
+  const cartIds = allCartIds;
   const counts: Record<TabSegment, number> = {
     all: allCartIds.length,
     lab: carts.lab.length,
@@ -443,6 +443,25 @@ export default function LabsScreen() {
   const options = useMemo(() => centresFor(cartIds.map((id) => ITEM_BY_ID[id])), [cartIds]);
   const cheapestTotal = options.length ? Math.min(...options.map((o) => o.total)) : null;
   const nearest = options.length ? Math.min(...options.map((o) => o.centre.distanceKm)) : null;
+
+  const totalEstimatedPrice = useMemo(() => {
+    if (cheapestTotal !== null) return cheapestTotal;
+    return cartIds.reduce((sum, id) => {
+      const it = ITEM_BY_ID[id];
+      return sum + (it ? fromPrice(it) : 0);
+    }, 0);
+  }, [cheapestTotal, cartIds]);
+
+  const cartSummarySubtitle = useMemo(() => {
+    const parts: string[] = [];
+    if (carts.lab.length > 0) parts.push(`${carts.lab.length} ${isHi ? 'लैब' : 'Lab'}`);
+    if (carts.scan.length > 0) parts.push(`${carts.scan.length} ${isHi ? 'स्कैन' : 'Scan'}`);
+    if (carts.package.length > 0) parts.push(`${carts.package.length} ${isHi ? 'पैकेज' : 'Pkg'}`);
+    const breakdown = parts.join(' · ');
+    const priceText = totalEstimatedPrice > 0 ? `${isHi ? 'न्यूनतम ' : 'From '}${inr(totalEstimatedPrice)}` : '';
+    if (priceText && breakdown) return `${priceText} (${breakdown})`;
+    return priceText || breakdown;
+  }, [carts, totalEstimatedPrice, isHi]);
 
   const sorted = useMemo(() => {
     const arr = [...options];
@@ -772,13 +791,11 @@ export default function LabsScreen() {
             <View>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
                 {isHi
-                  ? `${cartIds.length} ${noun} चुने गए`
-                  : `${cartIds.length} ${noun}${cartIds.length > 1 ? 's' : ''} selected`}
+                  ? `${cartIds.length} ${cartIds.length > 1 ? 'जांचें' : 'जांच'} चुनी गईं`
+                  : `${cartIds.length} ${cartIds.length > 1 ? 'tests & scans' : 'test'} selected`}
               </Text>
               <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12.5, marginTop: 1 }}>
-                {cheapestTotal !== null
-                  ? `${isHi ? 'न्यूनतम ' : 'From '}${inr(cheapestTotal)}`
-                  : (isHi ? 'एक से अधिक केंद्र की आवश्यकता' : 'Needs more than one centre')}
+                {cartSummarySubtitle}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fff', paddingHorizontal: 16, height: 42, borderRadius: 21 }}>
@@ -852,12 +869,54 @@ export default function LabsScreen() {
           <Text style={{ fontSize: 13.5, color: C.sub, marginTop: 2 }}>
             {options.length > 0
               ? (isHi
-                  ? `${options.length} केंद्र आपके चुने सभी ${cartIds.length} ${noun} करते हैं`
-                  : `${options.length} centre${options.length > 1 ? 's' : ''} can do all ${cartIds.length} ${noun}${cartIds.length > 1 ? 's' : ''}`)
+                  ? `${options.length} केंद्र आपके चुने सभी ${cartIds.length} जांचें करते हैं`
+                  : `${options.length} centre${options.length > 1 ? 's' : ''} can do all ${cartIds.length} selected tests & scans`)
               : (isHi
                   ? 'कोई एक केंद्र आपकी चुनी सभी जांचें नहीं करता'
                   : 'No single centre offers everything you picked')}
           </Text>
+
+          {/* Selected Items Breakdown List */}
+          <View style={{ backgroundColor: '#F8FAFC', borderRadius: R.md, padding: 12, marginTop: 10, borderWidth: 1, borderColor: C.line }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: C.sub, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                {isHi ? 'चुनी गई जांचें' : 'Selected Tests & Scans'} ({cartIds.length})
+              </Text>
+              <Pressable onPress={() => { setCarts({ lab: [], scan: [], package: [] }); setCentreSheet(false); }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: C.brand }}>
+                  {isHi ? 'सभी हटाएं' : 'Clear all'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={{ gap: 6 }}>
+              {cartIds.map((id) => {
+                const it = ITEM_BY_ID[id];
+                if (!it) return null;
+                return (
+                  <View key={id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, paddingRight: 8 }}>
+                      <View style={{ backgroundColor: it.segment === 'scan' ? '#F1EBFF' : it.segment === 'package' ? '#FFF4E0' : '#EAF1FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9.5, fontWeight: '800', color: it.segment === 'scan' ? '#7C3AED' : it.segment === 'package' ? '#B45309' : C.brand }}>
+                          {it.segment === 'scan' ? (isHi ? 'स्कैन' : 'SCAN') : it.segment === 'package' ? (isHi ? 'पैकेज' : 'PKG') : (isHi ? 'लैब' : 'LAB')}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '600', color: C.ink, flex: 1 }}>
+                        {getItemName(it, isHi)}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.brand }}>
+                        {inr(fromPrice(it))}
+                      </Text>
+                      <Pressable onPress={() => toggle(it)} hitSlop={6}>
+                        <X size={15} color="#94A3B8" />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
           {options.length > 0 && (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               {([

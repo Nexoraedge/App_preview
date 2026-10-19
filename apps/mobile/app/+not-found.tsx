@@ -362,11 +362,39 @@ const TV_CSS = `
 function RetroTvView({ isHi }: { isHi: boolean }) {
   const onScreenText = isHi ? '404 · सिग्नल नहीं है :(' : '404 · NO SIGNAL :(';
 
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 24 }}>
+        <View
+          style={{
+            width: 240,
+            height: 160,
+            backgroundColor: '#1E293B',
+            borderRadius: 24,
+            borderWidth: 4,
+            borderColor: '#334155',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOpacity: 0.4,
+            shadowRadius: 16,
+            elevation: 8,
+          }}
+        >
+          <Text style={{ fontSize: 44, fontWeight: '900', color: '#60A5FA', letterSpacing: 4 }}>
+            404
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#94A3B8', marginTop: 4 }}>
+            {onScreenText}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', marginVertical: 8 }}>
-      {Platform.OS === 'web' && (
-        <style dangerouslySetInnerHTML={{ __html: TV_CSS }} />
-      )}
+      <style dangerouslySetInnerHTML={{ __html: TV_CSS }} />
 
       {/* Uiverse Retro TV DOM structure */}
       <div className="retro_tv_wrapper">
