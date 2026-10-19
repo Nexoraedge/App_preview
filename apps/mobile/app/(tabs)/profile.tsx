@@ -20,6 +20,8 @@ import {
   Languages,
   Check,
   Users,
+  Settings,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage, type Language } from '../../src/context/LanguageContext';
@@ -80,6 +82,23 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.7}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              backgroundColor: '#EFF6FF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: '#DBEAFE',
+            }}
+          >
+            <Settings size={18} color="#2563EB" />
+          </TouchableOpacity>
         </View>
 
         {/* Wallet Balance Pill */}
@@ -192,16 +211,38 @@ export default function ProfileScreen() {
       {/* Settings / Links */}
       <View className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-6">
         <TouchableOpacity
+          onPress={() => router.push('/settings')}
+          className="p-4 flex-row items-center justify-between border-b border-slate-100"
+        >
+          <View className="flex-row items-center space-x-3">
+            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+              <Settings size={18} color="#2563EB" />
+            </View>
+            <View>
+              <Text className="text-xs font-bold text-slate-800">
+                {language === 'hi' ? 'सेटिंग्स और गोपनीयता' : 'Settings & Privacy'}
+              </Text>
+              <Text className="text-[10.5px] text-slate-500 mt-0.5">
+                {language === 'hi' ? 'अकाउंट, सूचनाएं, ABHA, सुरक्षा ও डेटा' : 'Account, Notifications, ABHA, Security & Data'}
+              </Text>
+            </View>
+          </View>
+          <ChevronRight size={16} color="#94A3B8" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={() => router.push('/family')}
           className="p-4 flex-row items-center justify-between border-b border-slate-100"
         >
           <View className="flex-row items-center space-x-3">
-            <Users size={18} color="#2563EB" />
+            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={18} color="#16A34A" />
+            </View>
             <Text className="text-xs font-semibold text-slate-800">
               {language === 'hi' ? 'परिवार के सदस्य (Family Members)' : 'Family Members'}
             </Text>
           </View>
-          <Text className="text-xs text-slate-400">›</Text>
+          <ChevronRight size={16} color="#94A3B8" />
         </TouchableOpacity>
 
         <TouchableOpacity

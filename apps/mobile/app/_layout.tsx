@@ -75,6 +75,13 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen
+                  name="settings"
+                  options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                  }}
+                />
+                <Stack.Screen
                   name="+not-found"
                   options={{
                     title: 'Oops! Page Not Found',

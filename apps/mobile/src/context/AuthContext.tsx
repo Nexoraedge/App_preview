@@ -15,6 +15,8 @@ interface AuthContextType {
   logout: () => void;
   addDependent: (dependent: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => void;
   deductWallet: (amount: number) => void;
+  updateUser: (updates: Partial<User>) => void;
+  deleteAccount: () => Promise<void>;
 }
 
 const TEST_USER: User = {
@@ -169,6 +171,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updates, updated_at: new Date().toISOString() };
+      saveUserSession(updated);
+      return updated;
+    });
+  };
+
+  const deleteAccount = async () => {
+    try {
+      await AsyncStorage.multiRemove([
+        AUTH_USER_STORAGE_KEY,
+        ONBOARDING_SEEN_KEY,
+        '@adityam_appointments_v1',
+        '@adityam_lab_cart_v1',
+        '@adityam_family_v1',
+        '@adityam_settings_v1',
+      ]);
+    } catch {}
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        window.localStorage.removeItem(ONBOARDING_SEEN_KEY);
+        window.localStorage.removeItem('@adityam_lab_cart_v1');
+        window.localStorage.removeItem('@adityam_appointments_v1');
+      } catch {}
+    }
+    setUser(null);
+    setDependents([]);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -180,6 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         addDependent,
         deductWallet,
+        updateUser,
+        deleteAccount,
       }}
     >
       {children}
