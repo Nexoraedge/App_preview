@@ -14,6 +14,7 @@ import {
   Linking,
   StatusBar as RNStatusBar,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronDown,
+  ChevronRight,
   Check,
   Star,
   Truck,
@@ -39,6 +41,11 @@ import {
   Clock,
   Pill,
   Navigation,
+  Download,
+  Phone,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react-native';
 
 import { C, R, SHADOW, inr } from '../../src/theme';
@@ -59,11 +66,56 @@ import {
   getBillItemName,
   type RequestStatus,
   type Pharmacy,
+  type BillLine,
 } from '../../src/data/pharmacySample';
 
 type Stage = 'home' | 'shops' | 'track';
 type Mode = 'delivery' | 'pickup';
-type HistoryItem = { ref: string; shop: string; shopHi?: string; total: number; mode: Mode; paidInApp: boolean };
+
+export type HistoryStatus = 'delivered' | 'picked_up' | 'ready' | 'out_for_delivery';
+
+export type HistoryItem = {
+  ref: string;
+  shop: string;
+  shopHi?: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  total: number;
+  subtotal: number;
+  discount: number;
+  deliveryFee: number;
+  mode: Mode;
+  paidInApp: boolean;
+  date: string;
+  status: HistoryStatus;
+  patientName: string;
+  items: BillLine[];
+};
+
+const INITIAL_HISTORY: HistoryItem[] = [
+  {
+    ref: 'RX-5730',
+    shop: 'Saket Care Pharmacy',
+    shopHi: 'साकेत केयर फार्मेसी',
+    shopAddress: 'Shop 4, Main Market, Saket, South Delhi',
+    shopPhone: '+91 98112 34567',
+    total: 306,
+    subtotal: 360,
+    discount: 54,
+    deliveryFee: 0,
+    mode: 'delivery',
+    paidInApp: true,
+    date: '19 Oct 2026, 04:30 PM',
+    status: 'delivered',
+    patientName: 'Myself (Rahul Sharma)',
+    items: [
+      { id: 'm1', name: 'Paracetamol 500 mg (10 tablets)', nameHi: 'पैरासिटामोल 500 मि.ग्रा. (10 गोलियां)', qty: 2, price: 30 },
+      { id: 'm2', name: 'Azithromycin 500 mg (3 tablets)', nameHi: 'एज़िथ्रोमाइसिन 500 मि.ग्रा. (3 गोलियां)', qty: 1, price: 120 },
+      { id: 'm3', name: 'Cetirizine 10 mg (10 tablets)', nameHi: 'सिट्रीज़िन 10 मि.ग्रा. (10 गोलियां)', qty: 1, price: 40 },
+      { id: 'm4', name: 'Vitamin D3 60000 IU (4 capsules)', nameHi: 'विटामिन D3 60000 IU (4 कैप्सूल)', qty: 1, price: 140 },
+    ],
+  },
+];
 
 const MAX_PAGES = 5;
 const wrap = { width: '100%' as const, maxWidth: 560, alignSelf: 'center' as const, paddingHorizontal: 16 };
@@ -259,7 +311,9 @@ export default function PharmacyScreen() {
   const [paidInApp, setPaidInApp] = useState<boolean | null>(null);
   const [reqRef, setReqRef] = useState('');
   const [code, setCode] = useState('');
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
+  const [selectedOrder, setSelectedOrder] = useState<HistoryItem | null>(null);
+  const [invoiceToast, setInvoiceToast] = useState(false);
   const [memberSheet, setMemberSheet] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [profileVisible, setProfileVisible] = useState(false);
@@ -399,23 +453,158 @@ export default function PharmacyScreen() {
 
   const finish = () => {
     if (shop) {
-      setHistory((h) => [
-        {
-          ref: reqRef,
-          shop: shop.name,
-          shopHi: shop.nameHi,
-          total: paidInApp ? total : subtotal,
-          mode,
-          paidInApp: !!paidInApp,
-        },
-        ...h,
-      ].slice(0, 5));
+      const orderStatus: HistoryStatus = mode === 'delivery' ? 'out_for_delivery' : 'ready';
+      const newOrder: HistoryItem = {
+        ref: reqRef || `RX-${Math.floor(1000 + Math.random() * 9000)}`,
+        shop: shop.name,
+        shopHi: shop.nameHi,
+        shopAddress: `${shop.area}, New Delhi`,
+        shopPhone: '+91 98112 34567',
+        total: paidInApp ? total : subtotal,
+        subtotal,
+        discount: paidInApp ? discount : 0,
+        deliveryFee: 0,
+        mode,
+        paidInApp: !!paidInApp,
+        date: 'Just now',
+        status: orderStatus,
+        patientName: forName || 'Myself',
+        items: [...SAMPLE_BILL],
+      };
+      setHistory((h) => [newOrder, ...h].slice(0, 5));
     }
     setImages([]);
     setShopId(null);
     setStatus('sent');
     setPaidInApp(null);
     setStage('home');
+  };
+
+  const handleDownloadInvoice = (order: HistoryItem) => {
+    tap();
+    const invoiceHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Invoice - ${order.ref}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 36px; color: #0F172A; max-width: 740px; margin: 0 auto; background: #fff; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #2563EB; padding-bottom: 20px; margin-bottom: 24px; }
+          .logo-title { font-size: 22px; font-weight: 800; color: #172554; }
+          .logo-sub { font-size: 13px; color: #2563EB; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
+          .inv-title { font-size: 22px; font-weight: 900; text-align: right; color: #0F172A; letter-spacing: 0.5px; }
+          .inv-meta { font-size: 13px; color: #64748B; text-align: right; margin-top: 4px; }
+          .details-grid { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 13.5px; line-height: 1.6; background: #F8FAFC; padding: 16px; border-radius: 12px; border: 1px solid #E2E8F0; }
+          .table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13.5px; }
+          .table th { background: #F1F5F9; text-align: left; padding: 11px 12px; border-bottom: 2px solid #CBD5E1; color: #334155; font-weight: 700; }
+          .table td { padding: 12px; border-bottom: 1px solid #E2E8F0; }
+          .summary { margin-left: auto; width: 300px; font-size: 13.5px; line-height: 1.8; }
+          .summary-row { display: flex; justify-content: space-between; padding: 4px 0; }
+          .total-row { font-size: 17px; font-weight: 900; color: #172554; border-top: 2px solid #CBD5E1; padding-top: 8px; margin-top: 4px; }
+          .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #DCFCE7; color: #166534; font-weight: 700; font-size: 12px; }
+          .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 11.5px; color: #94A3B8; text-align: center; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo-title">ADITYAM NIRAMAYAA</div>
+            <div class="logo-sub">Pharmacy Network & Healthcare Aggregator</div>
+            <div style="font-size: 12px; color: #64748B; margin-top: 6px;">Saket, New Delhi NCR · GSTIN: 07AAACN1234F1Z1</div>
+          </div>
+          <div>
+            <div class="inv-title">TAX INVOICE</div>
+            <div class="inv-meta">Invoice No: <strong>INV-${order.ref}</strong></div>
+            <div class="inv-meta">Date: ${order.date}</div>
+            <div class="inv-meta" style="margin-top: 4px;"><span class="badge">PAID · ${order.paidInApp ? 'IN-APP (UPI)' : 'AT PHARMACY'}</span></div>
+          </div>
+        </div>
+        <div class="details-grid">
+          <div>
+            <div style="font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase;">Dispensed By:</div>
+            <div style="font-weight: 700; font-size: 15px; color: #0F172A;">${order.shop}</div>
+            <div style="color: #64748B;">${order.shopAddress || 'Saket Main Market, New Delhi'}</div>
+            <div style="color: #64748B;">DL No: DL-WZ-2024-98765</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase;">Billed & Delivered To:</div>
+            <div style="font-weight: 700; font-size: 15px; color: #0F172A;">${order.patientName}</div>
+            <div style="color: #64748B;">Saket, South Delhi NCR</div>
+            <div style="color: #64748B;">Mode: ${order.mode === 'delivery' ? 'Home Delivery' : 'Store Pickup'}</div>
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width: 40px;">#</th>
+              <th>Medicine / Item Description</th>
+              <th style="text-align: center; width: 60px;">Qty</th>
+              <th style="text-align: right; width: 100px;">Rate (₹)</th>
+              <th style="text-align: right; width: 100px;">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${order.items.map((it, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td><strong>${it.name}</strong><br/><span style="font-size: 11.5px; color: #64748B;">${it.nameHi || ''}</span></td>
+                <td style="text-align: center;">${it.qty}</td>
+                <td style="text-align: right;">₹${it.price.toLocaleString('en-IN')}</td>
+                <td style="text-align: right;">₹${(it.qty * it.price).toLocaleString('en-IN')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="summary">
+          <div class="summary-row">
+            <span>Subtotal (MRP):</span>
+            <span>₹${order.subtotal.toLocaleString('en-IN')}</span>
+          </div>
+          <div class="summary-row" style="color: #16A34A; font-weight: 600;">
+            <span>Partner App Discount:</span>
+            <span>- ₹${order.discount.toLocaleString('en-IN')}</span>
+          </div>
+          <div class="summary-row">
+            <span>Delivery Fee:</span>
+            <span>${order.deliveryFee === 0 ? 'FREE' : `₹${order.deliveryFee}`}</span>
+          </div>
+          <div class="summary-row total-row">
+            <span>Total Amount Paid:</span>
+            <span>₹${order.total.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+        <div class="footer">
+          This is a computer-generated tax invoice for prescription order #${order.ref}. Dispensed under registered pharmacist supervision.<br/>
+          Thank you for choosing Adityam Niramayaa Healthcare Network.
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const blob = new Blob([invoiceHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Invoice-${order.ref}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } else {
+      Alert.alert(
+        isHi ? 'इनवॉइस डाउनलोड हुआ' : 'Invoice Downloaded',
+        isHi
+          ? `ऑर्डर #${order.ref} का टैक्स इनवॉइस सफलतापूर्वक सहेजा गया। कुल देय राशि: ${inr(order.total)}`
+          : `Tax Invoice for Order #${order.ref} (Total: ${inr(order.total)}) is ready.`
+      );
+    }
+    setInvoiceToast(true);
+    setTimeout(() => setInvoiceToast(false), 3200);
   };
 
   const openDirections = () => {
@@ -825,51 +1014,77 @@ export default function PharmacyScreen() {
               {/* Recent Orders History */}
               {history.length > 0 && (
                 <View style={{ marginTop: 22 }}>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '700',
-                      color: C.ink,
-                      marginBottom: 10,
-                    }}
-                  >
-                    {isHi ? 'हाल के ऑर्डर व अनुरोध' : 'Recent requests'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: C.ink,
+                      }}
+                    >
+                      {isHi ? 'हाल के ऑर्डर व अनुरोध' : 'Recent requests'}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: C.brand }}>
+                      {isHi ? 'विवरण देखने के लिए टैप करें' : 'Tap for details & invoice'}
+                    </Text>
+                  </View>
                   <View style={{ gap: 9 }}>
                     {history.map((h) => (
-                      <View
+                      <Pressable
                         key={h.ref}
-                        style={{
+                        onPress={() => {
+                          tap();
+                          setSelectedOrder(h);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View details and invoice for order ${h.ref}`}
+                        style={({ pressed }) => ({
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 12,
                           backgroundColor: '#FFFFFF',
                           borderRadius: R.lg,
                           borderWidth: 1,
-                          borderColor: C.line,
+                          borderColor: pressed ? C.brand : C.line,
                           padding: 13,
-                        }}
+                          opacity: pressed ? 0.92 : 1,
+                          ...SHADOW,
+                        })}
                       >
                         <View
                           style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 12,
-                            backgroundColor: C.brandSoft,
+                            width: 42,
+                            height: 42,
+                            borderRadius: 14,
+                            backgroundColor: '#EAF1FF',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                         >
-                          <Pill size={18} color={C.brand} />
+                          <Pill size={20} color={C.brand} />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text
-                            numberOfLines={1}
-                            style={{ fontSize: 14, fontWeight: '700', color: C.ink }}
-                          >
-                            {isHi && h.shopHi ? h.shopHi : h.shop}
-                          </Text>
-                          <Text style={{ fontSize: 11.5, color: C.sub, marginTop: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text
+                              numberOfLines={1}
+                              style={{ fontSize: 14.5, fontWeight: '700', color: C.ink, flex: 1 }}
+                            >
+                              {isHi && h.shopHi ? h.shopHi : h.shop}
+                            </Text>
+                            <View
+                              style={{
+                                backgroundColor: '#DCFCE7',
+                                paddingHorizontal: 7,
+                                paddingVertical: 2,
+                                borderRadius: R.pill,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#166534' }}>
+                                {isHi ? 'डिलीवर हुआ' : 'Delivered'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}>
                             {h.ref} ·{' '}
                             {h.mode === 'delivery'
                               ? (isHi ? 'होम डिलीवरी' : 'Delivery')
@@ -880,10 +1095,18 @@ export default function PharmacyScreen() {
                               : (isHi ? 'दुकान पर देय' : 'Pay at shop')}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: C.ink }}>
-                          {inr(h.total)}
-                        </Text>
-                      </View>
+                        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '800', color: C.ink }}>
+                            {inr(h.total)}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: C.brand }}>
+                              {isHi ? 'विवरण' : 'Track'}
+                            </Text>
+                            <ChevronRight size={13} color={C.brand} strokeWidth={2.5} />
+                          </View>
+                        </View>
+                      </Pressable>
                     ))}
                   </View>
                 </View>
@@ -1633,6 +1856,435 @@ export default function PharmacyScreen() {
             </View>
           </View>
         </SheetFrame>
+      )}
+
+      {/* Recent Request / Order Details & Invoice Sheet */}
+      {selectedOrder && (
+        <SheetFrame
+          visible={!!selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          title={isHi ? 'ऑर्डर ट्रैकिंग व इनवॉइस' : 'Order Tracking & Invoice'}
+        >
+          <ScrollView
+            style={{ maxHeight: 620 }}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 8,
+              paddingBottom: Math.max(insets.bottom, 16) + 24,
+              gap: 16,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Status Hero Card */}
+            <View
+              style={{
+                backgroundColor: '#F0FDF4',
+                borderWidth: 1,
+                borderColor: '#BBF7D0',
+                borderRadius: R.xl,
+                padding: 16,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: '#16A34A',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Check size={16} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#166534' }}>
+                    {isHi ? 'ऑर्डर डिलीवर हो गया' : 'Order Delivered'}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: R.pill,
+                    borderWidth: 1,
+                    borderColor: '#BBF7D0',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>
+                    #{selectedOrder.ref}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 13, color: '#334155', marginTop: 8, lineHeight: 18 }}>
+                {isHi
+                  ? `आपकी दवाइयां ${selectedOrder.shopHi || selectedOrder.shop} द्वारा सफलतापूर्वक आपके पते पर पहुंचा दी गई हैं।`
+                  : `Your medicines from ${selectedOrder.shop} were safely delivered to your address.`}
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginTop: 12,
+                  paddingTop: 10,
+                  borderTopWidth: 1,
+                  borderTopColor: '#DCFCE7',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Clock size={13} color="#15803D" />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#15803D' }}>
+                    {selectedOrder.date}
+                  </Text>
+                </View>
+                <Text style={{ color: '#86EFAC' }}>•</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  {selectedOrder.mode === 'delivery' ? (
+                    <Truck size={13} color="#15803D" />
+                  ) : (
+                    <Store size={13} color="#15803D" />
+                  )}
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#15803D' }}>
+                    {selectedOrder.mode === 'delivery'
+                      ? (isHi ? 'होम डिलीवरी' : 'Doorstep Delivery')
+                      : (isHi ? 'स्टोर पिकअप' : 'Store Pickup')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Previous Track Stepper */}
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: R.lg,
+                borderWidth: 1,
+                borderColor: C.line,
+                padding: 16,
+              }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '800', color: C.ink, marginBottom: 12 }}>
+                {isHi ? 'ऑर्डर ट्रैकिंग टाइमलाइन' : 'Order Status & Tracking'}
+              </Text>
+
+              {[
+                {
+                  title: isHi ? 'पर्चा अपलोड व सत्यापन' : 'Prescription Verified',
+                  sub: isHi ? 'डॉक्टर का पर्चा फार्मासिस्ट द्वारा जांचा गया' : 'Reviewed & verified by licensed pharmacist',
+                  time: '4:30 PM',
+                  done: true,
+                },
+                {
+                  title: isHi ? 'बिल तैयार व छूट लागू' : 'Bill Generated & Discount',
+                  sub: isHi ? '15% विशेष ऐप छूट लागू की गई' : '15% partner pharmacy app discount applied',
+                  time: '4:33 PM',
+                  done: true,
+                },
+                {
+                  title: isHi ? 'भुगतान सफल' : 'Payment Confirmed',
+                  sub: isHi ? `${inr(selectedOrder.total)} का ऑनलाइन भुगतान (UPI/कार्ड)` : `Paid ${inr(selectedOrder.total)} securely in app`,
+                  time: '4:35 PM',
+                  done: true,
+                },
+                {
+                  title: isHi ? 'दवाइयां पैक व डिस्पैच' : 'Packed & Dispatched',
+                  sub: isHi ? 'सुरक्षित सीलबंद पैकेजिंग में रवाना किया गया' : 'Sealed in tamper-evident safety packaging',
+                  time: '4:45 PM',
+                  done: true,
+                },
+                {
+                  title: isHi ? 'सफलतापूर्वक डिलीवर' : 'Delivered to Doorstep',
+                  sub: isHi ? 'साकेत, दक्षिण दिल्ली पते पर प्राप्त हुआ' : 'Handed over at Saket, South Delhi address',
+                  time: '5:15 PM',
+                  done: true,
+                  isLast: true,
+                },
+              ].map((step, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ alignItems: 'center', width: 22 }}>
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: '#16A34A',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                    {!step.isLast && (
+                      <View
+                        style={{
+                          width: 2,
+                          flex: 1,
+                          backgroundColor: '#BBF7D0',
+                          minHeight: 28,
+                          marginVertical: 2,
+                        }}
+                      />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, paddingBottom: step.isLast ? 0 : 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.ink }}>
+                        {step.title}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: C.sub }}>{step.time}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: C.sub, marginTop: 1 }}>
+                      {step.sub}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Pharmacy Info & Contact */}
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: R.lg,
+                borderWidth: 1,
+                borderColor: C.line,
+                padding: 16,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.ink }}>
+                    {isHi && selectedOrder.shopHi ? selectedOrder.shopHi : selectedOrder.shop}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                    {selectedOrder.shopAddress || 'Saket, South Delhi'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => Linking.openURL('tel:+919811234567').catch(() => {})}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: C.brandSoft,
+                    paddingHorizontal: 12,
+                    height: 36,
+                    borderRadius: R.pill,
+                  }}
+                >
+                  <Phone size={14} color={C.brand} />
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.brand }}>
+                    {isHi ? 'कॉल करें' : 'Call'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Purchased Items List */}
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: R.lg,
+                borderWidth: 1,
+                borderColor: C.line,
+                padding: 16,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 14.5, fontWeight: '800', color: C.ink }}>
+                  {isHi ? 'खरीदी गई दवाइयां' : 'Purchased Medicines'} ({selectedOrder.items.length})
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: C.sub }}>
+                  {isHi ? 'फार्मासिस्ट द्वारा सत्यापित' : 'Pharmacist Verified'}
+                </Text>
+              </View>
+
+              <View style={{ gap: 10 }}>
+                {selectedOrder.items.map((it, idx) => (
+                  <View
+                    key={it.id || idx}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 6,
+                      borderBottomWidth: idx < selectedOrder.items.length - 1 ? 1 : 0,
+                      borderBottomColor: '#F1F5F9',
+                    }}
+                  >
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.ink }}>
+                        {isHi && it.nameHi ? it.nameHi : it.name}
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: C.sub, marginTop: 1 }}>
+                        {isHi ? `मात्रा: ${it.qty} · दर: ${inr(it.price)}` : `Qty: ${it.qty} · Rate: ${inr(it.price)}`}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: C.ink }}>
+                      {inr(it.qty * it.price)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Bill & Amount Summary */}
+            <View
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: R.lg,
+                borderWidth: 1,
+                borderColor: C.line,
+                padding: 16,
+                gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                {isHi ? 'भुगतान विवरण' : 'Payment Summary'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13.5, color: C.sub }}>
+                  {isHi ? 'दवाइयों का कुल मूल्य (MRP)' : 'Medicines Total (MRP)'}
+                </Text>
+                <Text style={{ fontSize: 13.5, fontWeight: '600', color: C.ink }}>
+                  {inr(selectedOrder.subtotal)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13.5, color: '#16A34A', fontWeight: '600' }}>
+                  {isHi ? 'पार्टनर ऐप छूट (15%)' : 'Partner App Discount (15%)'}
+                </Text>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#16A34A' }}>
+                  - {inr(selectedOrder.discount)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13.5, color: C.sub }}>
+                  {isHi ? 'डिलीवरी शुल्क' : 'Delivery Charges'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: C.sub, textDecorationLine: 'line-through' }}>
+                    ₹30
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>
+                    {isHi ? 'मुफ्त' : 'FREE'}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: C.line,
+                  marginVertical: 4,
+                }}
+              />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: C.ink }}>
+                    {isHi ? 'कुल भुगतान की गई राशि' : 'Total Amount Paid'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700', marginTop: 1 }}>
+                    {isHi ? `आपने ${inr(selectedOrder.discount + 30)} की बचत की!` : `You saved ${inr(selectedOrder.discount + 30)}!`}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 19, fontWeight: '900', color: C.brandDark }}>
+                  {inr(selectedOrder.total)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ gap: 10, marginTop: 4 }}>
+              {/* Download Invoice Button */}
+              <Pressable
+                onPress={() => handleDownloadInvoice(selectedOrder)}
+                style={({ pressed }) => ({
+                  backgroundColor: C.brand,
+                  borderRadius: R.lg,
+                  height: 48,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: pressed ? 0.9 : 1,
+                  ...SHADOW,
+                })}
+              >
+                <Download size={18} color="#FFFFFF" strokeWidth={2.5} />
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
+                  {isHi ? 'टैक्स इनवॉइस डाउनलोड करें (PDF)' : 'Download Tax Invoice (PDF / Print)'}
+                </Text>
+              </Pressable>
+
+              {/* Reorder Button */}
+              <Pressable
+                onPress={() => {
+                  tap();
+                  setSelectedOrder(null);
+                  pickCamera();
+                }}
+                style={({ pressed }) => ({
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: R.lg,
+                  borderWidth: 1.5,
+                  borderColor: C.brand,
+                  height: 46,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <RefreshCw size={16} color={C.brand} strokeWidth={2.2} />
+                <Text style={{ color: C.brand, fontSize: 14.5, fontWeight: '700' }}>
+                  {isHi ? 'यह दवाइयां दोबारा ऑर्डर करें' : 'Reorder These Medicines'}
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </SheetFrame>
+      )}
+
+      {/* Invoice Download Toast Notification */}
+      {invoiceToast && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 80,
+            left: 20,
+            right: 20,
+            maxWidth: 420,
+            alignSelf: 'center',
+            backgroundColor: '#0F172A',
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            zIndex: 999,
+            shadowColor: '#000',
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            elevation: 10,
+          }}
+        >
+          <CheckCircle2 size={20} color="#4ADE80" strokeWidth={2.5} />
+          <Text style={{ color: '#FFFFFF', fontSize: 13.5, fontWeight: '600', flex: 1 }}>
+            {isHi ? 'इनवॉइस डाउनलोड हो गया! प्रिंट योग्य इनवॉइस तैयार है।' : 'Invoice downloaded! Printable copy ready.'}
+          </Text>
+        </View>
       )}
 
       {/* Profile & Language Switcher Modal */}

@@ -626,8 +626,8 @@ export default function LabsScreen() {
             </PressableCard>
           )}
 
-          {/* Popular packages carousel (All and Lab tab only) */}
-          {(segment === 'lab' || segment === 'all') && showBrowse && (
+          {/* Popular packages carousel (All tab only; packages tab lists all packages) */}
+          {segment === 'all' && showBrowse && (
             <View style={{ marginBottom: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink }}>
