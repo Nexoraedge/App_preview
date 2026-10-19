@@ -36,6 +36,13 @@ import {
   Check,
   PhoneCall,
   Upload,
+  Scissors,
+  Bone,
+  Baby,
+  Eye,
+  ChevronRight,
+  Info,
+  Heart,
 } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking } from '@adityam/types';
@@ -91,8 +98,8 @@ export interface HospitalAdmissionInfo {
   specialtiesHi: string[];
 }
 
-// Category Tint Palette
-const TINT: Record<string, string> = {
+// Category Icon Tile Background Palette (used for the small colored icon tile inside the white card)
+const CATEGORY_ICON_BG: Record<string, string> = {
   GeneralSurgery: '#ECFDF5',
   Orthopedics: '#FFFBEB',
   Cardiology: '#FEF2F2',
@@ -109,6 +116,18 @@ const CATEGORY_ACCENT: Record<string, string> = {
   Urology: '#7C3AED',
   Ophthalmology: '#2563EB',
 };
+
+export type CategoryFilter = 'ALL' | PlannedSurgery['category'];
+
+export const CATEGORY_CHIPS: { id: CategoryFilter; label: string; labelHi: string }[] = [
+  { id: 'ALL', label: 'All Surgeries', labelHi: 'सभी सर्जरी' },
+  { id: 'GeneralSurgery', label: 'Laparoscopy', labelHi: 'लैप्रोस्कोपी' },
+  { id: 'Orthopedics', label: 'Bones & joints', labelHi: 'हड्डी व जोड़' },
+  { id: 'Cardiology', label: 'Heart', labelHi: 'हृदय रोग' },
+  { id: 'Maternity', label: 'Maternity', labelHi: 'प्रसूति' },
+  { id: 'Urology', label: 'Urology', labelHi: 'गुर्दे व पथरी' },
+  { id: 'Ophthalmology', label: 'Eye', labelHi: 'आंखें' },
+];
 
 // Helper for Indian Currency formatting
 const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
@@ -356,6 +375,7 @@ export default function IpdScreen() {
   const isHi = language === 'hi';
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL');
   const [profileVisible, setProfileVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -384,11 +404,15 @@ export default function IpdScreen() {
   const [isSubmittingAdvice, setIsSubmittingAdvice] = useState(false);
   const [adviceSuccessRef, setAdviceSuccessRef] = useState<string | null>(null);
 
-  // Filtered surgeries based on search query
+  // Filtered surgeries based on search query and category chip
   const filteredSurgeries = useMemo(() => {
-    if (!searchQuery.trim()) return MASTER_SURGERIES;
+    let list = MASTER_SURGERIES;
+    if (selectedCategory !== 'ALL') {
+      list = list.filter((s) => s.category === selectedCategory);
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return MASTER_SURGERIES.filter(
+    return list.filter(
       (s) =>
         s.shortName.toLowerCase().includes(q) ||
         (s.shortNameHi && s.shortNameHi.toLowerCase().includes(q)) ||
@@ -398,7 +422,7 @@ export default function IpdScreen() {
         (s.tagHi && s.tagHi.toLowerCase().includes(q)) ||
         s.category.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [searchQuery, selectedCategory]);
 
   // Filtered hospitals based on search query
   const filteredHospitals = useMemo(() => {
@@ -478,7 +502,7 @@ export default function IpdScreen() {
       user_id: user?.id,
       patient_name: patientName,
       patient_phone: patientPhone,
-      hospital_name: 'Adityam Hospital Care Concierge Desk',
+      hospital_name: 'Adityam Niramayaa Care Concierge Desk',
       specialty_requested: 'Doctor Advice Slip Upload',
       status: 'NEW',
       call_status: 'pending',
@@ -499,22 +523,28 @@ export default function IpdScreen() {
     }, 600);
   };
 
-  // Icon for category
-  const iconForCategory = (cat: string) => {
-    const accent = CATEGORY_ACCENT[cat] || '#2563EB';
-    switch (cat) {
-      case 'GeneralSurgery':
-        return <IpdHospitalBedIcon size={22} color={accent} />;
-      case 'Orthopedics':
-        return <BoneJointIcon size={22} color={accent} />;
-      case 'Cardiology':
-        return <HeartPulseIcon size={22} color={accent} />;
-      case 'Maternity':
-        return <ChildCareIcon size={22} color={accent} />;
-      case 'Urology':
-        return <Activity size={22} color={accent} />;
+  // Dedicated icon for each procedure/surgery
+  const iconForSurgery = (s: PlannedSurgery) => {
+    const accent = CATEGORY_ACCENT[s.category] || '#2563EB';
+    switch (s.id) {
+      case 'surg-gallbladder':
+        return <Scissors size={20} color={accent} />;
+      case 'surg-hernia':
+        return <ShieldCheck size={20} color={accent} />;
+      case 'surg-knee-replace':
+        return <Bone size={20} color={accent} />;
+      case 'surg-csection':
+        return <Baby size={20} color={accent} />;
+      case 'surg-angioplasty':
+        return <HeartPulseIcon size={20} color={accent} />;
+      case 'surg-kidney-stone':
+        return <Sparkles size={20} color={accent} />;
+      case 'surg-cataract':
+        return <Eye size={20} color={accent} />;
+      case 'surg-appendix':
+        return <Scissors size={20} color={accent} />;
       default:
-        return <Sparkles size={22} color={accent} />;
+        return <Bed size={20} color={accent} />;
     }
   };
 
@@ -543,10 +573,10 @@ export default function IpdScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingBottom: Math.max(insets.bottom, 16) + 76,
+            paddingBottom: Math.max(insets.bottom, 16) + 110,
           }}
         >
-          {/* 2. ONE HERO ACTION CARD (Merged Upload & Insurance) */}
+          {/* 2. ONE HERO ACTION CARD WITH INTEGRATED 4-STEP CONCIERGE FLOW */}
           <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
             <View
               style={{
@@ -569,7 +599,7 @@ export default function IpdScreen() {
                 }}
               >
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#BFDBFE' }}>
-                  {isHi ? 'आदित्यम केयर कंसीयर्ज' : 'ADITYAM CARE CONCIERGE'}
+                  {isHi ? 'आदित्यम निरामया केयर कंसीयर्ज' : 'ADITYAM NIRAMAYAA CARE CONCIERGE'}
                 </Text>
               </View>
 
@@ -588,8 +618,8 @@ export default function IpdScreen() {
                 }}
               >
                 {isHi
-                  ? 'हम शीर्ष प्रमाणित अस्पतालों में पैकेज दरों की तुलना करते हैं और कैशलेस बीमा प्री-ऑथ संभालते हैं।'
-                  : 'We compare package rates across top accredited hospitals & handle your cashless insurance pre-auth.'}
+                  ? 'हम पार्टनर अस्पतालों में शुरुआती दरों की तुलना करते हैं और बीमा कागजी कार्रवाई में मदद करते हैं।'
+                  : 'We compare starting prices across partner hospitals & help with insurance paperwork.'}
               </Text>
 
               {/* Action Button */}
@@ -616,136 +646,94 @@ export default function IpdScreen() {
                   {isHi ? 'पर्चा अपलोड करें और कॉल पाएं →' : 'Upload Slip & Get Call →'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Merged Thin 4-Step Concierge Row */}
+              <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.16)' }}>
+                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#BFDBFE', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                  {isHi ? '4 आसान चरणों में सहायता' : 'How it works in 4 simple steps'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {[
+                    { step: '1', title: isHi ? 'पर्चा भेजें' : 'Upload slip' },
+                    { step: '2', title: isHi ? 'सलाहकार कॉल' : 'Advisor calls' },
+                    { step: '3', title: isHi ? 'दरें तुलना' : 'Compare' },
+                    { step: '4', title: isHi ? 'भर्ती सहायता' : 'Get admitted' },
+                  ].map((st, sIdx) => (
+                    <View key={st.step} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <View
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            backgroundColor: 'rgba(255, 255, 255, 0.22)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#FFFFFF' }}>{st.step}</Text>
+                        </View>
+                        <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#FFFFFF' }}>{st.title}</Text>
+                      </View>
+                      {sIdx < 3 && <ChevronRight size={11} color="rgba(255, 255, 255, 0.45)" />}
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* 3. FOUR-STEP "HOW IT WORKS" STRIP */}
-          <View
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              padding: 14,
-              marginHorizontal: 16,
-              marginTop: 12,
-            }}
+          {/* 3. CATEGORY CHIPS BAR */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+            style={{ marginTop: 14 }}
           >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginBottom: 10 }}>
-              {isHi ? 'अस्पताल कंसीयर्ज कैसे काम करता है' : 'How Hospital Concierge Works'}
-            </Text>
-
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
-              {/* Connecting line behind circles */}
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 15,
-                  left: 24,
-                  right: 24,
-                  height: 2,
-                  backgroundColor: '#E2E8F0',
-                  zIndex: 0,
-                }}
-              />
-
-              {/* Step 1 */}
-              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
-                <View
+            {CATEGORY_CHIPS.map((chip) => {
+              const isActive = selectedCategory === chip.id;
+              return (
+                <TouchableOpacity
+                  key={chip.id}
+                  onPress={() => setSelectedCategory(chip.id)}
+                  activeOpacity={0.8}
                   style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    backgroundColor: '#EFF6FF',
-                    borderWidth: 2,
-                    borderColor: '#2563EB',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    paddingHorizontal: 13,
+                    paddingVertical: 7,
+                    borderRadius: 20,
+                    backgroundColor: isActive ? '#1E40AF' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: isActive ? '#1E40AF' : '#E2E8F0',
+                    shadowColor: '#0F172A',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: isActive ? 0.12 : 0.03,
+                    shadowRadius: 2,
+                    elevation: 1,
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>1</Text>
-                </View>
-                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
-                  {isHi ? 'पर्चा भेजें\n(Upload)' : 'Upload slip'}
-                </Text>
-              </View>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: isActive ? '700' : '600',
+                      color: isActive ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    {isHi ? chip.labelHi : chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-              {/* Step 2 */}
-              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
-                <View
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    backgroundColor: '#EFF6FF',
-                    borderWidth: 2,
-                    borderColor: '#2563EB',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>2</Text>
-                </View>
-                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
-                  {isHi ? 'सलाहकार कॉल\n(Advisor)' : 'Advisor calls'}
-                </Text>
-              </View>
-
-              {/* Step 3 */}
-              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
-                <View
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    backgroundColor: '#EFF6FF',
-                    borderWidth: 2,
-                    borderColor: '#2563EB',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>3</Text>
-                </View>
-                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
-                  {isHi ? 'दरें तुलना\n(Compare)' : 'Compare'}
-                </Text>
-              </View>
-
-              {/* Step 4 */}
-              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
-                <View
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    backgroundColor: '#EFF6FF',
-                    borderWidth: 2,
-                    borderColor: '#2563EB',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>4</Text>
-                </View>
-                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
-                  {isHi ? 'भर्ती सहायता\n(Admission)' : 'Get admitted'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* 4. PROCEDURES (Two-Column Tile Grid) */}
-          <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                  {isHi ? 'प्रमुख सर्जरी व उपचार पैकेज' : 'Common Procedures & Packages'}
-                </Text>
-                <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
-                  {isHi ? 'कैशलेस बीमा प्री-ऑथ सहायता के साथ निश्चित लागत पैकेज' : 'Fixed-cost packages with pre-auth insurance support'}
-                </Text>
-              </View>
+          {/* 4. PROCEDURES (Two-Column White Cards) */}
+          <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                {isHi ? 'सर्जरी व उपचार प्रक्रियाएं' : 'Procedures & Surgeries'}
+              </Text>
+              <Text style={{ fontSize: 12, fontWeight: '400', color: '#64748B', marginTop: 2 }}>
+                {isHi ? 'शुरुआती कीमतों और बीमा कागजी सहायता के साथ पार्टनर अस्पताल पैकेज' : 'Starting prices with assistance for insurance paperwork'}
+              </Text>
             </View>
 
             {filteredSurgeries.length === 0 ? (
@@ -775,7 +763,7 @@ export default function IpdScreen() {
                   flexDirection: 'row',
                   flexWrap: 'wrap',
                   justifyContent: 'space-between',
-                  rowGap: 12,
+                  rowGap: 14,
                 }}
               >
                 {filteredSurgeries.map((s, i) => {
@@ -793,38 +781,38 @@ export default function IpdScreen() {
                     >
                       <View
                         style={{
-                          backgroundColor: TINT[s.category] || '#F8FAFC',
-                          borderRadius: 22,
-                          padding: 14,
-                          minHeight: 165,
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 20,
+                          padding: 13,
+                          minHeight: 180,
                           justifyContent: 'space-between',
                           borderWidth: 1,
-                          borderColor: 'rgba(0, 0, 0, 0.04)',
+                          borderColor: '#E2E8F0',
+                          shadowColor: '#0F172A',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 6,
+                          elevation: 1,
                         }}
                       >
-                        {/* Top White Icon Tile + Tag */}
+                        {/* Top: Category-Coloured Icon Tile + Stay Tag */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View
                             style={{
-                              width: 42,
-                              height: 42,
-                              borderRadius: 13,
-                              backgroundColor: '#FFFFFF',
+                              width: 38,
+                              height: 38,
+                              borderRadius: 11,
+                              backgroundColor: CATEGORY_ICON_BG[s.category] || '#F1F5F9',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              shadowColor: '#0F172A',
-                              shadowOffset: { width: 0, height: 1 },
-                              shadowOpacity: 0.05,
-                              shadowRadius: 2,
-                              elevation: 1,
                             }}
                           >
-                            {iconForCategory(s.category)}
+                            {iconForSurgery(s)}
                           </View>
 
                           <View
                             style={{
-                              backgroundColor: '#FFFFFF',
+                              backgroundColor: '#F1F5F9',
                               paddingHorizontal: 7,
                               paddingVertical: 2.5,
                               borderRadius: 6,
@@ -836,16 +824,16 @@ export default function IpdScreen() {
                           </View>
                         </View>
 
-                        {/* Title & Medical Subtitle */}
-                        <View style={{ marginTop: 10 }}>
+                        {/* Title & Medical Subtitle (Subtitle >= 13px) */}
+                        <View style={{ marginTop: 10, flex: 1 }}>
                           <Text
-                            style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', lineHeight: 18 }}
+                            style={{ fontSize: 14.5, fontWeight: '700', color: '#0F172A', lineHeight: 19 }}
                             numberOfLines={2}
                           >
                             {displayShort}
                           </Text>
                           <Text
-                            style={{ fontSize: 10.5, fontWeight: '400', color: '#64748B', marginTop: 2 }}
+                            style={{ fontSize: 13, fontWeight: '500', color: '#475569', marginTop: 3, lineHeight: 17 }}
                             numberOfLines={1}
                           >
                             {displayName}
@@ -853,21 +841,43 @@ export default function IpdScreen() {
                         </View>
 
                         {/* Bottom Row: Feature Tag & Price Pill */}
-                        <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0, 0, 0, 0.05)' }}>
+                        <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 10, fontWeight: '600', color: CATEGORY_ACCENT[s.category] || '#2563EB' }} numberOfLines={1}>
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: CATEGORY_ACCENT[s.category] || '#2563EB',
+                                textTransform: 'uppercase',
+                              }}
+                              numberOfLines={1}
+                            >
                               {displayTag}
                             </Text>
-                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
-                              {inr(s.price)}*
+                            <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
+                              {isHi ? 'शुरुआती ' : 'From '}{inr(s.price)}*
                             </Text>
                           </View>
 
-                          {/* Interactive subtle CTA tap prompt */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>
-                              {isHi ? 'परामर्श व पैकेज →' : 'Book Consultation →'}
+                          {/* Full-width soft button: "Get a call back" */}
+                          <View
+                            style={{
+                              marginTop: 8,
+                              backgroundColor: '#EFF6FF',
+                              borderRadius: 10,
+                              paddingVertical: 7,
+                              paddingHorizontal: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <PhoneCall size={12} color="#2563EB" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                              {isHi ? 'कॉल बैक पाएं' : 'Get a call back'}
                             </Text>
+                            <ChevronRight size={13} color="#2563EB" />
                           </View>
                         </View>
                       </View>
@@ -876,16 +886,25 @@ export default function IpdScreen() {
                 })}
               </View>
             )}
+
+            {/* Asterisk Footnote & Disclaimer */}
+            <View style={{ marginTop: 12, paddingHorizontal: 4 }}>
+              <Text style={{ fontSize: 11.5, color: '#64748B', lineHeight: 16 }}>
+                {isHi
+                  ? '*कीमतें सांकेतिक हैं; अंतिम लागत आपके डॉक्टर, अस्पताल और बीमा अनुमोदन पर निर्भर करती है।'
+                  : '*Prices are indicative; final cost depends on your doctor, hospital, and insurance approval.'}
+              </Text>
+            </View>
           </View>
 
-          {/* 5. TOP ACCREDITED PARTNER HOSPITALS (Horizontal Carousel) */}
+          {/* 5. PARTNER HOSPITALS (Horizontal Carousel) */}
           <View style={{ marginTop: 22, paddingBottom: 10 }}>
             <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                {isHi ? 'शीर्ष मान्यता प्राप्त अस्पताल नेटवर्क' : 'Top Accredited Partner Hospitals'}
+                {isHi ? 'पार्टनर अस्पताल नेटवर्क' : 'Partner Hospital Network'}
               </Text>
               <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
-                {isHi ? 'कैशलेस भर्ती डेस्क और समर्पित मरीज सहायता' : 'Direct cashless admission desk & dedicated patient care'}
+                {isHi ? 'भर्ती डेस्क और समर्पित मरीज सहायता' : 'Partner hospital admission desk & dedicated patient care'}
               </Text>
             </View>
 
@@ -1029,6 +1048,60 @@ export default function IpdScreen() {
               })}
             </ScrollView>
           </View>
+
+          {/* Calm Emergency Card */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 18,
+              marginBottom: 10,
+              backgroundColor: '#FEF2F2',
+              borderWidth: 1,
+              borderColor: '#FECACA',
+              borderRadius: 18,
+              padding: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 10 }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: '#FEE2E2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <PhoneCall size={18} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#991B1B' }}>
+                  {isHi ? 'क्या यह आपातकालीन स्थिति है?' : 'In an emergency?'}
+                </Text>
+                <Text style={{ fontSize: 11.5, color: '#B91C1C', marginTop: 2, lineHeight: 16 }}>
+                  {isHi ? 'तत्काल एम्बुलेंस व क्रिटिकल केयर हेतु 112 पर कॉल करें' : 'Call 112 for immediate ambulance & critical care'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('tel:112')}
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: '#DC2626',
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 12,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
+                {isHi ? 'कॉल 112' : 'Call 112'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
 
@@ -1150,8 +1223,8 @@ export default function IpdScreen() {
                   }}
                 >
                   {isHi
-                    ? 'हमारे वरिष्ठ चिकित्सा सलाहकार 15 मिनट के भीतर आपसे संपर्क कर अस्पताल विकल्प, रूम उपलब्धता और कैशलेस प्री-ऑथ प्रक्रिया शुरू करेंगे।'
-                    : 'Our senior medical advisor will call you within 15 minutes to review hospital options, room availability, and initiate your cashless pre-auth.'}
+                    ? 'हमारे वरिष्ठ चिकित्सा सलाहकार 15 मिनट के भीतर आपसे संपर्क कर अस्पताल विकल्प, रूम उपलब्धता और बीमा कागजी कार्रवाई में सहायता करेंगे।'
+                    : 'Our senior medical advisor will call you within 15 minutes to review hospital options, room availability, and help with insurance paperwork.'}
                 </Text>
 
                 <TouchableOpacity
@@ -1359,8 +1432,8 @@ export default function IpdScreen() {
                   <ShieldCheck size={16} color="#059669" />
                   <Text style={{ fontSize: 11, fontWeight: '600', color: '#065F46', flex: 1 }}>
                     {isHi
-                      ? 'कैशलेस प्री-ऑथ और प्राथमिकता अस्पताल डेस्क भर्ती हेतु समर्पित सहायता।'
-                      : 'Dedicated assistance for cashless pre-auth & priority hospital desk admission.'}
+                      ? 'बीमा कागजी कार्रवाई और पार्टनर अस्पताल भर्ती हेतु समर्पित सहायता।'
+                      : 'Dedicated assistance for insurance paperwork & partner hospital admission.'}
                   </Text>
                 </View>
 
@@ -1505,8 +1578,8 @@ export default function IpdScreen() {
                   }}
                 >
                   {isHi
-                    ? `आदित्यम केयर सलाहकार आपके पर्चे की समीक्षा कर रहे हैं। हम जल्द ही ${patientPhone} पर अस्पताल पैकेज अनुमान के साथ संपर्क करेंगे।`
-                    : `An Adityam care advisor is reviewing your prescription. We will contact you at ${patientPhone} with comparative package estimates.`}
+                    ? `आदित्यम निरामया केयर सलाहकार आपके पर्चे की समीक्षा कर रहे हैं। हम जल्द ही ${patientPhone} पर अस्पताल पैकेज अनुमान के साथ संपर्क करेंगे।`
+                    : `An Adityam Niramayaa care advisor is reviewing your prescription. We will contact you at ${patientPhone} with comparative package estimates.`}
                 </Text>
 
                 <TouchableOpacity
