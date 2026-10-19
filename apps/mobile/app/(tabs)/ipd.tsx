@@ -43,6 +43,8 @@ import {
   ChevronRight,
   Info,
   Heart,
+  LayoutGrid,
+  List,
 } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking } from '@adityam/types';
@@ -376,6 +378,7 @@ export default function IpdScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('ALL');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [profileVisible, setProfileVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -725,15 +728,91 @@ export default function IpdScreen() {
             })}
           </ScrollView>
 
-          {/* 4. PROCEDURES (Two-Column White Cards) */}
+          {/* 3.5 CONCIERGE TRUST STRIP */}
+          <View style={{ marginHorizontal: 16, marginTop: 12 }}>
+            <View
+              style={{
+                backgroundColor: '#EFF6FF',
+                borderWidth: 1,
+                borderColor: '#DBEAFE',
+                borderRadius: 14,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                <ShieldCheck size={14} color="#2563EB" />
+                <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#1E40AF' }} numberOfLines={1}>
+                  {isHi
+                    ? 'निःशुल्क कैब सहायता • 0% ब्याज ईएमआई • बीमा कागजी मदद'
+                    : 'Free cab pickup • 0% EMI support • Insurance paperwork'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 4. PROCEDURES (Spacious Full-Width Clinical Cards + Grid Switcher) */}
           <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                {isHi ? 'सर्जरी व उपचार प्रक्रियाएं' : 'Procedures & Surgeries'}
-              </Text>
-              <Text style={{ fontSize: 12, fontWeight: '400', color: '#64748B', marginTop: 2 }}>
-                {isHi ? 'शुरुआती कीमतों और बीमा कागजी सहायता के साथ पार्टनर अस्पताल पैकेज' : 'Starting prices with assistance for insurance paperwork'}
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                  {isHi ? 'सर्जरी व उपचार प्रक्रियाएं' : 'Procedures & Surgeries'}
+                </Text>
+                <Text style={{ fontSize: 11.5, fontWeight: '400', color: '#64748B', marginTop: 2 }}>
+                  {isHi ? 'शुरुआती कीमतों और बीमा कागजी सहायता के साथ पार्टनर अस्पताल पैकेज' : 'Starting prices with assistance for insurance paperwork'}
+                </Text>
+              </View>
+
+              {/* View Layout Toggle: List vs Grid */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  backgroundColor: '#F1F5F9',
+                  borderRadius: 10,
+                  padding: 2,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => setViewMode('list')}
+                  activeOpacity={0.8}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
+                    shadowColor: viewMode === 'list' ? '#0F172A' : 'transparent',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: viewMode === 'list' ? 0.08 : 0,
+                    shadowRadius: 2,
+                    elevation: viewMode === 'list' ? 1 : 0,
+                  }}
+                >
+                  <List size={16} color={viewMode === 'list' ? '#1E40AF' : '#64748B'} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setViewMode('grid')}
+                  activeOpacity={0.8}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent',
+                    shadowColor: viewMode === 'grid' ? '#0F172A' : 'transparent',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: viewMode === 'grid' ? 0.08 : 0,
+                    shadowRadius: 2,
+                    elevation: viewMode === 'grid' ? 1 : 0,
+                  }}
+                >
+                  <LayoutGrid size={16} color={viewMode === 'grid' ? '#1E40AF' : '#64748B'} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {filteredSurgeries.length === 0 ? (
@@ -757,7 +836,162 @@ export default function IpdScreen() {
                 <IpdCardSkeleton />
                 <IpdCardSkeleton />
               </View>
+            ) : viewMode === 'list' ? (
+              /* PREMIUM FULL-WIDTH CLINICAL PACKAGE CARDS (Zero truncation, spacious) */
+              <View style={{ gap: 12 }}>
+                {filteredSurgeries.map((s, i) => {
+                  const displayName = isHi && s.nameHi ? s.nameHi : s.name;
+                  const displayShort = isHi && s.shortNameHi ? s.shortNameHi : s.shortName;
+                  const displayStay = isHi && s.stayDaysHi ? s.stayDaysHi : s.stayDays;
+                  const displayTag = isHi && s.tagHi ? s.tagHi : s.tag;
+                  const displayRecovery = isHi && s.recoveryTimelineHi ? s.recoveryTimelineHi : s.recoveryTimeline;
+
+                  return (
+                    <PressableCard
+                      key={s.id}
+                      index={i}
+                      style={{ width: '100%' }}
+                      onPress={() => handleOpenProcedureSheet(s)}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 20,
+                          padding: 16,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          shadowColor: '#0F172A',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.04,
+                          shadowRadius: 8,
+                          elevation: 2,
+                        }}
+                      >
+                        {/* Top: Icon + Title + Stay Badge */}
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                          <View
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 14,
+                              backgroundColor: CATEGORY_ICON_BG[s.category] || '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {iconForSurgery(s)}
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+                              <Text
+                                style={{ fontSize: 15.5, fontWeight: '700', color: '#0F172A', lineHeight: 20, flex: 1 }}
+                              >
+                                {displayShort}
+                              </Text>
+
+                              <View
+                                style={{
+                                  backgroundColor: '#F1F5F9',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 7,
+                                  alignSelf: 'flex-start',
+                                }}
+                              >
+                                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#475569' }}>
+                                  {displayStay}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Text
+                              style={{ fontSize: 13, fontWeight: '500', color: '#64748B', marginTop: 2, lineHeight: 17 }}
+                            >
+                              {displayName}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Middle: Feature Badge + Clinical Recovery Highlight */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                          <View
+                            style={{
+                              backgroundColor: CATEGORY_ICON_BG[s.category] || '#F1F5F9',
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '700',
+                                color: CATEGORY_ACCENT[s.category] || '#2563EB',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.2,
+                              }}
+                            >
+                              {displayTag}
+                            </Text>
+                          </View>
+
+                          <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
+                            • {displayRecovery}
+                          </Text>
+                        </View>
+
+                        {/* Divider */}
+                        <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 }} />
+
+                        {/* Bottom: Price on Left & Call Back Button on Right */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: '#64748B',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.4,
+                              }}
+                            >
+                              {isHi ? 'शुरुआती पैकेज' : 'Starting from'}
+                            </Text>
+                            <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginTop: 1 }}>
+                              {inr(s.price)}*
+                            </Text>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => handleOpenProcedureSheet(s)}
+                            activeOpacity={0.88}
+                            style={{
+                              backgroundColor: '#EFF6FF',
+                              borderWidth: 1,
+                              borderColor: '#BFDBFE',
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 12,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <PhoneCall size={13} color="#2563EB" />
+                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#2563EB' }}>
+                              {isHi ? 'कॉल बैक पाएं' : 'Get a call back'}
+                            </Text>
+                            <ChevronRight size={14} color="#2563EB" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </PressableCard>
+                  );
+                })}
+              </View>
             ) : (
+              /* CLEAN NON-TRUNCATING 2-COLUMN GRID (Tag & Price un-crammed) */
               <View
                 style={{
                   flexDirection: 'row',
@@ -784,7 +1018,7 @@ export default function IpdScreen() {
                           backgroundColor: '#FFFFFF',
                           borderRadius: 20,
                           padding: 13,
-                          minHeight: 180,
+                          minHeight: 195,
                           justifyContent: 'space-between',
                           borderWidth: 1,
                           borderColor: '#E2E8F0',
@@ -795,7 +1029,7 @@ export default function IpdScreen() {
                           elevation: 1,
                         }}
                       >
-                        {/* Top: Category-Coloured Icon Tile + Stay Tag */}
+                        {/* Top: Category Icon Tile + Stay Tag */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View
                             style={{
@@ -824,28 +1058,37 @@ export default function IpdScreen() {
                           </View>
                         </View>
 
-                        {/* Title & Medical Subtitle (Subtitle >= 13px) */}
+                        {/* Title & Medical Subtitle */}
                         <View style={{ marginTop: 10, flex: 1 }}>
                           <Text
-                            style={{ fontSize: 14.5, fontWeight: '700', color: '#0F172A', lineHeight: 19 }}
+                            style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', lineHeight: 18 }}
                             numberOfLines={2}
                           >
                             {displayShort}
                           </Text>
                           <Text
-                            style={{ fontSize: 13, fontWeight: '500', color: '#475569', marginTop: 3, lineHeight: 17 }}
+                            style={{ fontSize: 11.5, fontWeight: '500', color: '#64748B', marginTop: 2, lineHeight: 15 }}
                             numberOfLines={1}
                           >
                             {displayName}
                           </Text>
                         </View>
 
-                        {/* Bottom Row: Feature Tag & Price Pill */}
-                        <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        {/* Bottom Section: Separated Stacked Tag, Price & CTA */}
+                        <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                          {/* Tag on its own line */}
+                          <View
+                            style={{
+                              alignSelf: 'flex-start',
+                              backgroundColor: CATEGORY_ICON_BG[s.category] || '#F1F5F9',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 5,
+                            }}
+                          >
                             <Text
                               style={{
-                                fontSize: 10.5,
+                                fontSize: 9.5,
                                 fontWeight: '700',
                                 color: CATEGORY_ACCENT[s.category] || '#2563EB',
                                 textTransform: 'uppercase',
@@ -854,30 +1097,32 @@ export default function IpdScreen() {
                             >
                               {displayTag}
                             </Text>
-                            <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
-                              {isHi ? 'शुरुआती ' : 'From '}{inr(s.price)}*
-                            </Text>
                           </View>
 
-                          {/* Full-width soft button: "Get a call back" */}
+                          {/* Price on its own line */}
+                          <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                            {isHi ? 'शुरुआती ' : 'From '}{inr(s.price)}*
+                          </Text>
+
+                          {/* Full-width soft button */}
                           <View
                             style={{
                               marginTop: 8,
                               backgroundColor: '#EFF6FF',
                               borderRadius: 10,
-                              paddingVertical: 7,
-                              paddingHorizontal: 8,
+                              paddingVertical: 6,
+                              paddingHorizontal: 6,
                               flexDirection: 'row',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: 5,
+                              gap: 4,
                             }}
                           >
-                            <PhoneCall size={12} color="#2563EB" />
-                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                            <PhoneCall size={11} color="#2563EB" />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>
                               {isHi ? 'कॉल बैक पाएं' : 'Get a call back'}
                             </Text>
-                            <ChevronRight size={13} color="#2563EB" />
+                            <ChevronRight size={12} color="#2563EB" />
                           </View>
                         </View>
                       </View>
