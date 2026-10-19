@@ -2,7 +2,7 @@
 // Labs & Scans: pick tests first, then pick the centre that offers all of them.
 // Each tab (Lab tests / Scans / Packages) has its own cart, because one centre rarely does all three.
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -273,21 +273,42 @@ function PackageCard({
 }) {
   const packageName = getItemName(item, isHi);
   return (
-    <PressableCard index={index} onPress={onPress} style={wide ? undefined : { width: 270 }} label={packageName}>
-      <LinearGradient colors={item.gradient ?? ['#172554', '#2563EB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: R.xl, padding: 18, minHeight: 168 }}>
+    <PressableCard
+      index={index}
+      onPress={onPress}
+      style={wide ? undefined : { width: 270, height: 215 }}
+      pressableStyle={wide ? undefined : { height: '100%' }}
+      label={packageName}
+    >
+      <LinearGradient
+        colors={item.gradient ?? ['#172554', '#2563EB']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          borderRadius: R.xl,
+          padding: 18,
+          height: wide ? undefined : '100%',
+          minHeight: wide ? 175 : 215,
+          justifyContent: 'space-between',
+        }}
+      >
         <View pointerEvents="none" style={{ position: 'absolute', right: -30, top: -30, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(255,255,255,0.10)' }} />
-        <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.pill }}>
-          <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '600' }}>
-            {isHi ? `${item.testsCount} टेस्ट शामिल` : `${item.testsCount} tests included`}
+        <View>
+          <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.pill }}>
+            <Text style={{ color: '#fff', fontSize: 11.5, fontWeight: '600' }}>
+              {isHi ? `${item.testsCount} टेस्ट शामिल` : `${item.testsCount} tests included`}
+            </Text>
+          </View>
+          <View style={{ minHeight: 48, justifyContent: 'flex-start', marginTop: 10 }}>
+            <Text style={{ color: '#fff', fontSize: 18.5, fontWeight: '700', lineHeight: 24 }} numberOfLines={2}>
+              {packageName}
+            </Text>
+          </View>
+          <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 12.5, marginTop: 4 }} numberOfLines={1}>
+            {fastText(item, isHi)}  ·  {reportText(item, isHi)}
           </Text>
         </View>
-        <Text style={{ color: '#fff', fontSize: 19, fontWeight: '700', marginTop: 12, lineHeight: 24 }} numberOfLines={2}>
-          {packageName}
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12.5, marginTop: 4 }}>
-          {fastText(item, isHi)}  ·  {reportText(item, isHi)}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 12 }}>
           <View>
             <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11.5 }}>
               {isHi ? 'न्यूनतम शुल्क' : 'Starting from'}
@@ -412,7 +433,7 @@ export default function LabsScreen() {
         stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: (cartIds.length ? 104 : 32) + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: (cartIds.length ? 175 : 96) + insets.bottom }}
       >
         {/* 0. Header */}
         <AppHeader
@@ -637,7 +658,15 @@ export default function LabsScreen() {
       {/* Sticky cart bar */}
       {cartIds.length > 0 && (
         <View
-          style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 12) + 4, alignItems: 'center', paddingHorizontal: 16 }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 10) + 64 + 12,
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            zIndex: 40,
+          }}
           pointerEvents="box-none"
         >
           <Pressable

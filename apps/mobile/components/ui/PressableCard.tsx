@@ -8,11 +8,12 @@ type Props = {
   children: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  pressableStyle?: StyleProp<ViewStyle>;
   index?: number;
   label?: string;
 };
 
-export function PressableCard({ children, onPress, style, index = 0, label }: Props) {
+export function PressableCard({ children, onPress, style, pressableStyle, index = 0, label }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(14)).current;
@@ -47,6 +48,7 @@ export function PressableCard({ children, onPress, style, index = 0, label }: Pr
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
+        style={[{ width: '100%' }, pressableStyle]}
         onPressIn={() => {
           Animated.spring(scale, {
             toValue: 0.97,
