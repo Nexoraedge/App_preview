@@ -28,7 +28,10 @@ const ICONS: Record<string, any> = {
   Droplets, Activity, HeartPulse, Sun, Waves, Flower2, Thermometer, FlaskConical, Bone, ScanLine, Brain,
 };
 
-const getSegments = (isHi: boolean): { id: Segment; label: string }[] => [
+export type TabSegment = 'all' | 'lab' | 'scan' | 'package';
+
+const getSegments = (isHi: boolean): { id: TabSegment; label: string }[] => [
+  { id: 'all', label: isHi ? 'सभी' : 'All' },
   { id: 'lab', label: isHi ? 'लैब टेस्ट' : 'Lab tests' },
   { id: 'scan', label: isHi ? 'स्कैन' : 'Scans' },
   { id: 'package', label: isHi ? 'पैकेज' : 'Packages' },
@@ -49,7 +52,7 @@ const fastText = (i: Item, isHi: boolean) => {
 };
 
 const findCategory = (i: Item): Category | undefined =>
-  i.segment === 'package' ? undefined : CATEGORIES[i.segment].find((c) => c.id === i.category);
+  i.segment === 'package' ? undefined : (CATEGORIES as any)[i.segment]?.find((c: Category) => c.id === i.category);
 
 const wrap = { width: '100%' as const, maxWidth: 600, alignSelf: 'center' as const, paddingHorizontal: 16 };
 
@@ -76,14 +79,14 @@ function SegmentSwitch({
   counts,
   isHi,
 }: {
-  value: Segment;
-  onChange: (s: Segment) => void;
-  counts: Record<Segment, number>;
+  value: TabSegment;
+  onChange: (s: TabSegment) => void;
+  counts: Record<TabSegment, number>;
   isHi: boolean;
 }) {
   const segments = getSegments(isHi);
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: '#E9EEF6', borderRadius: R.pill, padding: 4 }}>
+    <View style={{ flexDirection: 'row', backgroundColor: '#E9EEF6', borderRadius: R.pill, padding: 3 }}>
       {segments.map((s) => {
         const active = s.id === value;
         return (
@@ -92,22 +95,41 @@ function SegmentSwitch({
             onPress={() => onChange(s.id)}
             style={{
               flex: 1,
-              height: 40,
+              height: 38,
               borderRadius: R.pill,
               alignItems: 'center',
               justifyContent: 'center',
               flexDirection: 'row',
-              gap: 6,
+              gap: 4,
               backgroundColor: active ? '#FFFFFF' : 'transparent',
               ...(active ? SHADOW : {}),
             }}
           >
-            <Text style={{ fontSize: 13.5, fontWeight: active ? '700' : '500', color: active ? C.brand : C.sub }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 12.5,
+                fontWeight: active ? '700' : '600',
+                color: active ? C.brand : C.sub,
+              }}
+            >
               {s.label}
             </Text>
             {counts[s.id] > 0 && (
-              <View style={{ minWidth: 18, height: 18, borderRadius: 9, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }}>
-                <Text style={{ color: '#fff', fontSize: 10.5, fontWeight: '700' }}>{counts[s.id]}</Text>
+              <View
+                style={{
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: C.brand,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 4,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                  {counts[s.id]}
+                </Text>
               </View>
             )}
           </Pressable>
@@ -207,6 +229,7 @@ function ItemRow({
   onOpen,
   index,
   isHi,
+  showTypeBadge,
 }: {
   item: Item;
   added: boolean;
@@ -214,6 +237,7 @@ function ItemRow({
   onOpen: () => void;
   index: number;
   isHi: boolean;
+  showTypeBadge?: boolean;
 }) {
   const cat = findCategory(item);
   const Icon = cat ? ICONS[cat.icon] : FlaskConical;
@@ -237,9 +261,31 @@ function ItemRow({
           <Icon size={22} color={cat?.color ?? C.brand} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text numberOfLines={2} style={{ fontSize: 15, fontWeight: '600', color: C.ink, lineHeight: 20 }}>
-            {itemName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text numberOfLines={2} style={{ fontSize: 15, fontWeight: '600', color: C.ink, lineHeight: 20, flex: 1 }}>
+              {itemName}
+            </Text>
+            {showTypeBadge && (
+              <View
+                style={{
+                  backgroundColor: item.segment === 'scan' ? '#F1EBFF' : '#EAF1FF',
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                  borderRadius: R.pill,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: '700',
+                    color: item.segment === 'scan' ? '#7C3AED' : C.brand,
+                  }}
+                >
+                  {item.segment === 'scan' ? (isHi ? 'स्कैन' : 'Scan') : (isHi ? 'लैब' : 'Lab')}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={{ fontSize: 12.5, color: C.sub, marginTop: 2 }}>
             {reportText(item, isHi)}  ·  {fastText(item, isHi)}
           </Text>
@@ -362,7 +408,7 @@ export default function LabsScreen() {
   const { language } = useLanguage();
   const isHi = language === 'hi';
 
-  const [segment, setSegment] = useState<Segment>('lab');
+  const [segment, setSegment] = useState<TabSegment>('all');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [flt, setFlt] = useState({ home: false, sameDay: false, noFast: false });
@@ -379,8 +425,14 @@ export default function LabsScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  const cartIds = carts[segment];
-  const counts = { lab: carts.lab.length, scan: carts.scan.length, package: carts.package.length };
+  const allCartIds = useMemo(() => Array.from(new Set([...carts.lab, ...carts.scan, ...carts.package])), [carts]);
+  const cartIds = segment === 'all' ? allCartIds : carts[segment];
+  const counts: Record<TabSegment, number> = {
+    all: allCartIds.length,
+    lab: carts.lab.length,
+    scan: carts.scan.length,
+    package: carts.package.length,
+  };
 
   const toggle = (item: Item) =>
     setCarts((prev) => {
@@ -402,7 +454,7 @@ export default function LabsScreen() {
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return ITEMS.filter((i) => i.segment === segment)
+    return ITEMS.filter((i) => segment === 'all' ? true : i.segment === segment)
       .filter((i) => !category || i.category === category)
       .filter((i) => !q || i.name.toLowerCase().includes(q) || (i.nameHi && i.nameHi.toLowerCase().includes(q)))
       .filter((i) => !flt.home || homeAvailable(i))
@@ -411,17 +463,30 @@ export default function LabsScreen() {
   }, [segment, category, query, flt]);
 
   const packages = ITEMS.filter((i) => i.segment === 'package');
-  const cats = segment === 'package' ? [] : CATEGORIES[segment];
+  const cats =
+    segment === 'package'
+      ? []
+      : segment === 'all'
+      ? [...CATEGORIES.lab.slice(0, 6), CATEGORIES.scan[3], CATEGORIES.scan[0]]
+      : CATEGORIES[segment];
   const showBrowse = !query && !category;
-  const noun = segment === 'package'
-    ? (isHi ? 'पैकेज' : 'package')
-    : segment === 'scan'
-    ? (isHi ? 'स्कैन' : 'scan')
-    : (isHi ? 'टेस्ट' : 'test');
+  const noun =
+    segment === 'package'
+      ? (isHi ? 'पैकेज' : 'package')
+      : segment === 'scan'
+      ? (isHi ? 'स्कैन' : 'scan')
+      : segment === 'lab'
+      ? (isHi ? 'टेस्ट' : 'test')
+      : (isHi ? 'जांच' : 'test');
 
   const pickedOption = sorted.find((o) => o.centre.id === pick) ?? null;
 
-  const changeSegment = (s: Segment) => { setSegment(s); setCategory(null); setQuery(''); };
+  const changeSegment = (s: TabSegment) => {
+    setSegment(s);
+    setCategory(null);
+    setQuery('');
+    setFlt({ home: false, sameDay: false, noFast: false });
+  };
   const openCentres = () => { setPick(null); setCentreSheet(true); };
 
   const handleContinue = () => { setCentreSheet(false); };
@@ -542,8 +607,8 @@ export default function LabsScreen() {
             </PressableCard>
           )}
 
-          {/* Popular packages carousel (Lab tab only) */}
-          {segment === 'lab' && showBrowse && (
+          {/* Popular packages carousel (All and Lab tab only) */}
+          {(segment === 'lab' || segment === 'all') && showBrowse && (
             <View style={{ marginBottom: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink }}>
@@ -582,7 +647,7 @@ export default function LabsScreen() {
                     wide
                     index={i}
                     isHi={isHi}
-                    added={cartIds.includes(p.id)}
+                    added={carts.package.includes(p.id)}
                     onPress={() => setDetail(p)}
                     onToggle={() => toggle(p)}
                   />
@@ -595,6 +660,8 @@ export default function LabsScreen() {
                   <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink }}>
                     {query
                       ? (isHi ? 'खोज परिणाम' : 'Results')
+                      : segment === 'all'
+                      ? (isHi ? 'लोकप्रिय टेस्ट व स्कैन' : 'Popular Tests & Scans')
                       : segment === 'scan'
                       ? (isHi ? 'लोकप्रिय स्कैन' : 'Popular scans')
                       : (isHi ? 'लोकप्रिय टेस्ट' : 'Popular tests')}
@@ -631,17 +698,31 @@ export default function LabsScreen() {
                 </View>
               ) : (
                 <View style={{ gap: 10 }}>
-                  {list.map((it, i) => (
-                    <ItemRow
-                      key={it.id}
-                      item={it}
-                      index={i}
-                      isHi={isHi}
-                      added={cartIds.includes(it.id)}
-                      onToggle={() => toggle(it)}
-                      onOpen={() => setDetail(it)}
-                    />
-                  ))}
+                  {list.map((it, i) =>
+                    it.segment === 'package' ? (
+                      <PackageCard
+                        key={it.id}
+                        item={it}
+                        wide
+                        index={i}
+                        isHi={isHi}
+                        added={carts.package.includes(it.id)}
+                        onPress={() => setDetail(it)}
+                        onToggle={() => toggle(it)}
+                      />
+                    ) : (
+                      <ItemRow
+                        key={it.id}
+                        item={it}
+                        index={i}
+                        isHi={isHi}
+                        added={carts[it.segment].includes(it.id)}
+                        onToggle={() => toggle(it)}
+                        onOpen={() => setDetail(it)}
+                        showTypeBadge={segment === 'all'}
+                      />
+                    )
+                  )}
                 </View>
               )}
             </View>
