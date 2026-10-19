@@ -221,7 +221,13 @@ export default function SettingsScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/profile');
+                }
+              }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
                 width: 38,
@@ -243,6 +249,27 @@ export default function SettingsScreen() {
                 {isHi ? 'प्रोफ़ाइल, ABHA, सूचनाएं व सुरक्षा नियंत्रण' : 'Preferences, ABHA ID, Security & Data'}
               </Text>
             </View>
+
+            <TouchableOpacity
+              onPress={() => router.push('/profile')}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#EFF6FF',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: '#BFDBFE',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <UserIcon size={13} color="#2563EB" />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                {isHi ? 'प्रोफ़ाइल' : 'Profile'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -367,6 +394,32 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Direct Link to Full Profile & Family Vault */}
+            <TouchableOpacity
+              onPress={() => router.push('/profile')}
+              activeOpacity={0.8}
+              style={{
+                marginTop: 12,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 12,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <UserIcon size={14} color="#2563EB" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>
+                  {isHi ? 'पूरा प्रोफाइल, वॉलेट व परिवार देखें' : 'View Full Profile, Wallet & Family Vault'}
+                </Text>
+              </View>
+              <ChevronRight size={14} color="#94A3B8" />
+            </TouchableOpacity>
           </View>
 
           {/* 2. AYUSHMAN BHARAT (ABHA) HEALTH ID SECTION */}

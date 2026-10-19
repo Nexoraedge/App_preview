@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronRight,
   Users,
+  User,
 } from 'lucide-react-native';
 import { useLanguage, type Language } from '../../src/context/LanguageContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -71,8 +72,13 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
             borderColor: '#E2E8F0',
           }}
         >
-          {/* User Profile Header */}
-          <View
+          {/* User Profile Header (Tappable -> View Profile) */}
+          <TouchableOpacity
+            onPress={() => {
+              onClose();
+              router.push('/profile');
+            }}
+            activeOpacity={0.7}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -120,7 +126,8 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
                 {user?.phone || '+91 98765 43210'}
               </Text>
             </View>
-          </View>
+            <ChevronRight size={14} color="#94A3B8" />
+          </TouchableOpacity>
 
           {/* App Language Switcher inside Profile Menu */}
           <View
@@ -274,6 +281,7 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
               <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>₹2,500</Text>
             </TouchableOpacity>
 
+            {/* My Profile */}
             <TouchableOpacity
               onPress={() => {
                 onClose();
@@ -289,9 +297,33 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Settings size={15} color="#64748B" />
+                <User size={15} color="#2563EB" />
                 <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1E293B' }}>
-                  {language === 'hi' ? 'सेटिंग्स व प्रोफाइल' : 'Settings & Profile'}
+                  {language === 'hi' ? 'मेरी प्रोफाइल' : 'My Profile'}
+                </Text>
+              </View>
+              <ChevronRight size={14} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Settings & Privacy */}
+            <TouchableOpacity
+              onPress={() => {
+                onClose();
+                router.push('/settings');
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#F8FAFC',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Settings size={15} color="#2563EB" />
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1E293B' }}>
+                  {language === 'hi' ? 'सेटिंग्स और गोपनीयता' : 'Settings & Privacy'}
                 </Text>
               </View>
               <ChevronRight size={14} color="#94A3B8" />
