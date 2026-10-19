@@ -15,7 +15,7 @@ interface AuthContextType {
 const TEST_USER: User = {
   id: '00000000-0000-0000-0000-000000000001',
   phone: '+91 99999 99999',
-  full_name: 'Dr. Vikram Malhotra',
+  full_name: 'Rahul Jain',
   age: 34,
   gender: 'Male',
   city: 'Delhi NCR',

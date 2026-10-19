@@ -90,7 +90,7 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>
-                  {user?.full_name || 'Hardik Sharma'}
+                  {user?.full_name || 'Hardik Jain'}
                 </Text>
                 <View
                   style={{

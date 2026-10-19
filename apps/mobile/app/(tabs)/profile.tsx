@@ -40,7 +40,7 @@ export default function ProfileScreen() {
       language === 'hi' ? 'रिव्यूअर अकाउंट तैयार' : 'Reviewer Account Ready',
       language === 'hi'
         ? 'डॉ. विक्रम मल्होत्रा टेस्ट प्रोफाइल (₹2,500 वॉलेट) पर स्विच किया गया।'
-        : 'Switched to Dr. Vikram Malhotra test profile with ₹2,500 wallet.'
+        : 'Switched to Rahul Jain test profile with ₹2,500 wallet.'
     );
   };
 
@@ -54,7 +54,7 @@ export default function ProfileScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-lg font-bold text-[#2E4A70]">
-              {user?.full_name || (language === 'hi' ? 'डॉ. विक्रम मल्होत्रा' : 'Dr. Vikram Malhotra')}
+              {user?.full_name || (language === 'hi' ? 'डॉ. विक्रम मल्होत्रा' : 'Rahul Jain')}
             </Text>
             <View className="flex-row items-center space-x-1 mt-0.5">
               <Phone size={12} color="#64748B" />
@@ -97,11 +97,10 @@ export default function ProfileScreen() {
         <View className="flex-row space-x-3">
           <TouchableOpacity
             onPress={() => setLanguage('en')}
-            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${
-              language === 'en'
+            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${language === 'en'
                 ? 'bg-[#E6F8F9] border-[#24B0BA]'
                 : 'bg-slate-50 border-slate-200'
-            }`}
+              }`}
           >
             <View>
               <Text className="text-xs font-bold text-[#2E4A70]">English</Text>
@@ -112,11 +111,10 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             onPress={() => setLanguage('hi')}
-            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${
-              language === 'hi'
+            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${language === 'hi'
                 ? 'bg-[#E6F8F9] border-[#24B0BA]'
                 : 'bg-slate-50 border-slate-200'
-            }`}
+              }`}
           >
             <View>
               <Text className="text-xs font-bold text-[#2E4A70]">हिंदी (Hindi)</Text>

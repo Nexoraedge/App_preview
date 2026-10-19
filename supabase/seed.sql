@@ -8,7 +8,7 @@ INSERT INTO public.users (
 ) VALUES (
     '00000000-0000-0000-0000-000000000001',
     '+919999999999',
-    'Dr. Vikram Malhotra',
+    'Rahul Jain',
     34,
     'Male',
     'Delhi NCR',
@@ -227,7 +227,7 @@ INSERT INTO public.bookings (
     'AN-2026-9041',
     'OPD_CONCIERGE',
     '00000000-0000-0000-0000-000000000001',
-    'Dr. Vikram Malhotra',
+    'Rahul Jain',
     '+919999999999',
     '22222222-2222-2222-2222-222222222201',
     'Max Super Speciality Hospital, Saket',

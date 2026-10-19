@@ -213,7 +213,7 @@ export default function OpdConciergeScreen() {
       booking_ref: bookingRef,
       service_type: 'OPD_CONCIERGE',
       user_id: user?.id,
-      patient_name: user?.full_name || 'Dr. Vikram Malhotra',
+      patient_name: user?.full_name || 'Rahul Jain',
       patient_phone: user?.phone || '+91 99999 99999',
       hospital_id: selectedHospital.id,
       hospital_name: selectedHospital.name,
@@ -664,8 +664,8 @@ export default function OpdConciergeScreen() {
                             {language === 'hi'
                               ? 'शाखाएं'
                               : branches.length === 1
-                              ? 'Branch'
-                              : 'Branches'}
+                                ? 'Branch'
+                                : 'Branches'}
                           </Text>
                         </View>
                         <Text style={{ color: '#CBD5E1' }}>•</Text>
@@ -1002,7 +1002,7 @@ export default function OpdConciergeScreen() {
                     {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
                   </Text>
                   <Text className="text-xs text-slate-700 mt-1">
-                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Dr. Vikram Malhotra'}</Text>
+                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Rahul Jain'}</Text>
                   </Text>
                   <Text className="text-xs text-slate-700">
                     {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>

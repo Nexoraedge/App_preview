@@ -32,10 +32,12 @@ export default function RootLayout() {
                 screenOptions={{
                   headerShown: false,
                   contentStyle: {
-                    backgroundColor: '#F7FBFA',
+                    backgroundColor: '#172554',
                   },
                 }}
               >
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="welcome" options={{ headerShown: false }} />
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="login"

@@ -4,13 +4,13 @@
     "slug": "adityam-niramayaa",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo_AN.png",
+    "icon": "./assets/logo-an.png",
     "scheme": "adityam",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/logo_AN.png",
+      "image": "./assets/logo-an.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F7FBFA"
+      "backgroundColor": "#172554"
     },
     "ios": {
       "supportsTablet": true,
@@ -28,8 +28,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F7FBFA"
+        "foregroundImage": "./assets/logo-an.png",
+        "backgroundColor": "#172554"
       },
       "package": "com.adityam.niramayaa"
     },
@@ -44,7 +44,8 @@
           "cameraPermission": "Allow Adityam Niramayaa to access your camera to scan pharmacy QR codes and capture bill receipts."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-splash-screen"
     ]
   }
 }

@@ -84,7 +84,7 @@ export default function DiagnosticCentersScreen() {
   // Slot Booking Modal State
   const [selectedCenter, setSelectedCenter] = useState<NearbyCenter | null>(null);
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [patientName, setPatientName] = useState(user?.full_name || 'Hardik Gupta');
+  const [patientName, setPatientName] = useState(user?.full_name || 'Hardik Jain');
   const [patientPhone, setPatientPhone] = useState(user?.phone || '+91 98112 44550');
   const [selectedDate, setSelectedDate] = useState('Today');
   const [selectedSlot, setSelectedSlot] = useState('02:30 PM - 03:30 PM (Priority Pass)');
@@ -373,16 +373,14 @@ export default function DiagnosticCentersScreen() {
               <TouchableOpacity
                 key={area}
                 onPress={() => setSelectedAreaFilter(area)}
-                className={`px-3.5 py-1.5 rounded-full mr-2 border ${
-                  selectedAreaFilter === area
+                className={`px-3.5 py-1.5 rounded-full mr-2 border ${selectedAreaFilter === area
                     ? 'bg-[#2563EB] border-[#2563EB]'
                     : 'bg-white border-slate-200'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`text-[11px] font-bold ${
-                    selectedAreaFilter === area ? 'text-white' : 'text-slate-600'
-                  }`}
+                  className={`text-[11px] font-bold ${selectedAreaFilter === area ? 'text-white' : 'text-slate-600'
+                    }`}
                 >
                   {area}
                 </Text>
@@ -617,16 +615,14 @@ export default function DiagnosticCentersScreen() {
                     <TouchableOpacity
                       key={d}
                       onPress={() => setSelectedDate(d)}
-                      className={`flex-1 py-2 rounded-xl border items-center ${
-                        selectedDate === d
+                      className={`flex-1 py-2 rounded-xl border items-center ${selectedDate === d
                           ? 'bg-blue-50 border-[#2563EB]'
                           : 'bg-white border-slate-200'
-                      }`}
+                        }`}
                     >
                       <Text
-                        className={`text-xs font-bold ${
-                          selectedDate === d ? 'text-[#2563EB]' : 'text-slate-600'
-                        }`}
+                        className={`text-xs font-bold ${selectedDate === d ? 'text-[#2563EB]' : 'text-slate-600'
+                          }`}
                       >
                         {d}
                       </Text>
@@ -648,16 +644,14 @@ export default function DiagnosticCentersScreen() {
                     <TouchableOpacity
                       key={s}
                       onPress={() => setSelectedSlot(s)}
-                      className={`p-3 rounded-xl border flex-row items-center justify-between ${
-                        selectedSlot === s
+                      className={`p-3 rounded-xl border flex-row items-center justify-between ${selectedSlot === s
                           ? 'bg-blue-50 border-[#2563EB]'
                           : 'bg-white border-slate-200'
-                      }`}
+                        }`}
                     >
                       <Text
-                        className={`text-xs font-semibold ${
-                          selectedSlot === s ? 'text-[#2563EB] font-bold' : 'text-slate-700'
-                        }`}
+                        className={`text-xs font-semibold ${selectedSlot === s ? 'text-[#2563EB] font-bold' : 'text-slate-700'
+                          }`}
                       >
                         {s}
                       </Text>

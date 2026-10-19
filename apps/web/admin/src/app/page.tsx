@@ -1,20 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  PhoneCall, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Hospital as HospitalIcon, 
-  MapPin, 
-  FileText, 
-  QrCode, 
-  Activity, 
-  Search, 
-  RefreshCw, 
-  User, 
-  ShieldCheck, 
+import {
+  PhoneCall,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Hospital as HospitalIcon,
+  MapPin,
+  FileText,
+  QrCode,
+  Activity,
+  Search,
+  RefreshCw,
+  User,
+  ShieldCheck,
   Flame,
   Volume2,
   X,
@@ -40,7 +40,7 @@ export default function CallCenterDashboard() {
   // Set up Supabase Realtime subscription
   useEffect(() => {
     const supabase = getSupabaseClient();
-    
+
     // Attempt real-time subscription
     try {
       const channel = supabase
@@ -149,7 +149,7 @@ export default function CallCenterDashboard() {
   // Mock simulator to trigger incoming request from mobile app
   const simulateIncomingPatientRequest = () => {
     const randomHospital = ['Max Super Speciality Hospital, Saket', 'Fortis Memorial Gurugram', 'Medanta - The Medicity'][Math.floor(Math.random() * 3)];
-    const randomNames = ['Aman Sharma', 'Priya Deshmukh', 'Rajeev Kapoor', 'Ananya Gupta', 'Kavita Chawla'];
+    const randomNames = ['Aman Jain', 'Priya Deshmukh', 'Rajeev Kapoor', 'Ananya Gupta', 'Kavita Chawla'];
     const randomPatient = randomNames[Math.floor(Math.random() * randomNames.length)];
     const mockRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -231,11 +231,10 @@ export default function CallCenterDashboard() {
           <nav className="p-4 space-y-1">
             <button
               onClick={() => setActiveTab('ALL')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'ALL'
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'ALL'
                   ? 'bg-[#3A7BD5] text-white shadow-md'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <Activity className="w-4 h-4" />
@@ -248,11 +247,10 @@ export default function CallCenterDashboard() {
 
             <button
               onClick={() => setActiveTab('OPD_CONCIERGE')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'OPD_CONCIERGE'
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'OPD_CONCIERGE'
                   ? 'bg-[#3A7BD5] text-white shadow-md'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <HospitalIcon className="w-4 h-4" />
@@ -265,11 +263,10 @@ export default function CallCenterDashboard() {
 
             <button
               onClick={() => setActiveTab('PHARMACY_SCAN_PAY')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'PHARMACY_SCAN_PAY'
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'PHARMACY_SCAN_PAY'
                   ? 'bg-[#3A7BD5] text-white shadow-md'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <QrCode className="w-4 h-4" />
@@ -282,11 +279,10 @@ export default function CallCenterDashboard() {
 
             <button
               onClick={() => setActiveTab('IPD_ENQUIRY')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === 'IPD_ENQUIRY'
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'IPD_ENQUIRY'
                   ? 'bg-[#3A7BD5] text-white shadow-md'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <FileText className="w-4 h-4" />
@@ -336,11 +332,10 @@ export default function CallCenterDashboard() {
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-md font-medium transition ${
-                    statusFilter === status
+                  className={`px-3 py-1.5 rounded-md font-medium transition ${statusFilter === status
                       ? 'bg-white text-[#1D2D50] shadow-sm font-semibold'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   {status}
                 </button>
@@ -469,26 +464,24 @@ export default function CallCenterDashboard() {
                     <div
                       key={booking.id}
                       onClick={() => setSelectedBooking(booking)}
-                      className={`p-3.5 rounded-lg cursor-pointer transition relative mb-1.5 ${
-                        isSelected
+                      className={`p-3.5 rounded-lg cursor-pointer transition relative mb-1.5 ${isSelected
                           ? 'bg-blue-50/80 border border-[#3A7BD5]/40 shadow-sm'
                           : 'hover:bg-slate-50 border border-transparent'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="font-mono text-[11px] font-bold text-slate-500">
                           {booking.booking_ref}
                         </span>
                         <span
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                            booking.status === 'NEW'
+                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${booking.status === 'NEW'
                               ? 'bg-rose-100 text-rose-700 animate-pulse'
                               : booking.status === 'CALLING'
-                              ? 'bg-amber-100 text-amber-800'
-                              : booking.status === 'CONFIRMED' || booking.status === 'PAID'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
+                                ? 'bg-amber-100 text-amber-800'
+                                : booking.status === 'CONFIRMED' || booking.status === 'PAID'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-100 text-slate-600'
+                            }`}
                         >
                           {booking.status}
                         </span>

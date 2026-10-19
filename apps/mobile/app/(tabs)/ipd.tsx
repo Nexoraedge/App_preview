@@ -363,7 +363,7 @@ export default function IpdScreen() {
   const [selectedHospital, setSelectedHospital] = useState<HospitalAdmissionInfo | null>(null);
 
   // Booking fields
-  const [patientName, setPatientName] = useState(user?.full_name || 'Dr. Vikram Malhotra');
+  const [patientName, setPatientName] = useState(user?.full_name || 'Rahul Jain');
   const [patientPhone, setPatientPhone] = useState(user?.phone || '+91 98112 44550');
   const [roomType, setRoomType] = useState<'DELUXE' | 'SEMI' | 'GENERAL' | 'ICU'>('DELUXE');
   const [insurancePolicy, setInsurancePolicy] = useState('Star Health Insurance');
@@ -441,9 +441,8 @@ export default function IpdScreen() {
       specialty_requested: selectedSurgery ? selectedSurgery.name : 'Hospital Admission',
       status: 'NEW',
       call_status: 'pending',
-      notes: `Room: ${roomType}. Insurance: ${insurancePolicy}. Reason: ${
-        admissionReason || 'Inpatient admission booking assistance.'
-      }`,
+      notes: `Room: ${roomType}. Insurance: ${insurancePolicy}. Reason: ${admissionReason || 'Inpatient admission booking assistance.'
+        }`,
       created_at: new Date().toISOString(),
     };
 

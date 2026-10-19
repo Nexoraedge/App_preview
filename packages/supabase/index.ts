@@ -284,7 +284,7 @@ export const SEED_HOSPITALS: Hospital[] = [
             id: 'doc-apollo-3',
             hospital_id: '22222222-2222-2222-2222-222222222204',
             branch_id: 'branch-apollo-nehru-enclave',
-            name: 'Dr. Priya Sharma',
+            name: 'Dr. Priya Jain',
             specialty: 'Pediatrics',
             qualification: 'MBBS, MD (Pediatrics), Fellowship Neonatology',
             experience_years: 13,
@@ -580,9 +580,9 @@ export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lo
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c * 10) / 10;
 }
@@ -647,7 +647,7 @@ export const SEED_BOOKINGS: Booking[] = [
     id: '33333333-3333-3333-3333-333333333301',
     booking_ref: 'AN-2026-9041',
     service_type: 'OPD_CONCIERGE',
-    patient_name: 'Dr. Vikram Malhotra',
+    patient_name: 'Rahul Jain',
     patient_phone: '+919999999999',
     hospital_id: '22222222-2222-2222-2222-222222222201',
     hospital_name: 'Max Super Speciality Hospital, Saket',

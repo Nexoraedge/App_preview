@@ -117,7 +117,7 @@ export const DOCTORS: Record<string, string> = {
   'Dr. Rakesh Tandon': 'डॉ. राकेश टंडन',
   'Dr. Sunita Rao': 'डॉ. सुनीता राव',
   'Dr. Rohan Kapur': 'डॉ. रोहन कपूर',
-  'Dr. Priya Sharma': 'डॉ. प्रिया शर्मा',
+  'Dr. Priya Jain': 'डॉ. प्रिया जैन',
   'Dr. Divya Nambiar': 'डॉ. दिव्या नांबियार',
   'Dr. Nitin Sood': 'डॉ. नितिन सूद',
   'Dr. Shweta Bansal': 'डॉ. श्वेता बंसल',

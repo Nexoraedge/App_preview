@@ -71,8 +71,8 @@ const SEED: Member[] = [
   },
   {
     id: 'm1',
-    name: 'Asha Sharma',
-    nameHi: 'आशा शर्मा',
+    name: 'Asha Jain',
+    nameHi: 'आशा जैन',
     relation: 'Mother',
     relationHi: 'माताजी',
     age: 58,
@@ -81,8 +81,8 @@ const SEED: Member[] = [
   },
   {
     id: 'm2',
-    name: 'Rohan Sharma',
-    nameHi: 'रोहन शर्मा',
+    name: 'Rohan Jain',
+    nameHi: 'रोहन जैन',
     relation: 'Son',
     relationHi: 'बेटा',
     age: 8,
@@ -141,9 +141,9 @@ export const useFamilyOptional = (): FamilyContextType | null => {
     members: SEED,
     activeId: 'self',
     active: SEED[0],
-    setActive: () => {},
+    setActive: () => { },
     add: () => 'self',
-    update: () => {},
-    remove: () => {},
+    update: () => { },
+    remove: () => { },
   };
 };
