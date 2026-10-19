@@ -800,14 +800,14 @@ export default function BranchDoctorsScreen() {
                 )}
 
                 {/* Section Heading for All Department Specialists */}
-                <View className="flex-row items-center justify-between mb-3 px-0.5">
-                  <Text className="text-base font-black text-[#182F3B] tracking-tight">
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 2 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
                     {selectedSpecialty === 'All'
                       ? (language === 'hi' ? 'उपलब्ध विशेषज्ञ' : (t.topSpecialistsTitle || 'Available Specialists'))
                       : (language === 'hi' ? `${translateSpecialty(selectedSpecialty, true)} विशेषज्ञ` : `${selectedSpecialty} Specialists`)}
                   </Text>
-                  <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
-                    <Text className="text-xs font-bold text-[#2563EB]">
+                  <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.6)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                       {regularDoctors.length} {language === 'hi' ? 'डॉक्टर' : (regularDoctors.length === 1 ? 'Doctor' : 'Doctors')}
                     </Text>
                   </View>
@@ -830,10 +830,15 @@ export default function BranchDoctorsScreen() {
                     return (
                       <View
                         key={doctor.id}
-                        className="bg-white rounded-[22px] border border-slate-200/90 p-4 overflow-hidden"
                         style={{
                           width: isTablet ? tabletCardWidth : '100%',
                           marginBottom: isTablet ? cardGap : 16,
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 22,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 16,
+                          overflow: 'hidden',
                           shadowColor: '#1E3A8A',
                           shadowOffset: { width: 0, height: 3 },
                           shadowOpacity: 0.05,
@@ -842,26 +847,50 @@ export default function BranchDoctorsScreen() {
                         }}
                       >
                         {/* Doctor Profile Info Row (Name, Experience, Rating, Qualification) */}
-                        <View className="flex-row items-start space-x-3.5">
-                          <View className="relative">
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+                          <View style={{ position: 'relative' }}>
                             <Image
                               source={{ uri: avatar }}
-                              style={{ width: 78, height: 98, borderRadius: 16 }}
-                              className="bg-blue-50 border border-slate-100"
+                              style={{
+                                width: 78,
+                                height: 98,
+                                borderRadius: 16,
+                                backgroundColor: '#EFF6FF',
+                                borderWidth: 1,
+                                borderColor: '#F1F5F9',
+                              }}
                               resizeMode="cover"
                             />
                           </View>
 
-                          <View className="flex-1">
-                            <View className="flex-row items-start justify-between">
-                              <Text className="text-[16px] font-black text-[#0F172A] flex-1 leading-tight mr-1">
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: '900',
+                                  color: '#0F172A',
+                                  flex: 1,
+                                  lineHeight: 20,
+                                  marginRight: 4,
+                                }}
+                              >
                                 {translateDoctorName(doctor.name, language === 'hi')}
                               </Text>
 
                               <TouchableOpacity
                                 onPress={() => toggleFavorite(doctor.id)}
                                 activeOpacity={0.7}
-                                className="w-7 h-7 rounded-full bg-slate-50 items-center justify-center -mt-0.5 -mr-0.5"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 14,
+                                  backgroundColor: '#F8FAFC',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginTop: -2,
+                                  marginRight: -2,
+                                }}
                               >
                                 <Heart
                                   size={14}
@@ -872,22 +901,37 @@ export default function BranchDoctorsScreen() {
                             </View>
 
                             {/* Specialty & Experience Line */}
-                            <Text className="text-[12px] font-bold text-[#2563EB] mt-0.5">
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '700',
+                                color: '#2563EB',
+                                marginTop: 2,
+                              }}
+                            >
                               {translateSpecialty(doctor.specialty, language === 'hi')} • {doctor.experience_years} {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
                             </Text>
 
                             {/* Single Qualification Line */}
-                            <Text className="text-[11px] text-slate-500 font-medium mt-0.5" numberOfLines={1}>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: '#64748B',
+                                fontWeight: '500',
+                                marginTop: 2,
+                              }}
+                              numberOfLines={1}
+                            >
                               {translateQualification(doctor.qualification, language === 'hi')}
                             </Text>
 
                             {/* Star Rating Line */}
-                            <View className="flex-row items-center space-x-1 mt-1">
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                               <Star size={11} color="#D97706" fill="#D97706" />
-                              <Text className="text-xs font-black text-slate-800">
+                              <Text style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}>
                                 {doctor.rating}
                               </Text>
-                              <Text className="text-[10px] text-slate-500 font-medium">
+                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>
                                 ({doctor.total_reviews} {language === 'hi' ? 'समीक्षा' : 'reviews'})
                               </Text>
                             </View>
@@ -895,21 +939,31 @@ export default function BranchDoctorsScreen() {
                         </View>
 
                         {/* Plain Text Fee with In-App Price & One Obvious Book CTA */}
-                        <View className="mt-3 pt-2.5 border-t border-slate-100 flex-row items-center justify-between">
+                        <View
+                          style={{
+                            marginTop: 12,
+                            paddingTop: 10,
+                            borderTopWidth: 1,
+                            borderTopColor: '#F1F5F9',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
                           <View>
-                            <Text className="text-[13px] text-slate-500 font-medium">
+                            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500' }}>
                               <Text style={{ textDecorationLine: 'line-through' }}>
                                 ₹{doctor.consultation_fee}
                               </Text>
                               {' · '}
-                              <Text className="text-[#16A34A] font-black text-sm">
+                              <Text style={{ color: '#16A34A', fontWeight: '900', fontSize: 14 }}>
                                 {language === 'hi'
                                   ? `ऐप में ₹${doctor.discounted_fee}`
                                   : `Pay in app ₹${doctor.discounted_fee}`}
                               </Text>
                             </Text>
                             {hospital?.discount_percentage ? (
-                              <Text className="text-[10.5px] text-[#2563EB] font-bold mt-0.5">
+                              <Text style={{ fontSize: 10.5, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
                                 {language === 'hi'
                                   ? `${hospital.discount_percentage}% छूट • इन-ऐप दर`
                                   : `Save ${hospital.discount_percentage}% with in-app pay`}
@@ -920,9 +974,22 @@ export default function BranchDoctorsScreen() {
                           <TouchableOpacity
                             onPress={() => handleInitiateDoctorBooking(doctor)}
                             activeOpacity={0.88}
-                            className="bg-[#2563EB] active:bg-[#1D4ED8] px-4 py-2.5 rounded-xl flex-row items-center space-x-1.5 shadow-sm"
+                            style={{
+                              backgroundColor: '#2563EB',
+                              paddingHorizontal: 16,
+                              paddingVertical: 10,
+                              borderRadius: 12,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              shadowColor: '#2563EB',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.2,
+                              shadowRadius: 4,
+                              elevation: 2,
+                            }}
                           >
-                            <Text className="text-white text-xs font-bold">
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
                               {language === 'hi' ? 'बुक करें' : 'Book'}
                             </Text>
                             <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />

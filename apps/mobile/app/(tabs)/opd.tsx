@@ -485,9 +485,9 @@ export default function OpdConciergeScreen() {
   ];
 
   return (
-    <View className="flex-1 bg-[#F8FAFC]">
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: Math.max(insets.bottom, 12) + (selectedSlotDoctor ? 150 : 90),
@@ -600,17 +600,17 @@ export default function OpdConciergeScreen() {
         </AppHeader>
 
         {/* Categories Capsule Pills Section */}
-        <View className="pt-3 px-5">
-          <View className="flex-row items-center justify-between mb-2.5 px-0.5">
-            <Text className="text-base font-black text-[#182F3B] tracking-tight">
+        <View style={{ paddingTop: 14, paddingHorizontal: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
               {t.categoriesTitle}
             </Text>
             {selectedSpecialty !== 'All' && (
               <TouchableOpacity
                 onPress={() => setSelectedSpecialty('All')}
-                className="flex-row items-center space-x-1"
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
               >
-                <Text className="text-xs font-bold text-[#2563EB]">
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                   {language === 'hi' ? 'सभी देखें' : 'Reset to All'}
                 </Text>
               </TouchableOpacity>
@@ -629,7 +629,7 @@ export default function OpdConciergeScreen() {
                   key={cat.id}
                   onPress={() => setSelectedSpecialty(cat.id)}
                   activeOpacity={0.8}
-                  className="mr-2"
+                  style={{ marginRight: 8 }}
                 >
                   {isSelected ? (
                     <LinearGradient
@@ -649,8 +649,8 @@ export default function OpdConciergeScreen() {
                         elevation: 4,
                       }}
                     >
-                      <View className="mr-2">{cat.icon('#FFFFFF')}</View>
-                      <Text className="text-white text-xs font-black tracking-tight">
+                      <View style={{ marginRight: 8 }}>{cat.icon('#FFFFFF')}</View>
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: -0.2 }}>
                         {cat.label}
                       </Text>
                     </LinearGradient>
@@ -672,8 +672,8 @@ export default function OpdConciergeScreen() {
                         elevation: 1,
                       }}
                     >
-                      <View className="mr-2">{cat.icon(cat.accentColor)}</View>
-                      <Text className="text-[#334155] text-xs font-bold">
+                      <View style={{ marginRight: 8 }}>{cat.icon(cat.accentColor)}</View>
+                      <Text style={{ color: '#334155', fontSize: 12, fontWeight: '700' }}>
                         {cat.label}
                       </Text>
                     </View>
@@ -685,7 +685,7 @@ export default function OpdConciergeScreen() {
         </View>
 
         {/* Sort Chips Row */}
-        <View className="pt-3 px-5">
+        <View style={{ paddingTop: 12, paddingHorizontal: 20 }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -728,13 +728,13 @@ export default function OpdConciergeScreen() {
 
         {/* TAB 1: HOSPITALS LIST */}
         {activeTab === 'hospitals' && (
-          <View className="px-5 pt-4">
-            <View className="flex-row items-center justify-between mb-3.5">
+          <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <View>
-                <Text className="text-lg font-bold text-[#182F3B] tracking-tight">
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#182F3B', letterSpacing: -0.3 }}>
                   {t.hospitalNetworksTitle}
                 </Text>
-                <Text className="text-xs text-slate-500 font-medium">
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
                   {language === 'hi'
                     ? `${filteredHospitals.length} अस्पताल नेटवर्क उपलब्ध`
                     : `${filteredHospitals.length} ${filteredHospitals.length === 1 ? 'Hospital Network' : 'Hospital Networks'} available`}
@@ -743,21 +743,21 @@ export default function OpdConciergeScreen() {
             </View>
 
             {isLoading ? (
-              <View className="py-16 items-center">
+              <View style={{ paddingVertical: 64, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#2563EB" />
-                <Text className="text-xs text-slate-500 font-medium mt-3">
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 12 }}>
                   {t.loadingSpecialists}
                 </Text>
               </View>
             ) : filteredHospitals.length === 0 ? (
-              <View className="py-16 items-center px-6">
-                <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-3">
+              <View style={{ paddingVertical: 64, alignItems: 'center', paddingHorizontal: 24 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                   <Building2 size={28} color="#94A3B8" />
                 </View>
-                <Text className="text-base font-bold text-[#182F3B]">
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
                   {t.noHospitalsFound}
                 </Text>
-                <Text className="text-xs text-slate-500 text-center mt-1">
+                <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
                   {t.noHospitalsSub}
                 </Text>
               </View>
@@ -780,8 +780,9 @@ export default function OpdConciergeScreen() {
                   return (
                     <View
                       key={hospital.id}
-                      className="bg-white overflow-hidden"
                       style={{
+                        backgroundColor: '#FFFFFF',
+                        overflow: 'hidden',
                         width: isTablet ? tabletCardWidth : '100%',
                         marginBottom: isTablet ? cardGap : 16,
                         borderRadius: 22,
@@ -1139,28 +1140,28 @@ export default function OpdConciergeScreen() {
 
         {/* TAB 2: DOCTORS LIST */}
         {activeTab === 'doctors' && (
-          <View className="px-4 pt-4">
+          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
             {isLoading ? (
-              <View className="py-16 items-center">
+              <View style={{ paddingVertical: 64, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#2563EB" />
-                <Text className="text-xs text-slate-500 font-medium mt-3">
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 12 }}>
                   {t.loadingSpecialists}
                 </Text>
               </View>
             ) : filteredDoctors.length === 0 ? (
-              <View className="bg-white p-8 rounded-3xl border border-slate-200 items-center my-6 shadow-sm">
+              <View style={{ backgroundColor: '#FFFFFF', padding: 32, borderRadius: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', marginVertical: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
                 <UserCheck size={36} color="#94A3B8" />
-                <Text className="text-base font-bold text-[#182F3B] mt-2">
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B', marginTop: 8 }}>
                   {language === 'hi' ? 'कोई डॉक्टर नहीं मिले' : 'No doctors found'}
                 </Text>
-                <Text className="text-xs text-slate-500 text-center mt-1">
+                <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
                   {language === 'hi' ? 'कृपया अपनी विशेषता या खोज बदलें।' : 'Please change your specialty or search filter.'}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setSelectedSpecialty('All')}
-                  className="mt-4 bg-[#2563EB] px-5 py-2.5 rounded-xl shadow-sm shadow-blue-500/20"
+                  style={{ marginTop: 16, backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}
                 >
-                  <Text className="text-white text-xs font-bold">
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
                     {language === 'hi' ? 'सभी डॉक्टर देखें' : 'Show All Doctors'}
                   </Text>
                 </TouchableOpacity>
@@ -1169,13 +1170,13 @@ export default function OpdConciergeScreen() {
               <>
                 {/* 1. TOP DOCTORS SPOTLIGHT (The Royal Blue Cards from Image 1) */}
                 {showTopDoctors && topDoctors.length > 0 && (
-                  <View className="mb-6">
-                    <View className="flex-row items-center justify-between mb-3 px-1">
-                      <Text className="text-lg font-black text-[#182F3B] tracking-tight">
+                  <View style={{ marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
                         {language === 'hi' ? 'शीर्ष डॉक्टर' : 'Top Doctors'}
                       </Text>
                       {topDoctors.length > 1 && (
-                        <Text className="text-xs font-semibold text-slate-500">
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>
                           {language === 'hi' ? 'खोजने के लिए स्वाइप करें' : 'Swipe to explore'}
                         </Text>
                       )}
@@ -1248,15 +1249,21 @@ export default function OpdConciergeScreen() {
                                 <View style={{ flex: 1, paddingLeft: 12, justifyContent: 'space-between' }}>
                                   <View>
                                     {/* Name & Favorite Button */}
-                                    <View className="flex-row items-start justify-between">
-                                      <View className="flex-1 mr-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                                      <View style={{ flex: 1, marginRight: 4 }}>
                                         <Text
-                                          className="text-white text-[15px] font-black tracking-tight leading-tight"
+                                          style={{
+                                            color: '#FFFFFF',
+                                            fontSize: 15,
+                                            fontWeight: '900',
+                                            letterSpacing: -0.3,
+                                            lineHeight: 19,
+                                          }}
                                           numberOfLines={2}
                                         >
                                           {translateDoctorName(doc.name, language === 'hi')}
                                         </Text>
-                                        <Text className="text-blue-100 text-xs font-semibold mt-0.5">
+                                        <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
                                           {translateSpecialty(doc.specialty, language === 'hi')}
                                         </Text>
                                       </View>
@@ -1264,7 +1271,15 @@ export default function OpdConciergeScreen() {
                                       <TouchableOpacity
                                         onPress={() => toggleFavorite(doc.id)}
                                         activeOpacity={0.7}
-                                        className="w-7 h-7 rounded-full bg-white/20 items-center justify-center -mt-0.5"
+                                        style={{
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: 14,
+                                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          marginTop: -2,
+                                        }}
                                       >
                                         <Heart
                                           size={13}
@@ -1275,9 +1290,9 @@ export default function OpdConciergeScreen() {
                                     </View>
 
                                     {/* Star Rating */}
-                                    <View className="flex-row items-center space-x-1 mt-1">
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                       <Star size={11} color="#FBBF24" fill="#FBBF24" />
-                                      <Text className="text-white text-xs font-bold">
+                                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
                                         {doc.rating} ({doc.total_reviews} {language === 'hi' ? 'समीक्षाएं' : 'reviews'})
                                       </Text>
                                     </View>
@@ -1378,14 +1393,14 @@ export default function OpdConciergeScreen() {
                 )}
 
                 {/* 2. ALL SPECIALISTS SECTION HEADING */}
-                <View className="flex-row items-center justify-between mb-3 px-0.5">
-                  <Text className="text-base font-black text-[#182F3B] tracking-tight">
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 2 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B', letterSpacing: -0.3 }}>
                     {selectedSpecialty === 'All'
                       ? (language === 'hi' ? 'उपलब्ध विशेषज्ञ' : 'Available Specialists')
                       : (language === 'hi' ? `${translateSpecialty(selectedSpecialty, true)} विशेषज्ञ` : `${selectedSpecialty} Specialists`)}
                   </Text>
-                  <View className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
-                    <Text className="text-xs font-bold text-[#2563EB]">
+                  <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.6)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
                       {regularDoctors.length} {language === 'hi' ? 'डॉक्टर' : (regularDoctors.length === 1 ? 'Doctor' : 'Doctors')}
                     </Text>
                   </View>
@@ -1408,10 +1423,15 @@ export default function OpdConciergeScreen() {
                     return (
                       <View
                         key={`${doc.id}-${doc.hospitalId}`}
-                        className="bg-white rounded-[22px] border border-slate-200/90 p-4 overflow-hidden"
                         style={{
                           width: isTablet ? tabletCardWidth : '100%',
                           marginBottom: isTablet ? cardGap : 16,
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 22,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 16,
+                          overflow: 'hidden',
                           shadowColor: '#1E3A8A',
                           shadowOffset: { width: 0, height: 3 },
                           shadowOpacity: 0.05,
@@ -1420,26 +1440,50 @@ export default function OpdConciergeScreen() {
                         }}
                       >
                         {/* Doctor Profile Info Row */}
-                        <View className="flex-row items-start space-x-3.5">
-                          <View className="relative">
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+                          <View style={{ position: 'relative' }}>
                             <Image
                               source={{ uri: avatar }}
-                              style={{ width: 78, height: 98, borderRadius: 16 }}
-                              className="bg-blue-50 border border-slate-100"
+                              style={{
+                                width: 78,
+                                height: 98,
+                                borderRadius: 16,
+                                backgroundColor: '#EFF6FF',
+                                borderWidth: 1,
+                                borderColor: '#F1F5F9',
+                              }}
                               resizeMode="cover"
                             />
                           </View>
 
-                          <View className="flex-1">
-                            <View className="flex-row items-start justify-between">
-                              <Text className="text-[16px] font-black text-[#0F172A] flex-1 leading-tight mr-1">
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: '900',
+                                  color: '#0F172A',
+                                  flex: 1,
+                                  lineHeight: 20,
+                                  marginRight: 4,
+                                }}
+                              >
                                 {translateDoctorName(doc.name, language === 'hi')}
                               </Text>
 
                               <TouchableOpacity
                                 onPress={() => toggleFavorite(doc.id)}
                                 activeOpacity={0.7}
-                                className="w-7 h-7 rounded-full bg-slate-50 items-center justify-center -mt-0.5 -mr-0.5"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 14,
+                                  backgroundColor: '#F8FAFC',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginTop: -2,
+                                  marginRight: -2,
+                                }}
                               >
                                 <Heart
                                   size={14}
@@ -1450,28 +1494,51 @@ export default function OpdConciergeScreen() {
                             </View>
 
                             {/* Hospital & Branch with distance - 2 lines so NEVER truncated with ... */}
-                            <Text className="text-[11px] font-semibold text-slate-500 mt-0.5" numberOfLines={2}>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '600',
+                                color: '#64748B',
+                                marginTop: 2,
+                              }}
+                              numberOfLines={2}
+                            >
                               {translateHospitalName(doc.hospitalName, language === 'hi')}
                               {doc.branchName ? ` • ${translateBranchName(doc.branchName, language === 'hi')}` : ''} ({doc.distanceKm} {language === 'hi' ? 'किमी' : 'km'})
                             </Text>
 
                             {/* Specialty & Experience Line */}
-                            <Text className="text-[12px] font-bold text-[#2563EB] mt-0.5">
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '700',
+                                color: '#2563EB',
+                                marginTop: 2,
+                              }}
+                            >
                               {translateSpecialty(doc.specialty, language === 'hi')} • {doc.experience_years} {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
                             </Text>
 
                             {/* Single Qualification Line */}
-                            <Text className="text-[11px] text-slate-500 font-medium mt-0.5" numberOfLines={2}>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: '#64748B',
+                                fontWeight: '500',
+                                marginTop: 2,
+                              }}
+                              numberOfLines={2}
+                            >
                               {translateQualification(doc.qualification, language === 'hi')}
                             </Text>
 
                             {/* Star Rating Line */}
-                            <View className="flex-row items-center space-x-1 mt-1">
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                               <Star size={11} color="#D97706" fill="#D97706" />
-                              <Text className="text-xs font-black text-slate-800">
+                              <Text style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}>
                                 {doc.rating}
                               </Text>
-                              <Text className="text-[10px] text-slate-500 font-medium">
+                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>
                                 ({doc.total_reviews} {language === 'hi' ? 'समीक्षा' : 'reviews'})
                               </Text>
                             </View>
@@ -1479,21 +1546,31 @@ export default function OpdConciergeScreen() {
                         </View>
 
                         {/* Plain Text Fee with In-App Price & One Obvious Book CTA */}
-                        <View className="mt-3 pt-2.5 border-t border-slate-100 flex-row items-center justify-between">
+                        <View
+                          style={{
+                            marginTop: 12,
+                            paddingTop: 10,
+                            borderTopWidth: 1,
+                            borderTopColor: '#F1F5F9',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
                           <View>
-                            <Text className="text-[13px] text-slate-500 font-medium">
+                            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500' }}>
                               <Text style={{ textDecorationLine: 'line-through' }}>
                                 ₹{doc.consultation_fee}
                               </Text>
                               {' · '}
-                              <Text className="text-[#16A34A] font-black text-sm">
+                              <Text style={{ color: '#16A34A', fontWeight: '900', fontSize: 14 }}>
                                 {language === 'hi'
                                   ? `ऐप में ₹${doc.discounted_fee}`
                                   : `Pay in app ₹${doc.discounted_fee}`}
                               </Text>
                             </Text>
                             {doc.hospitalDiscount > 0 ? (
-                              <Text className="text-[10.5px] text-[#2563EB] font-bold mt-0.5">
+                              <Text style={{ fontSize: 10.5, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
                                 {language === 'hi'
                                   ? `${doc.hospitalDiscount}% छूट • इन-ऐप दर`
                                   : `Save ${doc.hospitalDiscount}% with in-app pay`}
@@ -1504,9 +1581,22 @@ export default function OpdConciergeScreen() {
                           <TouchableOpacity
                             onPress={() => handleInitiateDoctorBooking(doc, undefined, doc.hospitalName)}
                             activeOpacity={0.88}
-                            className="bg-[#2563EB] active:bg-[#1D4ED8] px-4 py-2.5 rounded-xl flex-row items-center space-x-1.5 shadow-sm"
+                            style={{
+                              backgroundColor: '#2563EB',
+                              paddingHorizontal: 16,
+                              paddingVertical: 10,
+                              borderRadius: 12,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              shadowColor: '#2563EB',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.2,
+                              shadowRadius: 4,
+                              elevation: 2,
+                            }}
                           >
-                            <Text className="text-white text-xs font-bold">
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
                               {language === 'hi' ? 'बुक करें' : 'Book'}
                             </Text>
                             <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />
@@ -1618,47 +1708,47 @@ export default function OpdConciergeScreen() {
         animationType="slide"
         onRequestClose={() => setBookingModalVisible(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View className="bg-white rounded-t-3xl p-6 shadow-2xl">
-            <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
-              <Text className="text-base font-bold text-[#182F3B]">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
                 {confirmedBooking
                   ? (language === 'hi' ? 'स्लॉट अनुरोध प्राप्त हुआ!' : 'OPD Slot Requested!')
                   : (language === 'hi' ? 'ओपीडी स्लॉट बुकिंग' : 'Confirm OPD Slot')}
               </Text>
               <TouchableOpacity
                 onPress={() => setBookingModalVisible(false)}
-                className="p-1"
+                style={{ padding: 4 }}
               >
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             {confirmedBooking ? (
-              <View className="py-6 items-center">
-                <View className="w-16 h-16 rounded-full bg-[#EFF6FF] items-center justify-center mb-3">
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                   <CheckCircle2 size={32} color="#3B82F6" />
                 </View>
-                <Text className="text-xl font-bold text-[#182F3B]">
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#182F3B' }}>
                   {language === 'hi' ? 'ओपीडी स्लॉट सुरक्षित!' : 'OPD Slot Reserved!'}
                 </Text>
-                <Text className="text-xs font-mono font-bold text-[#3B82F6] mt-1">
+                <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#3B82F6', marginTop: 4 }}>
                   {language === 'hi' ? 'संदर्भ संख्या:' : 'Reference:'} {confirmedBooking.booking_ref}
                 </Text>
-                <Text className="text-xs text-slate-600 text-center mt-3 px-4 leading-relaxed">
+                <Text style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 12, paddingHorizontal: 16, lineHeight: 18 }}>
                   {language === 'hi'
                     ? `${confirmedBooking.doctor_name ? translateDoctorName(confirmedBooking.doctor_name, true) : 'डॉक्टर'} के साथ ${confirmedBooking.slot_time || 'आज'} का स्लॉट सुरक्षित किया जा रहा है। हमारे कंसीयर्ज समन्वयक एक्सोटेल द्वारा आपसे संपर्क करेंगे।`
                     : `Your consult with ${confirmedBooking.doctor_name} for ${confirmedBooking.slot_time || 'Today'} is reserved. Our concierge desk is contacting you via Exotel masked telephony.`}
                 </Text>
 
-                <View className="w-full bg-[#F8FAFC] p-4 rounded-xl border border-slate-200 mt-5">
-                  <Text className="text-[11px] font-bold text-[#182F3B] uppercase">
+                <View style={{ width: '100%', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 20 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#182F3B', textTransform: 'uppercase' }}>
                     {language === 'hi' ? 'वर्चुअल टेलीफोनी रूट' : 'Virtual Telephony Route'}
                   </Text>
-                  <Text className="text-xs font-mono font-bold text-slate-800 mt-0.5">
+                  <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#1E293B', marginTop: 2 }}>
                     +91 11 4000 8800 ➔ {user?.phone || '+91 99999 99999'}
                   </Text>
-                  <Text className="text-[10px] text-[#3B82F6] font-semibold mt-1">
+                  <Text style={{ fontSize: 10, color: '#3B82F6', fontWeight: '600', marginTop: 4 }}>
                     {language === 'hi'
                       ? '✓ आपका व्यक्तिगत नंबर 100% गोपनीय रहता है।'
                       : '✓ Your personal number remains 100% confidential.'}
@@ -1667,38 +1757,38 @@ export default function OpdConciergeScreen() {
 
                 <TouchableOpacity
                   onPress={() => setBookingModalVisible(false)}
-                  className="w-full bg-[#3B82F6] py-3.5 rounded-xl items-center mt-5 shadow-sm shadow-blue-500/30"
+                  style={{ width: '100%', backgroundColor: '#3B82F6', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 }}
                 >
-                  <Text className="text-white font-bold text-xs">
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
                     {language === 'hi' ? 'पूर्ण' : 'Done'}
                   </Text>
                 </TouchableOpacity>
               </View>
             ) : bookingTargetDoctor ? (
-              <View className="py-4">
-                <Text className="text-base font-bold text-[#182F3B]">
+              <View style={{ paddingVertical: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
                   {translateDoctorName(bookingTargetDoctor.doctor.name, language === 'hi')}
                 </Text>
-                <Text className="text-xs text-[#2563EB] font-bold mt-0.5">
+                <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
                   {translateSpecialty(bookingTargetDoctor.doctor.specialty, language === 'hi')} • {translateHospitalName(bookingTargetDoctor.hospitalName, language === 'hi')}
                 </Text>
                 {bookingTargetDoctor.doctor.qualification && (
-                  <Text className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
                     {translateQualification(bookingTargetDoctor.doctor.qualification, language === 'hi')}
                   </Text>
                 )}
 
                 {/* Doctor's OPD Consultation Timings / Schedule */}
                 {bookingTargetDoctor.doctor.opd_timing && (
-                  <View className="bg-blue-50/80 p-3 rounded-2xl border border-blue-200/70 mt-3 mb-1 flex-row items-center">
-                    <View className="w-8 h-8 rounded-xl bg-[#2563EB]/10 items-center justify-center mr-2.5">
+                  <View style={{ backgroundColor: 'rgba(239, 246, 255, 0.8)', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.7)', marginTop: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 12, backgroundColor: 'rgba(37, 99, 235, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
                       <Clock size={16} color="#2563EB" strokeWidth={2.2} />
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wide">
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         {language === 'hi' ? 'डॉक्टर का ओपीडी समय (शेड्यूल):' : 'Doctor OPD Schedule:'}
                       </Text>
-                      <Text className="text-xs font-bold text-[#0F172A] mt-0.5">
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginTop: 2 }}>
                         {translateTiming(bookingTargetDoctor.doctor.opd_timing, language === 'hi')}
                       </Text>
                     </View>
@@ -1706,21 +1796,21 @@ export default function OpdConciergeScreen() {
                 )}
 
                 {/* Booking Timing: Selectable Time Slots */}
-                <View className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-slate-200 my-2.5">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <Text className="text-xs font-bold text-slate-700">
+                <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginVertical: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
                       {language === 'hi' ? 'बुकिंग का समय (स्लॉट) चुनें:' : 'Select Booking Slot:'}
                     </Text>
-                    <View className="flex-row items-center gap-1 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(219, 234, 254, 0.7)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
                       <Clock size={11} color="#1D4ED8" />
-                      <Text className="text-[11px] font-bold text-[#1D4ED8]">
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
                         {selectedModalSlot || bookingTargetDoctor.slot}
                       </Text>
                     </View>
                   </View>
 
                   {/* Interactive slot chips */}
-                  <View className="flex-row flex-wrap gap-2">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     {getDoctorSlots(bookingTargetDoctor.doctor, language === 'hi').map((slot) => {
                       const isSelected = (selectedModalSlot || bookingTargetDoctor.slot) === slot;
                       return (
@@ -1728,15 +1818,30 @@ export default function OpdConciergeScreen() {
                           key={slot}
                           onPress={() => setSelectedModalSlot(slot)}
                           activeOpacity={0.8}
-                          className={`px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${isSelected
-                              ? 'bg-[#2563EB] border-[#1D4ED8] shadow-sm'
-                              : 'bg-white border-slate-200'
-                            }`}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: isSelected ? '#2563EB' : '#FFFFFF',
+                            borderColor: isSelected ? '#1D4ED8' : '#E2E8F0',
+                            shadowColor: isSelected ? '#2563EB' : 'transparent',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: isSelected ? 0.2 : 0,
+                            shadowRadius: 2,
+                            elevation: isSelected ? 2 : 0,
+                          }}
                         >
                           <Clock size={12} color={isSelected ? '#FFFFFF' : '#64748B'} />
                           <Text
-                            className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-700'
-                              }`}
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: isSelected ? '#FFFFFF' : '#334155',
+                            }}
                           >
                             {slot}
                           </Text>
@@ -1746,15 +1851,15 @@ export default function OpdConciergeScreen() {
                   </View>
 
                   {/* Consultation Fee Breakdown */}
-                  <View className="flex-row items-center justify-between mt-3 pt-2.5 border-t border-slate-200/80">
-                    <Text className="text-xs text-slate-600 font-semibold">
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(226, 232, 240, 0.8)' }}>
+                    <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>
                       {language === 'hi' ? 'परामर्श शुल्क (ऐप में दर):' : 'Consultation Fee (In-App):'}
                     </Text>
-                    <View className="flex-row items-center gap-1.5">
-                      <Text className="text-xs text-slate-400 line-through">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 12, color: '#94A3B8', textDecorationLine: 'line-through' }}>
                         ₹{bookingTargetDoctor.doctor.consultation_fee}
                       </Text>
-                      <Text className="text-sm font-black text-[#16A34A]">
+                      <Text style={{ fontSize: 14, fontWeight: '900', color: '#16A34A' }}>
                         ₹{bookingTargetDoctor.doctor.discounted_fee}
                       </Text>
                     </View>
@@ -1762,25 +1867,39 @@ export default function OpdConciergeScreen() {
                 </View>
 
                 {/* Patient Information */}
-                <View className="bg-[#FFF9F0] p-3.5 rounded-xl border border-[#CF8A40]/30 mb-4">
-                  <Text className="text-xs font-bold text-[#182F3B]">
+                <View style={{ backgroundColor: '#FFF9F0', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(207, 138, 64, 0.3)', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#182F3B' }}>
                     {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
                   </Text>
-                  <Text className="text-xs text-slate-700 mt-1">
-                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Rahul Jain'}</Text>
+                  <Text style={{ fontSize: 12, color: '#334155', marginTop: 4 }}>
+                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text style={{ fontWeight: '700' }}>{user?.full_name || 'Rahul Jain'}</Text>
                   </Text>
-                  <Text className="text-xs text-slate-700">
-                    {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
+                  <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
+                    {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text style={{ fontWeight: '700' }}>{user?.phone || '+91 99999 99999'}</Text>
                   </Text>
                 </View>
 
                 <TouchableOpacity
                   onPress={handleConfirmBooking}
                   disabled={isSubmitting}
-                  className="w-full bg-[#2563EB] active:bg-[#1D4ED8] py-3.5 rounded-xl items-center flex-row justify-center space-x-2 shadow-sm shadow-blue-500/30"
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#2563EB',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 8,
+                    shadowColor: '#2563EB',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }}
                 >
                   <Calendar size={16} color="#FFFFFF" />
-                  <Text className="text-white font-bold text-sm">
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
                     {isSubmitting
                       ? (language === 'hi' ? 'स्लॉट बुक किया जा रहा है...' : 'Reserving OPD Slot...')
                       : (language === 'hi' ? 'पुष्टि करें और ओपीडी स्लॉट बुक करें' : 'Confirm & Reserve OPD Slot')}
