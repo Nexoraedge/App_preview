@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,12 +22,23 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
-import { useLanguage } from '../../src/context/LanguageContext';
+import { useLanguage, type Language } from '../../src/context/LanguageContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, loginAsTestUser } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const [activeLang, setActiveLang] = useState<Language>(language);
+
+  useEffect(() => {
+    setActiveLang(language);
+  }, [language]);
+
+  const handleLanguageChange = (newLang: Language) => {
+    if (activeLang === newLang) return;
+    setActiveLang(newLang);
+    setLanguage(newLang);
+  };
 
   const handleLogout = () => {
     logout();
@@ -86,41 +97,57 @@ export default function ProfileScreen() {
       </View>
 
       {/* Language Preferences Card */}
-      <View className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm mb-4">
-        <View className="flex-row items-center space-x-2 mb-3">
-          <Languages size={18} color="#24B0BA" />
-          <Text className="text-xs font-bold text-[#2E4A70] uppercase tracking-wider">
+      <View style={{ backgroundColor: '#FFFFFF', padding: 20, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Languages size={18} color="#2563EB" />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
             {language === 'hi' ? 'ऐप की भाषा / App Language' : 'App Language / भाषा'}
           </Text>
         </View>
 
-        <View className="flex-row space-x-3">
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity
-            onPress={() => setLanguage('en')}
-            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${language === 'en'
-                ? 'bg-[#E6F8F9] border-[#24B0BA]'
-                : 'bg-slate-50 border-slate-200'
-              }`}
+            onPress={() => handleLanguageChange('en')}
+            activeOpacity={0.8}
+            style={{
+              flex: 1,
+              padding: 14,
+              borderRadius: 14,
+              borderWidth: 1.5,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: activeLang === 'en' ? '#EFF6FF' : '#F8FAFC',
+              borderColor: activeLang === 'en' ? '#2563EB' : '#E2E8F0',
+            }}
           >
             <View>
-              <Text className="text-xs font-bold text-[#2E4A70]">English</Text>
-              <Text className="text-[10px] text-slate-500">Default language</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: activeLang === 'en' ? '#1E40AF' : '#1E293B' }}>English</Text>
+              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Default language</Text>
             </View>
-            {language === 'en' && <Check size={16} color="#24B0BA" strokeWidth={2.5} />}
+            {activeLang === 'en' && <Check size={16} color="#2563EB" strokeWidth={2.5} />}
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => setLanguage('hi')}
-            className={`flex-1 p-3 rounded-xl border flex-row items-center justify-between ${language === 'hi'
-                ? 'bg-[#E6F8F9] border-[#24B0BA]'
-                : 'bg-slate-50 border-slate-200'
-              }`}
+            onPress={() => handleLanguageChange('hi')}
+            activeOpacity={0.8}
+            style={{
+              flex: 1,
+              padding: 14,
+              borderRadius: 14,
+              borderWidth: 1.5,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: activeLang === 'hi' ? '#EFF6FF' : '#F8FAFC',
+              borderColor: activeLang === 'hi' ? '#2563EB' : '#E2E8F0',
+            }}
           >
             <View>
-              <Text className="text-xs font-bold text-[#2E4A70]">हिंदी (Hindi)</Text>
-              <Text className="text-[10px] text-slate-500">भारत की भाषा</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: activeLang === 'hi' ? '#1E40AF' : '#1E293B' }}>हिंदी (Hindi)</Text>
+              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>भारत की भाषा</Text>
             </View>
-            {language === 'hi' && <Check size={16} color="#24B0BA" strokeWidth={2.5} />}
+            {activeLang === 'hi' && <Check size={16} color="#2563EB" strokeWidth={2.5} />}
           </TouchableOpacity>
         </View>
       </View>

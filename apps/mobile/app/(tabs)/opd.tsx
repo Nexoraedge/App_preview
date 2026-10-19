@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -90,8 +90,28 @@ export default function OpdConciergeScreen() {
   const tabletCardWidth = (width - 40 - cardGap) / 2;
   const topDoctorCardWidth = Math.min(width - 48, 330);
 
-  // Tab switch: Hospitals vs Doctors
+  // Tab switch: Hospitals vs Doctors (Instant zero-lag tab flipping via display toggling)
   const [activeTab, setActiveTab] = useState<'hospitals' | 'doctors'>('hospitals');
+  const [hasVisitedDoctors, setHasVisitedDoctors] = useState(false);
+
+  useEffect(() => {
+    // Warm up the doctors list in idle background time so tab switching is instantaneous (0ms)
+    const timer = setTimeout(() => {
+      setHasVisitedDoctors(true);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleTabSwitch = useCallback((tab: 'hospitals' | 'doctors') => {
+    if (tab === 'doctors') {
+      setHasVisitedDoctors(true);
+    }
+    setActiveTab(tab);
+    if (tab === 'hospitals') {
+      setSelectedSlotDoctor(null);
+    }
+  }, []);
+
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [sortBy, setSortBy] = useState<SortOption>('nearest');
   const [searchQuery, setSearchQuery] = useState('');
@@ -330,70 +350,84 @@ export default function OpdConciergeScreen() {
     return filteredDoctors.filter((d) => !topIds.has(d.id));
   }, [filteredDoctors, showTopDoctors, topDoctors]);
 
-  // Helper to ensure crisp clinical avatars
-  const getDoctorAvatar = (doctor: Doctor) => {
-    if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
-      return doctor.avatar_url;
-    }
-    const nameLower = doctor.name.toLowerCase();
-    if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
-      return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
-    }
-    if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
-      return 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
-  };
-
-  // 3 distinct time slots as chips (All realistic future evening or tomorrow slots - NEVER past or right now!)
-  const getDoctorSlots = (doc: Doctor, isHi: boolean): string[] => {
-    let raw = doc.next_available_slot || 'Today, 6:30 PM';
-    // Sanitize: any daytime hours before 6 PM are automatically shifted to realistic later evening hours
-    const isToday = raw.toLowerCase().includes('today');
-    if (isToday) {
-      if (
-        raw.includes('1:') ||
-        raw.includes('2:') ||
-        raw.includes('3:') ||
-        raw.includes('4:') ||
-        raw.includes('5:') ||
-        raw.includes('01:') ||
-        raw.includes('02:') ||
-        raw.includes('03:') ||
-        raw.includes('04:') ||
-        raw.includes('05:')
-      ) {
-        raw = 'Today, 6:30 PM';
-      }
-    }
-
-    let s1 = raw;
-    let s2 = 'Today, 7:45 PM';
-    let s3 = 'Tomorrow, 10:30 AM';
-
-    if (s1.toLowerCase().includes('today')) {
-      if (s1.includes('6:00') || s1.includes('6:15') || s1.includes('6:30')) {
-        s1 = 'Today, 6:30 PM';
-        s2 = 'Today, 7:45 PM';
-        s3 = 'Tomorrow, 10:30 AM';
-      } else if (s1.includes('6:45') || s1.includes('7:00') || s1.includes('7:15')) {
-        s1 = 'Today, 7:00 PM';
-        s2 = 'Today, 8:15 PM';
-        s3 = 'Tomorrow, 11:00 AM';
+  // Avatar Cache & Memoized Helper
+  const avatarCache = useMemo(() => new Map<string, string>(), []);
+  const getDoctorAvatar = useCallback(
+    (doctor: Doctor) => {
+      if (avatarCache.has(doctor.id)) return avatarCache.get(doctor.id)!;
+      let url = 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
+      if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
+        url = doctor.avatar_url;
       } else {
-        s1 = 'Today, 7:30 PM';
-        s2 = 'Today, 8:30 PM';
-        s3 = 'Tomorrow, 11:30 AM';
+        const nameLower = doctor.name.toLowerCase();
+        if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
+          url = 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
+        } else if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
+          url = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
+        }
       }
-    } else {
-      // Tomorrow slots
-      s1 = s1 || 'Tomorrow, 10:30 AM';
-      s2 = 'Tomorrow, 02:30 PM';
-      s3 = 'Tomorrow, 05:30 PM';
-    }
+      avatarCache.set(doctor.id, url);
+      return url;
+    },
+    [avatarCache]
+  );
 
-    return [translateSlot(s1, isHi), translateSlot(s2, isHi), translateSlot(s3, isHi)];
-  };
+  // Slots Cache & Memoized Helper (Pre-calculated so renders never block)
+  const slotsCache = useMemo(() => new Map<string, string[]>(), [language]);
+  const getDoctorSlots = useCallback(
+    (doc: Doctor, isHi: boolean): string[] => {
+      const key = `${doc.id}-${isHi ? 'hi' : 'en'}`;
+      if (slotsCache.has(key)) return slotsCache.get(key)!;
+
+      let raw = doc.next_available_slot || 'Today, 6:30 PM';
+      const isToday = raw.toLowerCase().includes('today');
+      if (isToday) {
+        if (
+          raw.includes('1:') ||
+          raw.includes('2:') ||
+          raw.includes('3:') ||
+          raw.includes('4:') ||
+          raw.includes('5:') ||
+          raw.includes('01:') ||
+          raw.includes('02:') ||
+          raw.includes('03:') ||
+          raw.includes('04:') ||
+          raw.includes('05:')
+        ) {
+          raw = 'Today, 6:30 PM';
+        }
+      }
+
+      let s1 = raw;
+      let s2 = 'Today, 7:45 PM';
+      let s3 = 'Tomorrow, 10:30 AM';
+
+      if (s1.toLowerCase().includes('today')) {
+        if (s1.includes('6:00') || s1.includes('6:15') || s1.includes('6:30')) {
+          s1 = 'Today, 6:30 PM';
+          s2 = 'Today, 7:45 PM';
+          s3 = 'Tomorrow, 10:30 AM';
+        } else if (s1.includes('6:45') || s1.includes('7:00') || s1.includes('7:15')) {
+          s1 = 'Today, 7:00 PM';
+          s2 = 'Today, 8:15 PM';
+          s3 = 'Tomorrow, 11:00 AM';
+        } else {
+          s1 = 'Today, 7:30 PM';
+          s2 = 'Today, 8:30 PM';
+          s3 = 'Tomorrow, 11:30 AM';
+        }
+      } else {
+        s1 = s1 || 'Tomorrow, 10:30 AM';
+        s2 = 'Tomorrow, 02:30 PM';
+        s3 = 'Tomorrow, 05:30 PM';
+      }
+
+      const res = [translateSlot(s1, isHi), translateSlot(s2, isHi), translateSlot(s3, isHi)];
+      slotsCache.set(key, res);
+      return res;
+    },
+    [slotsCache]
+  );
 
   // Navigate to dedicated Branch Doctors Screen
   const handleSelectHospital = (hospital: Hospital) => {
@@ -525,10 +559,7 @@ export default function OpdConciergeScreen() {
             }}
           >
             <TouchableOpacity
-              onPress={() => {
-                setActiveTab('hospitals');
-                setSelectedSlotDoctor(null);
-              }}
+              onPress={() => handleTabSwitch('hospitals')}
               activeOpacity={0.85}
               style={{
                 flex: 1,
@@ -563,7 +594,7 @@ export default function OpdConciergeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setActiveTab('doctors')}
+              onPress={() => handleTabSwitch('doctors')}
               activeOpacity={0.85}
               style={{
                 flex: 1,
@@ -727,7 +758,7 @@ export default function OpdConciergeScreen() {
         </View>
 
         {/* TAB 1: HOSPITALS LIST */}
-        {activeTab === 'hospitals' && (
+        <View style={{ display: activeTab === 'hospitals' ? 'flex' : 'none' }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <View>
@@ -1136,11 +1167,11 @@ export default function OpdConciergeScreen() {
               </View>
             )}
           </View>
-        )}
+        </View>
 
         {/* TAB 2: DOCTORS LIST */}
-        {activeTab === 'doctors' && (
-          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+        {hasVisitedDoctors && (
+          <View style={{ display: activeTab === 'doctors' ? 'flex' : 'none', paddingHorizontal: 16, paddingTop: 16 }}>
             {isLoading ? (
               <View style={{ paddingVertical: 64, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#2563EB" />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Users,
 } from 'lucide-react-native';
-import { useLanguage } from '../../src/context/LanguageContext';
+import { useLanguage, type Language } from '../../src/context/LanguageContext';
 import { useAuth } from '../../src/context/AuthContext';
 
 interface ProfileModalProps {
@@ -22,8 +22,19 @@ interface ProfileModalProps {
 
 export function ProfileModal({ visible, onClose }: ProfileModalProps) {
   const router = useRouter();
-  const { language, toggleLanguage } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const { user, logout } = useAuth();
+  const [activeLang, setActiveLang] = useState<Language>(language);
+
+  useEffect(() => {
+    setActiveLang(language);
+  }, [language]);
+
+  const handleLanguageChange = (newLang: Language) => {
+    if (activeLang === newLang) return;
+    setActiveLang(newLang);
+    setLanguage(newLang);
+  };
 
   return (
     <Modal
@@ -139,42 +150,40 @@ export function ProfileModal({ visible, onClose }: ProfileModalProps) {
               }}
             >
               <TouchableOpacity
-                onPress={() => {
-                  if (language !== 'en') toggleLanguage();
-                }}
+                onPress={() => handleLanguageChange('en')}
+                activeOpacity={0.8}
                 style={{
                   paddingHorizontal: 8,
                   paddingVertical: 4,
                   borderRadius: 7,
-                  backgroundColor: language === 'en' ? '#2563EB' : 'transparent',
+                  backgroundColor: activeLang === 'en' ? '#2563EB' : 'transparent',
                 }}
               >
                 <Text
                   style={{
                     fontSize: 10.5,
                     fontWeight: '800',
-                    color: language === 'en' ? '#FFFFFF' : '#64748B',
+                    color: activeLang === 'en' ? '#FFFFFF' : '#64748B',
                   }}
                 >
                   EN
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => {
-                  if (language !== 'hi') toggleLanguage();
-                }}
+                onPress={() => handleLanguageChange('hi')}
+                activeOpacity={0.8}
                 style={{
                   paddingHorizontal: 8,
                   paddingVertical: 4,
                   borderRadius: 7,
-                  backgroundColor: language === 'hi' ? '#2563EB' : 'transparent',
+                  backgroundColor: activeLang === 'hi' ? '#2563EB' : 'transparent',
                 }}
               >
                 <Text
                   style={{
                     fontSize: 10.5,
                     fontWeight: '800',
-                    color: language === 'hi' ? '#FFFFFF' : '#64748B',
+                    color: activeLang === 'hi' ? '#FFFFFF' : '#64748B',
                   }}
                 >
                   हिंदी
