@@ -4,6 +4,9 @@
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
+    "build": "expo export -p web",
+    "build:mobile:web": "expo export -p web",
+    "export": "expo export -p web",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
