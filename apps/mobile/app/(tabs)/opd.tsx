@@ -964,36 +964,50 @@ export default function OpdConciergeScreen() {
                         </Text>
                       </View>
 
-                      {/* Wave transition */}
+                      {/* Wave transition with seamless overlap to prevent sub-pixel horizontal bleed */}
                       <View
                         pointerEvents="none"
                         style={{
                           position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: 28,
+                          bottom: -2,
+                          left: -1,
+                          right: -1,
+                          height: 32,
                         }}
                       >
                         <Svg
                           width="100%"
                           height="100%"
-                          viewBox="0 0 360 39"
+                          viewBox="0 0 360 42"
                           preserveAspectRatio="none"
                         >
                           <Path
-                            d="M0 14 C48 39 95 34 150 20 C205 5 242 35 292 27 C324 23 342 5 360 9 L360 39 L0 39 Z"
+                            d="M-2 14 C48 39 95 34 150 20 C205 5 242 35 292 27 C324 23 342 5 362 9 L362 44 L-2 44 Z"
                             fill="#FFFFFF"
                           />
                         </Svg>
                       </View>
+
+                      {/* Solid white seam overlap to guarantee zero sub-pixel dark bleed on any screen */}
+                      <View
+                        pointerEvents="none"
+                        style={{
+                          position: 'absolute',
+                          bottom: -1,
+                          left: 0,
+                          right: 0,
+                          height: 3,
+                          backgroundColor: '#FFFFFF',
+                          zIndex: 1,
+                        }}
+                      />
 
                       {/* Discount Pill */}
                       {hospital.discount_percentage > 0 && (
                         <View
                           style={{
                             position: 'absolute',
-                            bottom: 5,
+                            bottom: 6,
                             right: 10,
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -1004,6 +1018,7 @@ export default function OpdConciergeScreen() {
                             paddingHorizontal: 9,
                             paddingVertical: 4,
                             borderRadius: 16,
+                            zIndex: 3,
                           }}
                         >
                           <Tag size={11} color="#2563EB" />
@@ -1023,7 +1038,16 @@ export default function OpdConciergeScreen() {
                     </View>
 
                     {/* Card Body */}
-                    <View style={{ paddingHorizontal: 15, paddingTop: 4, paddingBottom: 15 }}>
+                    <View
+                      style={{
+                        paddingHorizontal: 15,
+                        paddingTop: 6,
+                        paddingBottom: 15,
+                        backgroundColor: '#FFFFFF',
+                        position: 'relative',
+                        zIndex: 2,
+                      }}
+                    >
                       <Text
                         numberOfLines={1}
                         style={{
