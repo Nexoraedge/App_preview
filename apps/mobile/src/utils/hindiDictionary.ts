@@ -41,6 +41,9 @@ export const AREAS_AND_ADDRESSES: Record<string, string> = {
   'Lajpat Nagar, South Delhi': 'लाजपत नगर, दक्षिण दिल्ली',
   'Greater Kailash 1, South Delhi': 'ग्रेटर कैलाश 1, दक्षिण दिल्ली',
   'South Delhi NCR': 'दक्षिण दिल्ली एनसीआर',
+  'Saket, South Delhi NCR': 'साकेत, दक्षिण दिल्ली एनसीआर',
+  'Koramangala, Bengaluru': 'कोरमंगला, बेंगलुरु',
+  'Malviya Nagar, Jaipur': 'मालवीय नगर, जयपुर',
   'New Delhi': 'नई दिल्ली',
   'Gurugram': 'गुरुग्राम',
   'Delhi NCR': 'दिल्ली एनसीआर',
@@ -192,21 +195,40 @@ export const FACILITIES_AND_TAGS: Record<string, string> = {
 };
 
 export const SLOTS: Record<string, string> = {
-  'Today, 4:30 PM': 'आज, शाम 4:30',
-  'Today, 3:00 PM': 'आज, दोपहर 3:00',
-  'Tomorrow, 11:00 AM': 'कल, सुबह 11:00',
-  'Today, 5:15 PM': 'आज, शाम 5:15',
-  'Tomorrow, 10:30 AM': 'कल, सुबह 10:30',
-  'Tomorrow, 02:00 PM': 'कल, दोपहर 02:00',
-  'Today, 3:30 PM': 'आज, दोपहर 3:30',
-  'Tomorrow, 10:00 AM': 'कल, सुबह 10:00',
   'Today, 6:00 PM': 'आज, शाम 6:00',
-  'Tomorrow, 11:30 AM': 'कल, सुबह 11:30',
-  'Today, 2:45 PM': 'आज, दोपहर 2:45',
-  'Today, 5:00 PM': 'आज, शाम 5:00',
-  'Today, 4:00 PM': 'आज, शाम 4:00',
-  'Today, 5:30 PM': 'आज, शाम 5:30',
+  'Today, 6:15 PM': 'आज, शाम 6:15',
+  'Today, 6:30 PM': 'आज, शाम 6:30',
+  'Today, 6:45 PM': 'आज, शाम 6:45',
+  'Today, 7:00 PM': 'आज, शाम 7:00',
+  'Today, 7:15 PM': 'आज, शाम 7:15',
+  'Today, 7:30 PM': 'आज, शाम 7:30',
+  'Today, 7:45 PM': 'आज, शाम 7:45',
+  'Today, 8:00 PM': 'आज, शाम 8:00',
+  'Today, 8:15 PM': 'आज, शाम 8:15',
+  'Today, 8:30 PM': 'आज, शाम 8:30',
   'Tomorrow, 09:30 AM': 'कल, सुबह 09:30',
+  'Tomorrow, 10:00 AM': 'कल, सुबह 10:00',
+  'Tomorrow, 10:30 AM': 'कल, सुबह 10:30',
+  'Tomorrow, 11:00 AM': 'कल, सुबह 11:00',
+  'Tomorrow, 11:30 AM': 'कल, सुबह 11:30',
+  'Tomorrow, 12:00 PM': 'कल, दोपहर 12:00',
+  'Tomorrow, 12:30 PM': 'कल, दोपहर 12:30',
+  'Tomorrow, 01:00 PM': 'कल, दोपहर 01:00',
+  'Tomorrow, 02:00 PM': 'कल, दोपहर 02:00',
+  'Tomorrow, 2:30 PM': 'कल, दोपहर 2:30',
+  'Tomorrow, 02:30 PM': 'कल, दोपहर 02:30',
+  'Tomorrow, 03:00 PM': 'कल, दोपहर 03:00',
+  'Tomorrow, 3:30 PM': 'कल, दोपहर 3:30',
+  'Tomorrow, 4:30 PM': 'कल, शाम 4:30',
+  'Tomorrow, 04:30 PM': 'कल, शाम 04:30',
+  'Tomorrow, 5:00 PM': 'कल, शाम 5:00',
+  'Tomorrow, 05:00 PM': 'कल, शाम 05:00',
+  'Tomorrow, 05:30 PM': 'कल, शाम 05:30',
+  'Tomorrow, 5:30 PM': 'कल, शाम 5:30',
+  'Tomorrow, 6:00 PM': 'कल, शाम 6:00',
+  'Tomorrow, 06:00 PM': 'कल, शाम 06:00',
+  'Tomorrow, 06:30 PM': 'कल, शाम 06:30',
+  'Tomorrow, 07:00 PM': 'कल, शाम 07:00',
 };
 
 export const TIMINGS: Record<string, string> = {
@@ -278,13 +300,29 @@ export function translateTag(tag: string, isHi: boolean): string {
 export function translateSlot(slot: string, isHi: boolean): string {
   if (!isHi || !slot) return slot;
   if (SLOTS[slot]) return SLOTS[slot];
-  // Fallback for dynamic slots like "Today, 3:30 PM"
-  let res = slot;
-  res = res.replace(/Today/g, 'आज');
-  res = res.replace(/Tomorrow/g, 'कल');
-  res = res.replace(/AM/g, 'सुबह');
-  res = res.replace(/PM/g, 'शाम');
-  return res;
+  // Robust dynamic parser with natural Indian time-of-day phrasing
+  const isTomorrow = slot.toLowerCase().includes('tomorrow');
+  const day = isTomorrow ? 'कल' : 'आज';
+  const cleanSlot = slot.replace(/Today,?\s*/i, '').replace(/Tomorrow,?\s*/i, '').trim();
+  const isAM = cleanSlot.toUpperCase().includes('AM');
+  const isPM = cleanSlot.toUpperCase().includes('PM');
+  const timeDigits = cleanSlot.replace(/\s*(AM|PM)/i, '').trim();
+  const hour = parseInt(timeDigits.split(':')[0], 10) || 0;
+
+  let period = 'सुबह';
+  if (isPM) {
+    if (hour === 12 || (hour >= 1 && hour <= 3)) {
+      period = 'दोपहर';
+    } else if (hour >= 8) {
+      period = 'रात';
+    } else {
+      period = 'शाम';
+    }
+  } else if (isAM) {
+    period = 'सुबह';
+  }
+
+  return `${day}, ${period} ${timeDigits}`;
 }
 
 export function translateTiming(timing: string, isHi: boolean): string {

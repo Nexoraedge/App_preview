@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { MapPin, User, ChevronDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from '../../src/context/LanguageContext';
+import { translateAddress } from '../../src/utils/hindiDictionary';
 
 interface AppHeaderProps {
   title: string;
@@ -50,9 +52,11 @@ export function AppHeader({
     }
   };
 
-  const displayLocation = subtitle !== 'South Delhi NCR · within 10 km' && subtitle
+  const { language } = useLanguage();
+  const rawLocation = subtitle !== 'South Delhi NCR · within 10 km' && subtitle
     ? subtitle
     : CITIES[cityIndex];
+  const displayLocation = translateAddress(rawLocation, language === 'hi');
 
   return (
     <View

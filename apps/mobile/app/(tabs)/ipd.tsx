@@ -308,9 +308,9 @@ const MASTER_HOSPITALS: HospitalAdmissionInfo[] = [
     nameHi: 'मेदांता सुपर स्पेशियलिटी क्लिनिक (Medanta)',
     location: 'Defence Colony, South Delhi',
     locationHi: 'डिफेंस कॉलोनी, दक्षिण दिल्ली',
-    distance_km: 5.2,
+    distance_km: 5.0,
     image_url:
-      'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
     rating: 4.9,
     total_reviews: 280,
     tag: 'Cashless Desk Partner',

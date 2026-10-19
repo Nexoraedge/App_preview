@@ -5,6 +5,7 @@
   "description": "Adityam Niramayaa - High-Traffic Healthcare Aggregator Monorepo",
   "scripts": {
     "dev:mobile": "pnpm --filter @adityam/mobile dev",
+    "build:mobile:web": "pnpm --filter @adityam/mobile exec expo export --platform web",
     "dev:admin": "pnpm --filter @adityam/admin dev",
     "build:admin": "pnpm --filter @adityam/admin build",
     "start:admin": "pnpm --filter @adityam/admin start",
