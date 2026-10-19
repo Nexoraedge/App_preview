@@ -26,6 +26,7 @@ export default function Login() {
   const t = pickLoginCopy(language);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
@@ -43,6 +44,10 @@ export default function Login() {
   const phoneOk = /^[6-9]\d{9}$/.test(phone);
 
   const sendOtp = async () => {
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setError(language === 'hi' ? 'कृपया अपना पूरा नाम दर्ज करें' : 'Please enter your full name');
+      return;
+    }
     if (!phoneOk) { setError(t.invalidPhone); return; }
     setError(''); setBusy(true);
     try {
@@ -66,11 +71,11 @@ export default function Login() {
           setError(t.wrongOtp);
           return;
         }
-        loginWithPhone(phone, otp);
+        loginWithPhone(phone, otp, fullName.trim());
       } else {
         // const { error: e } = await getSupabaseClient().auth.verifyOtp({ phone: '+91' + phone, token: otp, type: 'sms' });
         // if (e) { setError(e.status === 429 ? t.tooMany : t.wrongOtp); return; }
-        loginWithPhone(phone, otp);
+        loginWithPhone(phone, otp, fullName.trim());
       }
       router.replace(ROUTES.home as any);
     } catch {
@@ -132,6 +137,26 @@ export default function Login() {
 
                 {step === 'phone' ? (
                   <View style={{ marginTop: 22 }}>
+                    {/* Full Name Input */}
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>
+                        {language === 'hi' ? 'पूरा नाम' : 'Full Name'}
+                      </Text>
+                      <View style={field}>
+                        <TextInput
+                          value={fullName}
+                          onChangeText={(v) => { setFullName(v); setError(''); }}
+                          placeholder={language === 'hi' ? 'उदा. राहुल जैन' : 'e.g. Rahul Jain'}
+                          placeholderTextColor={C.mute}
+                          autoCapitalize="words"
+                          autoComplete="name"
+                          returnKeyType="next"
+                          style={{ flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 12 }}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Mobile Number Input */}
                     <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>{t.phoneLabel}</Text>
                     <View style={field}>
                       <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink, marginRight: 10 }}>+91</Text>

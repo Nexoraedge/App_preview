@@ -1,7 +1,7 @@
 // app/(tabs)/labs.tsx
 // Labs & Scans: pick tests first, then pick the centre that offers all of them.
 // Each tab (Lab tests / Scans / Packages) has its own cart, because one centre rarely does all three.
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { PressableCard } from '../../components/ui/PressableCard';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { LabCardSkeleton } from '../../components/ui/SkeletonBox';
 import { useLanguage } from '../../src/context/LanguageContext';
 import {
   CATEGORIES, ITEMS, ITEM_BY_ID, CENTRES, centresFor, fromPrice, homeAvailable,
@@ -350,6 +351,12 @@ export default function LabsScreen() {
   const [sort, setSort] = useState<'near' | 'cheap' | 'rated'>('near');
   const [pick, setPick] = useState<string | null>(null);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 350);
+    return () => clearTimeout(t);
+  }, []);
 
   const cartIds = carts[segment];
   const counts = { lab: carts.lab.length, scan: carts.scan.length, package: carts.package.length };
@@ -577,7 +584,13 @@ export default function LabsScreen() {
                 </View>
               )}
 
-              {list.length === 0 ? (
+              {isLoading ? (
+                <View style={{ gap: 10 }}>
+                  <LabCardSkeleton />
+                  <LabCardSkeleton />
+                  <LabCardSkeleton />
+                </View>
+              ) : list.length === 0 ? (
                 <View style={{ alignItems: 'center', padding: 32, backgroundColor: '#fff', borderRadius: R.xl, borderWidth: 1, borderColor: C.line }}>
                   <Search size={30} color={C.mute} />
                   <Text style={{ fontSize: 15, fontWeight: '700', color: C.ink, marginTop: 10 }}>

@@ -1,12 +1,17 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User, Dependent } from '@adityam/types';
+
+const AUTH_USER_STORAGE_KEY = '@adityam_auth_user_v1';
+const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
 
 interface AuthContextType {
   user: User | null;
   dependents: Dependent[];
   isLoggedIn: boolean;
   loginAsTestUser: () => void;
-  loginWithPhone: (phone: string, otp: string) => boolean;
+  loginWithPhone: (phone: string, otp: string, fullName?: string) => boolean;
   logout: () => void;
   addDependent: (dependent: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => void;
   deductWallet: (amount: number) => void;
@@ -53,42 +58,95 @@ const INITIAL_DEPENDENTS: Dependent[] = [
   },
 ];
 
+const getStoredInitialUser = (): User | null => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+  }
+  return TEST_USER;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(TEST_USER);
+  const [user, setUser] = useState<User | null>(getStoredInitialUser);
   const [dependents, setDependents] = useState<Dependent[]>(INITIAL_DEPENDENTS);
 
-  const loginAsTestUser = () => {
-    setUser(TEST_USER);
+  // Restore session from AsyncStorage asynchronously on all platforms
+  useEffect(() => {
+    AsyncStorage.getItem(AUTH_USER_STORAGE_KEY)
+      .then((data) => {
+        if (data) {
+          try {
+            setUser(JSON.parse(data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveUserSession = (newUser: User | null) => {
+    setUser(newUser);
+    if (newUser) {
+      const json = JSON.stringify(newUser);
+      AsyncStorage.setItem(AUTH_USER_STORAGE_KEY, json).catch(() => {});
+      AsyncStorage.setItem(ONBOARDING_SEEN_KEY, '1').catch(() => {});
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem(AUTH_USER_STORAGE_KEY, json);
+          window.localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+        } catch {}
+      }
+    } else {
+      AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY).catch(() => {});
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        } catch {}
+      }
+    }
   };
 
-  const loginWithPhone = (phone: string, otp: string) => {
+  const loginAsTestUser = () => {
+    saveUserSession(TEST_USER);
+  };
+
+  const loginWithPhone = (phone: string, otp: string, fullName?: string) => {
+    const cleanName = fullName?.trim() || 'Rahul Jain';
     // App Store review bypass: phone 9999999999 or OTP 123456
-    if (phone.includes('9999999999') || otp === '123456') {
-      setUser(TEST_USER);
+    if (phone.includes('9999999999')) {
+      const reviewerUser: User = {
+        ...TEST_USER,
+        full_name: cleanName !== 'Rahul Jain' ? cleanName : TEST_USER.full_name,
+      };
+      saveUserSession(reviewerUser);
       return true;
     }
-    // General login
+
+    // General login with user's inputted full name
     const newUser: User = {
       id: `user-${Date.now()}`,
       phone: phone.startsWith('+91') ? phone : `+91 ${phone}`,
-      full_name: 'Patient User',
-      age: 28,
-      gender: 'Other',
+      full_name: cleanName,
+      age: 29,
+      gender: 'Male',
       city: 'Delhi NCR',
-      wallet_balance: 1250.00,
+      wallet_balance: 2500.00,
       is_verified: true,
       role: 'patient',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setUser(newUser);
+    saveUserSession(newUser);
     return true;
   };
 
   const logout = () => {
-    setUser(null);
+    saveUserSession(null);
   };
 
   const addDependent = (dep: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => {
@@ -103,7 +161,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deductWallet = (amount: number) => {
     if (!user) return;
-    setUser((prev) => (prev ? { ...prev, wallet_balance: Math.max(0, prev.wallet_balance - amount) } : null));
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, wallet_balance: Math.max(0, prev.wallet_balance - amount) };
+      saveUserSession(updated);
+      return updated;
+    });
   };
 
   return (

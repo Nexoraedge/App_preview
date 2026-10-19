@@ -4,7 +4,7 @@
 //   seen, signed out    -> /login
 //   seen, signed in     -> /(tabs) (home)
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,12 +13,22 @@ import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
 import { ONBOARDING_KEY, ROUTES, SPLASH_BG } from '../src/config/brand';
 
+const getInitialSeen = (): boolean | null => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const v = window.localStorage.getItem(ONBOARDING_KEY);
+      if (v === '1') return true;
+    } catch {}
+  }
+  return null;
+};
+
 export default function Gate() {
   const router = useRouter();
   const auth = useAuth();
   const { language } = useLanguage() as any;
 
-  const [seen, setSeen] = useState<boolean | null>(null);
+  const [seen, setSeen] = useState<boolean | null>(getInitialSeen);
 
   useEffect(() => {
     // Immediately unlock native splash screen so it never gets stuck on Android/iOS
@@ -51,9 +61,9 @@ export default function Gate() {
 
   const go = () => {
     SplashScreen.hideAsync().catch(() => {});
-    if (!seen) router.replace(ROUTES.welcome as any);
-    else if (!signedIn) router.replace(ROUTES.login as any);
-    else router.replace(ROUTES.home as any);
+    if (signedIn) router.replace(ROUTES.home as any);
+    else if (!seen) router.replace(ROUTES.welcome as any);
+    else router.replace(ROUTES.login as any);
   };
 
   return (

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -49,6 +50,7 @@ import {
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { HospitalCardSkeleton, DoctorCardSkeleton } from '../../components/ui/SkeletonBox';
 import {
   translateHospitalName,
   translateBranchName,
@@ -110,6 +112,12 @@ export default function OpdConciergeScreen() {
     if (tab === 'hospitals') {
       setSelectedSlotDoctor(null);
     }
+  }, []);
+
+  const [screenLoading, setScreenLoading] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setScreenLoading(false), 350);
+    return () => clearTimeout(t);
   }, []);
 
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
@@ -773,12 +781,11 @@ export default function OpdConciergeScreen() {
               </View>
             </View>
 
-            {isLoading ? (
-              <View style={{ paddingVertical: 64, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#2563EB" />
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 12 }}>
-                  {t.loadingSpecialists}
-                </Text>
+            {(isLoading || screenLoading) ? (
+              <View>
+                <HospitalCardSkeleton />
+                <HospitalCardSkeleton />
+                <HospitalCardSkeleton />
               </View>
             ) : filteredHospitals.length === 0 ? (
               <View style={{ paddingVertical: 64, alignItems: 'center', paddingHorizontal: 24 }}>
@@ -1172,12 +1179,11 @@ export default function OpdConciergeScreen() {
         {/* TAB 2: DOCTORS LIST */}
         {hasVisitedDoctors && (
           <View style={{ display: activeTab === 'doctors' ? 'flex' : 'none', paddingHorizontal: 16, paddingTop: 16 }}>
-            {isLoading ? (
-              <View style={{ paddingVertical: 64, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#2563EB" />
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 12 }}>
-                  {t.loadingSpecialists}
-                </Text>
+            {(isLoading || screenLoading) ? (
+              <View>
+                <DoctorCardSkeleton />
+                <DoctorCardSkeleton />
+                <DoctorCardSkeleton />
               </View>
             ) : filteredDoctors.length === 0 ? (
               <View style={{ backgroundColor: '#FFFFFF', padding: 32, borderRadius: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', marginVertical: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>

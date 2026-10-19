@@ -12,6 +12,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   StatusBar as RNStatusBar,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,6 +67,24 @@ import {
 } from '../../components/ServiceIcons';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { SkeletonBox } from '../../components/ui/SkeletonBox';
+
+const docHeroImg = require('../../assets/doc.png');
+const labHeroImg = require('../../assets/lab.png');
+const hospHeroImg = require('../../assets/hosp.png');
+
+// Fast eager pre-load in memory for web browsers
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  [docHeroImg, labHeroImg, hospHeroImg].forEach((asset) => {
+    try {
+      const uri = typeof asset === 'string' ? asset : (asset as any)?.uri || (asset as any)?.default;
+      if (uri) {
+        const img = new (window as any).Image();
+        img.src = uri;
+      }
+    } catch {}
+  });
+}
 
 const { width } = Dimensions.get('window');
 
@@ -337,53 +356,7 @@ function ServiceCard({
 }
 
 // Shimmering Skeleton Component for Clean Prototype Loading State
-function SkeletonBox({
-  width: w,
-  height: h,
-  borderRadius = 16,
-  style,
-}: {
-  width: number | string;
-  height: number;
-  borderRadius?: number;
-  style?: any;
-}) {
-  const shimmer = useRef(new Animated.Value(0.35)).current;
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 0.85,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmer, {
-          toValue: 0.35,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer]);
-
-  return (
-    <Animated.View
-      style={[
-        {
-          width: w as any,
-          height: h,
-          borderRadius,
-          backgroundColor: '#E2E8F0',
-          opacity: shimmer,
-        },
-        style,
-      ]}
-    />
-  );
-}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -417,7 +390,7 @@ export default function HomeScreen() {
         sub: isHi ? 'समय पर इन-क्लिनिक अपॉइंटमेंट' : 'Priority in-clinic consultations',
         cta: isHi ? 'अपॉइंटमेंट लें ›' : 'Book Consult ›',
         colors: ['#1E3A8A', '#2563EB'] as const,
-        image: require('../../assets/doc.png'),
+        image: docHeroImg,
       },
       {
         id: 'b-labs',
@@ -427,7 +400,7 @@ export default function HomeScreen() {
         sub: isHi ? 'घर से मुफ़्त सैंपल व त्वरित रिपोर्ट' : 'Home sample pickup & fast reports',
         cta: isHi ? 'टेस्ट्स देखें ›' : 'Explore Tests ›',
         colors: ['#065F46', '#059669'] as const,
-        image: require('../../assets/lab.png'),
+        image: labHeroImg,
       },
       {
         id: 'b-ipd',
@@ -437,7 +410,7 @@ export default function HomeScreen() {
         sub: isHi ? 'अनुभवी डॉक्टरों व केंद्रों का नेटवर्क' : 'Dedicated support across partner network',
         cta: isHi ? 'अस्पताल खोजें ›' : 'Find Hospitals ›',
         colors: ['#312E81', '#4F46E5'] as const,
-        image: require('../../assets/hosp.png'),
+        image: hospHeroImg,
       },
     ],
     [isHi]
@@ -738,6 +711,9 @@ export default function HomeScreen() {
                             zIndex: 1,
                           }}
                           resizeMode="contain"
+                          // @ts-ignore
+                          priority="high"
+                          loading="eager"
                         />
 
                         {/* Left Content Column */}

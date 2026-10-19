@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -51,6 +51,7 @@ import { PressableCard } from '../../components/PressableCard';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { IpdCardSkeleton } from '../../components/ui/SkeletonBox';
 
 const { width } = Dimensions.get('window');
 
@@ -356,6 +357,12 @@ export default function IpdScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [profileVisible, setProfileVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 350);
+    return () => clearTimeout(t);
+  }, []);
 
   // Bottom Sheet State for Procedure / Hospital Booking
   const [bottomSheetVisible, setBottomSheetVisible] = useState(false);
@@ -755,6 +762,12 @@ export default function IpdScreen() {
                 <Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B' }}>
                   {isHi ? `"${searchQuery}" से कोई प्रक्रिया नहीं मिली` : `No procedures match "${searchQuery}"`}
                 </Text>
+              </View>
+            ) : isLoading ? (
+              <View style={{ width: '100%' }}>
+                <IpdCardSkeleton />
+                <IpdCardSkeleton />
+                <IpdCardSkeleton />
               </View>
             ) : (
               <View

@@ -1,7 +1,7 @@
 // app/welcome.tsx
 // Three-slide "how to use the app" walkthrough. Shown once. Finishing it saves a flag and goes to login.
 import React, { useRef, useState } from 'react';
-import { View, Text, Animated, FlatList, Pressable, useWindowDimensions, ViewToken } from 'react-native';
+import { View, Text, Animated, FlatList, Pressable, useWindowDimensions, ViewToken, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -122,7 +122,12 @@ export default function Welcome() {
   }).current;
 
   const finish = async () => {
-    try { await AsyncStorage.setItem(ONBOARDING_KEY, '1'); } catch {}
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, '1');
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(ONBOARDING_KEY, '1');
+      }
+    } catch {}
     router.replace(ROUTES.login as any);
   };
 
