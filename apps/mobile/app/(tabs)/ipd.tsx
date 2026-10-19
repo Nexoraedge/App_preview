@@ -10,15 +10,16 @@ import {
   Linking,
   ActivityIndicator,
   StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+  StatusBar as RNStatusBar,
+  Dimensions,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Bed,
   ShieldCheck,
-  PhoneCall,
   Search,
   CheckCircle2,
   MapPin,
@@ -27,20 +28,14 @@ import {
   ArrowRight,
   X,
   Building2,
-  Calendar,
-  AlertCircle,
   Star,
-  Tag,
-  ChevronDown,
-  ChevronUp,
-  Check,
   Activity,
   FileText,
-  Award,
-  Info,
   Phone,
-  HelpCircle,
-  UserCheck,
+  Users,
+  Check,
+  PhoneCall,
+  Upload,
 } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking } from '@adityam/types';
@@ -51,387 +46,384 @@ import {
   HeartPulseIcon,
   BoneJointIcon,
   ChildCareIcon,
-  AllCategoriesIcon,
 } from '../../components/ServiceIcons';
+import { PressableCard } from '../../components/PressableCard';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppSearchBar } from '../../components/ui/AppSearchBar';
+import { ProfileModal } from '../../components/ui/ProfileModal';
 
-interface SurgeryCategory {
-  id: string;
-  label: string;
-  subtitle: string;
-  count: string;
-  accentColor: string;
-  icon: (color: string) => React.ReactNode;
-}
+const { width } = Dimensions.get('window');
 
-interface PlannedSurgery {
+// ---------------- DATA STRUCTURES ---------------- //
+
+export interface PlannedSurgery {
   id: string;
-  name: string;
-  category: string;
+  shortName: string;
+  shortNameHi: string;
+  name: string; // medical procedure title
+  nameHi: string;
+  category: 'GeneralSurgery' | 'Orthopedics' | 'Cardiology' | 'Maternity' | 'Urology' | 'Ophthalmology';
   stayDays: string;
+  stayDaysHi: string;
   price: number;
-  originalPrice: number;
-  discountPercent: number;
-  insuranceCovered: boolean;
   tag: string;
+  tagHi: string;
+  whatItInvolves: string;
+  whatItInvolvesHi: string;
+  recoveryTimeline: string;
+  recoveryTimelineHi: string;
 }
 
-interface HospitalAdmissionInfo {
+export interface HospitalAdmissionInfo {
   id: string;
   name: string;
+  nameHi: string;
   location: string;
+  locationHi: string;
   distance_km: number;
   image_url: string;
   rating: number;
   total_reviews: number;
-  icuAvailable: number;
-  privateRooms: number;
-  cashlessPreAuth: string;
-  discount_percentage: number;
+  tag: string;
+  tagHi: string;
   specialties: string[];
-  tpaInsurance: string[];
-  featured: boolean;
+  specialtiesHi: string[];
 }
 
+// Category Tint Palette
+const TINT: Record<string, string> = {
+  GeneralSurgery: '#ECFDF5',
+  Orthopedics: '#FFFBEB',
+  Cardiology: '#FEF2F2',
+  Maternity: '#FDF2F8',
+  Urology: '#F5F3FF',
+  Ophthalmology: '#EFF6FF',
+};
+
+const CATEGORY_ACCENT: Record<string, string> = {
+  GeneralSurgery: '#059669',
+  Orthopedics: '#D97706',
+  Cardiology: '#DC2626',
+  Maternity: '#DB2777',
+  Urology: '#7C3AED',
+  Ophthalmology: '#2563EB',
+};
+
+// Helper for Indian Currency formatting
+const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
+
+// ---------------- MASTER DATA ---------------- //
+
+const MASTER_SURGERIES: PlannedSurgery[] = [
+  {
+    id: 'surg-gallbladder',
+    shortName: 'Gallbladder surgery',
+    shortNameHi: 'पित्त की थैली सर्जरी (Gallbladder)',
+    name: 'Laparoscopic Cholecystectomy',
+    nameHi: 'लैप्रोस्कोपिक कोलेसिस्टेक्टॉमी (Cholecystectomy)',
+    category: 'GeneralSurgery',
+    stayDays: '1–2 days stay',
+    stayDaysHi: '1–2 दिन भर्ती',
+    price: 45000,
+    tag: 'Minimal invasive',
+    tagHi: 'कम चीरा (लैप्रोस्कोपिक)',
+    whatItInvolves: 'Keyhole surgical removal of the inflamed gallbladder containing painful gallstones.',
+    whatItInvolvesHi: 'दर्दनाक पथरी से ग्रस्त पित्त की थैली को लैप्रोस्कोपिक कीहोल विधि द्वारा सुरक्षित निकालना।',
+    recoveryTimeline: 'Normal routine resumed in 5–7 days.',
+    recoveryTimelineHi: '5–7 दिनों में सामान्य दिनचर्या फिर से शुरू।',
+  },
+  {
+    id: 'surg-knee-replace',
+    shortName: 'Knee replacement',
+    shortNameHi: 'घुटना प्रत्यारोपण (Knee Replacement)',
+    name: 'Total Knee Arthroplasty (TKR)',
+    nameHi: 'टोटल नी आर्थ्रोप्लास्टी (TKR Surgery)',
+    category: 'Orthopedics',
+    stayDays: '3–4 days stay',
+    stayDaysHi: '3–4 दिन भर्ती',
+    price: 125000,
+    tag: 'Implant included',
+    tagHi: 'यूएस-एफडीए इम्प्लांट शामिल',
+    whatItInvolves: 'Precision joint resurfacing using US-FDA approved cobalt-chromium implants.',
+    whatItInvolvesHi: 'घिसे हुए जोड़ को उच्च गुणवत्ता वाले कोबाल्ट-क्रोमियम इम्प्लांट से बदलना।',
+    recoveryTimeline: 'Assisted walking on day 2. Physiotherapy included.',
+    recoveryTimelineHi: 'दूसरे दिन से फिजियोथेरेपी की मदद से चलना शुरू।',
+  },
+  {
+    id: 'surg-hernia',
+    shortName: 'Hernia repair',
+    shortNameHi: 'हर्निया ऑपरेशन (Hernia Repair)',
+    name: 'Laparoscopic Hernioplasty',
+    nameHi: 'लैप्रोस्कोपिक हर्नियोप्लास्टी (Mesh Repair)',
+    category: 'GeneralSurgery',
+    stayDays: '1 day stay',
+    stayDaysHi: '1 दिन भर्ती',
+    price: 38000,
+    tag: 'Daycare / 24 hrs',
+    tagHi: '24 घंटे में छुट्टी',
+    whatItInvolves: 'High-grade surgical mesh reinforcement for inguinal or umbilical wall weakness.',
+    whatItInvolvesHi: 'कमजोर पेट की दीवार को मेडिकल मेश (जाली) लगाकर सुरक्षित रूप से मजबूत करना।',
+    recoveryTimeline: 'Discharge within 24 hours. Light desk work in 3 days.',
+    recoveryTimelineHi: '24 घंटे में डिस्चार्ज। 3 दिन में हल्का काम संभव।',
+  },
+  {
+    id: 'surg-csection',
+    shortName: 'Maternity delivery',
+    shortNameHi: 'डिलीवरी व प्रसूति (C-Section)',
+    name: 'Normal & C-Section Package',
+    nameHi: 'नॉर्मल व सिजेरियन डिलीवरी (Maternity)',
+    category: 'Maternity',
+    stayDays: '2–3 days stay',
+    stayDaysHi: '2–3 दिन भर्ती',
+    price: 55000,
+    tag: 'Baby care included',
+    tagHi: 'शिशु देखभाल व कमरा शामिल',
+    whatItInvolves: 'Complete delivery package with pediatrician attendance, baby care, and lactation consult.',
+    whatItInvolvesHi: 'बाल रोग विशेषज्ञ, नवजात शिशु देखभाल और स्तनपान परामर्श सहित संपूर्ण प्रसूति पैकेज।',
+    recoveryTimeline: '24–48 hours private room monitoring.',
+    recoveryTimelineHi: '24–48 घंटे प्राइवेट रूम में विशेषज्ञ देखरेख।',
+  },
+  {
+    id: 'surg-angioplasty',
+    shortName: 'Coronary angioplasty',
+    shortNameHi: 'हार्ट एंजियोप्लास्टी (Heart Stent)',
+    name: 'PTCA with Drug Eluting Stent',
+    nameHi: 'ड्रग एल्यूटिंग स्टेंट एंजियोप्लास्टी (PTCA)',
+    category: 'Cardiology',
+    stayDays: '2 days stay',
+    stayDaysHi: '2 दिन भर्ती',
+    price: 110000,
+    tag: 'Cardiac desk',
+    tagHi: 'कार्डियक डेस्क सहायता',
+    whatItInvolves: 'Radial or femoral artery catheterization to clear blockages with DES stent.',
+    whatItInvolvesHi: 'धमनियों में जमा ब्लॉकेज को हटाकर यूएस-एफडीए स्वीकृत स्टेंट लगाना।',
+    recoveryTimeline: 'Radial site recovery with normal walking next morning.',
+    recoveryTimelineHi: 'अगली सुबह से सामान्य चलना-फिरना शुरू।',
+  },
+  {
+    id: 'surg-kidney-stone',
+    shortName: 'Kidney stone removal',
+    shortNameHi: 'गुर्दे की पथरी लेजर (Kidney Stone)',
+    name: 'Laser RIRS / PCNL Lithotripsy',
+    nameHi: 'लेजर RIRS / PCNL लिथोट्रिप्सी (Laser)',
+    category: 'Urology',
+    stayDays: '1 day stay',
+    stayDaysHi: '1 दिन भर्ती',
+    price: 42000,
+    tag: 'No-cut laser',
+    tagHi: 'बिना चीरे वाली लेजर',
+    whatItInvolves: 'Holmium laser dusting of stones through natural urinary tract with zero incisions.',
+    whatItInvolvesHi: 'होलमियम लेजर द्वारा बिना किसी चीरे के पथरी को पाउडर बनाकर बाहर निकालना।',
+    recoveryTimeline: 'Same-day or next-morning discharge.',
+    recoveryTimelineHi: 'उसी दिन या अगली सुबह तक डिस्चार्ज।',
+  },
+  {
+    id: 'surg-cataract',
+    shortName: 'Cataract eye surgery',
+    shortNameHi: 'मोतियाबिंद ऑपरेशन (Cataract)',
+    name: 'Micro-Incision Phaco Laser',
+    nameHi: 'माइक्रो-इंसीजन फेको लेजर (Phaco Lens)',
+    category: 'Ophthalmology',
+    stayDays: 'Daycare (4 hrs)',
+    stayDaysHi: 'डेकेयर (4 घंटे)',
+    price: 24000,
+    tag: 'Bladeless phaco',
+    tagHi: 'ब्लेडलेस फोल्डेबल लेंस',
+    whatItInvolves: 'Foldable hydrophobic IOL lens implantation under gentle topical drop anesthesia.',
+    whatItInvolvesHi: 'आई-ड्रॉप एनेस्थीसिया के साथ प्रीमियम हाइड्रोफोबिक फोल्डेबल लेंस प्रत्यारोपण।',
+    recoveryTimeline: 'Walk home in 4 hours; crystal clear vision next day.',
+    recoveryTimelineHi: '4 घंटे में घर जाएं; अगले दिन से स्पष्ट दृष्टि।',
+  },
+  {
+    id: 'surg-appendix',
+    shortName: 'Appendectomy',
+    shortNameHi: 'अपेंडिक्स सर्जरी (Appendectomy)',
+    name: 'Emergency Laparoscopic Appendectomy',
+    nameHi: 'इमरजेंसी लैप्रोस्कोपिक अपेंडिसेक्टॉमी',
+    category: 'GeneralSurgery',
+    stayDays: '1–2 days stay',
+    stayDaysHi: '1–2 दिन भर्ती',
+    price: 40000,
+    tag: 'Emergency fast-track',
+    tagHi: 'आपातकालीन त्वरित भर्ती',
+    whatItInvolves: 'Urgent keyhole removal of inflamed appendix to prevent abdominal perforation.',
+    whatItInvolvesHi: 'सूजे हुए अपेंडिक्स को कीहोल सर्जरी से तुरंत सुरक्षित रूप से बाहर निकालना।',
+    recoveryTimeline: 'Prompt discharge within 24–36 hours.',
+    recoveryTimelineHi: '24–36 घंटों के भीतर सुरक्षित डिस्चार्ज।',
+  },
+];
+
+const MASTER_HOSPITALS: HospitalAdmissionInfo[] = [
+  {
+    id: 'hosp-1',
+    name: 'Max Super Speciality Hospital',
+    nameHi: 'मैक्स सुपर स्पेशियलिटी अस्पताल (Max Hospital)',
+    location: 'Press Enclave Marg, Saket',
+    locationHi: 'प्रेस एन्क्लेव मार्ग, साकेत',
+    distance_km: 1.4,
+    image_url:
+      'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=80',
+    rating: 4.9,
+    total_reviews: 420,
+    tag: 'NABH Accredited Partner',
+    tagHi: 'NABH मान्यता प्राप्त पार्टनर',
+    specialties: ['Cardiology', 'Orthopedics', 'Laparoscopy'],
+    specialtiesHi: ['हृदय रोग', 'हड्डी व जोड़', 'लैप्रोस्कोपी'],
+  },
+  {
+    id: 'hosp-2',
+    name: 'Indraprastha Apollo Hospitals',
+    nameHi: 'इंद्रप्रस्थ अपोलो अस्पताल (Apollo Hospitals)',
+    location: 'Mathura Road, Sarita Vihar',
+    locationHi: 'मथुरा रोड, सरिता विहार',
+    distance_km: 8.1,
+    image_url:
+      'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
+    rating: 4.8,
+    total_reviews: 490,
+    tag: 'JCI & NABH Certified',
+    tagHi: 'JCI व NABH प्रमाणित',
+    specialties: ['Cardiac Surgery', 'Joint Care', 'Transplant'],
+    specialtiesHi: ['कार्डियक सर्जरी', 'जोड़ देखभाल', 'अंग प्रत्यारोपण'],
+  },
+  {
+    id: 'hosp-3',
+    name: 'Fortis Escorts Heart Institute',
+    nameHi: 'फोर्टिस एस्कॉर्ट्स हार्ट इंस्टीट्यूट (Fortis Escorts)',
+    location: 'Okhla Road, Sukhdev Vihar',
+    locationHi: 'ओखला रोड, सुखदेव विहार',
+    distance_km: 6.5,
+    image_url:
+      'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=600&q=80',
+    rating: 4.8,
+    total_reviews: 350,
+    tag: 'Specialist Cardiac Care',
+    tagHi: 'विशेषज्ञ हृदय देखभाल',
+    specialties: ['Cardiac Surgery', 'Vascular Care', 'Cathlab'],
+    specialtiesHi: ['हृदय शल्य चिकित्सा', 'वैस्कुलर केयर', 'कैथलैब'],
+  },
+  {
+    id: 'hosp-4',
+    name: 'Medanta Super Speciality Clinic',
+    nameHi: 'मेदांता सुपर स्पेशियलिटी क्लिनिक (Medanta)',
+    location: 'Defence Colony, South Delhi',
+    locationHi: 'डिफेंस कॉलोनी, दक्षिण दिल्ली',
+    distance_km: 5.2,
+    image_url:
+      'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80',
+    rating: 4.9,
+    total_reviews: 280,
+    tag: 'Cashless Desk Partner',
+    tagHi: 'कैशलेस डेस्क पार्टनर',
+    specialties: ['Minimal Invasive', 'Urology', 'General Surgery'],
+    specialtiesHi: ['कम चीरे वाली सर्जरी', 'मूत्र रोग', 'जनरल सर्जरी'],
+  },
+];
+
+// Room choice cards
+const getRoomOptions = (isHi: boolean) => [
+  {
+    id: 'DELUXE',
+    title: isHi ? 'सिंगल डीलक्स रूम (Single Deluxe)' : 'Single Deluxe',
+    subtitle: isHi ? 'मरीज व तीमारदार हेतु प्राइवेट अटैच्ड रूम' : 'Private en-suite room for patient & attendant',
+    icon: (c: string) => <Bed size={18} color={c} />,
+  },
+  {
+    id: 'SEMI',
+    title: isHi ? 'ट्विन शेयरिंग (Twin Sharing)' : 'Twin Sharing',
+    subtitle: isHi ? 'पर्दे के विभाजन के साथ दो मरीजों का रूम' : 'Semi-private room with curtain partition',
+    icon: (c: string) => <Users size={18} color={c} />,
+  },
+  {
+    id: 'GENERAL',
+    title: isHi ? 'जनरल वार्ड (General Ward)' : 'General Ward',
+    subtitle: isHi ? 'किफायती साझा अस्पताल वार्ड' : 'Economy multi-bed shared healthcare ward',
+    icon: (c: string) => <Building2 size={18} color={c} />,
+  },
+  {
+    id: 'ICU',
+    title: isHi ? 'आईसीयू (ICU / Critical Care)' : 'ICU / Critical Care',
+    subtitle: isHi ? 'निरंतर कार्डियक टेलीमेट्री व गहन निगरानी' : 'Continuous cardiac telemetry & specialist care',
+    icon: (c: string) => <HeartPulseIcon size={18} color={c} />,
+  },
+];
+
 export default function IpdScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const isHi = language === 'hi';
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [profileVisible, setProfileVisible] = useState(false);
 
-  // Admission / Bed Booking Modal State
-  const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [selectedHospital, setSelectedHospital] = useState<HospitalAdmissionInfo | null>(null);
+  // Bottom Sheet State for Procedure / Hospital Booking
+  const [bottomSheetVisible, setBottomSheetVisible] = useState(false);
   const [selectedSurgery, setSelectedSurgery] = useState<PlannedSurgery | null>(null);
+  const [selectedHospital, setSelectedHospital] = useState<HospitalAdmissionInfo | null>(null);
 
-  const [patientName, setPatientName] = useState(user?.full_name || 'Hardik Gupta');
+  // Booking fields
+  const [patientName, setPatientName] = useState(user?.full_name || 'Dr. Vikram Malhotra');
   const [patientPhone, setPatientPhone] = useState(user?.phone || '+91 98112 44550');
-  const [roomType, setRoomType] = useState<'DELUXE' | 'SEMI' | 'ICU' | 'GENERAL'>('DELUXE');
-  const [insuranceType, setInsuranceType] = useState<string>('Star Health Insurance (Cashless Desk)');
-  const [plannedDate, setPlannedDate] = useState('Tomorrow');
+  const [roomType, setRoomType] = useState<'DELUXE' | 'SEMI' | 'GENERAL' | 'ICU'>('DELUXE');
+  const [insurancePolicy, setInsurancePolicy] = useState('Star Health Insurance');
   const [admissionReason, setAdmissionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+  const [confirmedBookingId, setConfirmedBookingId] = useState<string | null>(null);
 
-  // Doctor's Admission Slip / Advice Upload Modal State
-  const [adviceModalVisible, setAdviceModalVisible] = useState(false);
+  // Doctor Slip Upload Sheet State
+  const [adviceSheetVisible, setAdviceSheetVisible] = useState(false);
   const [adviceNote, setAdviceNote] = useState('');
   const [isSubmittingAdvice, setIsSubmittingAdvice] = useState(false);
   const [adviceSuccessRef, setAdviceSuccessRef] = useState<string | null>(null);
 
-  // Surgery & Inpatient Categories (Capsule Pills 1:1 with OPD)
-  const categories: SurgeryCategory[] = useMemo(
-    () => [
-      {
-        id: 'All',
-        label: language === 'hi' ? 'सभी सर्जरी' : 'All Surgeries',
-        subtitle: 'Comprehensive admissions & surgeries',
-        count: '18 Procedures',
-        accentColor: '#2563EB',
-        icon: (color: string) => <AllCategoriesIcon size={20} color={color} />,
-      },
-      {
-        id: 'GeneralSurgery',
-        label: language === 'hi' ? 'लेप्रोस्कोपिक' : 'Laparoscopy',
-        subtitle: 'Gallbladder, Hernia, Appendix, Piles',
-        count: '4 Surgeries',
-        accentColor: '#059669',
-        icon: (color: string) => <IpdHospitalBedIcon size={20} color={color} />,
-      },
-      {
-        id: 'Orthopedics',
-        label: language === 'hi' ? 'हड्डी व जोड़' : 'Orthopedics',
-        subtitle: 'Knee & Hip Replacement, Spine',
-        count: '3 Surgeries',
-        accentColor: '#D97706',
-        icon: (color: string) => <BoneJointIcon size={20} color={color} />,
-      },
-      {
-        id: 'Cardiology',
-        label: language === 'hi' ? 'कार्डियक' : 'Cardiology',
-        subtitle: 'Angioplasty, Bypass, Pacemaker',
-        count: '3 Surgeries',
-        accentColor: '#DC2626',
-        icon: (color: string) => <HeartPulseIcon size={20} color={color} />,
-      },
-      {
-        id: 'Maternity',
-        label: language === 'hi' ? 'प्रसूति व सिजेरियन' : 'Maternity',
-        subtitle: 'Normal & C-Section Delivery Packages',
-        count: '3 Surgeries',
-        accentColor: '#DB2777',
-        icon: (color: string) => <ChildCareIcon size={20} color={color} />,
-      },
-      {
-        id: 'Urology',
-        label: language === 'hi' ? 'किडनी स्टोन' : 'Urology',
-        subtitle: 'Laser Kidney Stones, Prostate',
-        count: '2 Surgeries',
-        accentColor: '#7C3AED',
-        icon: (color: string) => <Activity size={19} color={color} />,
-      },
-      {
-        id: 'Ophthalmology',
-        label: language === 'hi' ? 'मोतियाबिंद' : 'Cataract / Eye',
-        subtitle: 'Laser Cataract (Phaco), Cornea',
-        count: '2 Surgeries',
-        accentColor: '#2563EB',
-        icon: (color: string) => <Sparkles size={19} color={color} />,
-      },
-      {
-        id: 'CriticalCare',
-        label: language === 'hi' ? 'लाइव आईसीयू' : 'Live ICU Beds',
-        subtitle: 'Emergency ICU / CCU bed allocation',
-        count: 'Live Beds',
-        accentColor: '#E11D48',
-        icon: (color: string) => <Building2 size={19} color={color} />,
-      },
-    ],
-    [language]
-  );
-
-  // Partner Hospitals Catalog for IPD
-  const partnerHospitals: HospitalAdmissionInfo[] = useMemo(
-    () => [
-      {
-        id: 'hosp-1',
-        name: 'Max Super Speciality Hospital',
-        location: '1, 2, Press Enclave Marg, Saket, New Delhi',
-        distance_km: 1.4,
-        image_url:
-          'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=80',
-        rating: 4.9,
-        total_reviews: 420,
-        icuAvailable: 4,
-        privateRooms: 9,
-        cashlessPreAuth: 'Cashless Pre-Auth in 30 Mins',
-        discount_percentage: 20,
-        specialties: ['Cardiology', 'Orthopedics', 'Oncology', 'Laparoscopy'],
-        tpaInsurance: ['Star Health', 'HDFC ERGO', 'Care', 'ICICI Lombard', 'Niva Bupa'],
-        featured: true,
-      },
-      {
-        id: 'hosp-2',
-        name: 'Indraprastha Apollo Hospitals',
-        location: 'Delhi-Mathura Road, Sarita Vihar, New Delhi',
-        distance_km: 8.1,
-        image_url:
-          'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
-        rating: 4.8,
-        total_reviews: 490,
-        icuAvailable: 2,
-        privateRooms: 14,
-        cashlessPreAuth: 'Zero Deposit • 100% Cashless Desk',
-        discount_percentage: 20,
-        specialties: ['Organ Transplant', 'Cardiac Surgery', 'Neurosciences', 'Joint Care'],
-        tpaInsurance: ['All Major TPAs', 'Star Health', 'Medi Assist', 'Paramount'],
-        featured: true,
-      },
-      {
-        id: 'hosp-3',
-        name: 'Fortis Escorts Heart Institute',
-        location: 'Okhla Road, Sukhdev Vihar Metro, New Delhi',
-        distance_km: 6.5,
-        image_url:
-          'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=600&q=80',
-        rating: 4.8,
-        total_reviews: 350,
-        icuAvailable: 6,
-        privateRooms: 11,
-        cashlessPreAuth: 'Dedicated Desk • Instant Approvals',
-        discount_percentage: 25,
-        specialties: ['Cardiac Surgery', 'Pediatric Heart', 'Vascular', 'Thoracic'],
-        tpaInsurance: ['Star Health', 'Vidal Health', 'Raksha TPA', 'FHPL'],
-        featured: false,
-      },
-      {
-        id: 'hosp-4',
-        name: 'Medanta - The Medicity',
-        location: 'CH Bakhtawar Singh Road, Sector 38, Gurugram',
-        distance_km: 14.2,
-        image_url:
-          'https://images.unsplash.com/photo-1512678080530-7760d81faba6?auto=format&fit=crop&w=600&q=80',
-        rating: 4.9,
-        total_reviews: 580,
-        icuAvailable: 8,
-        privateRooms: 22,
-        cashlessPreAuth: 'Zero-Advance Admission Protection',
-        discount_percentage: 20,
-        specialties: ['Robotic Surgery', 'Orthopedics', 'Gastroenterology', 'Cardiology'],
-        tpaInsurance: ['HDFC ERGO', 'Star Health', 'Niva Bupa', 'Care Health', 'Bajaj Allianz'],
-        featured: true,
-      },
-      {
-        id: 'hosp-5',
-        name: 'Artemis Hospital',
-        location: 'Sector 51, Near Artemis Roundabout, Gurugram',
-        distance_km: 16.5,
-        image_url:
-          'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=600&q=80',
-        rating: 4.8,
-        total_reviews: 410,
-        icuAvailable: 5,
-        privateRooms: 12,
-        cashlessPreAuth: 'Fast Cashless Clearance Guarantee',
-        discount_percentage: 20,
-        specialties: ['Joint Replacement', 'Oncology', 'Bariatric Surgery', 'Urology'],
-        tpaInsurance: ['Star Health', 'Care', 'ICICI Lombard', 'Medi Assist'],
-        featured: false,
-      },
-    ],
-    []
-  );
-
-  // Planned Surgeries Catalog
-  const plannedSurgeries: PlannedSurgery[] = useMemo(
-    () => [
-      {
-        id: 'surg-gallbladder',
-        name: 'Laparoscopic Gallbladder Removal (Cholecystectomy)',
-        category: 'GeneralSurgery',
-        stayDays: '1-2 Days Stay',
-        price: 45000,
-        originalPrice: 75000,
-        discountPercent: 40,
-        insuranceCovered: true,
-        tag: 'MINIMAL INVASIVE',
-      },
-      {
-        id: 'surg-knee-replace',
-        name: 'Total Knee Replacement (TKR - Unilateral)',
-        category: 'Orthopedics',
-        stayDays: '3-4 Days Stay',
-        price: 125000,
-        originalPrice: 190000,
-        discountPercent: 34,
-        insuranceCovered: true,
-        tag: 'IMPLANT INCLUDED',
-      },
-      {
-        id: 'surg-hernia',
-        name: 'Laparoscopic Inguinal / Umbilical Hernia Repair',
-        category: 'GeneralSurgery',
-        stayDays: '1 Day Stay',
-        price: 38000,
-        originalPrice: 65000,
-        discountPercent: 41,
-        insuranceCovered: true,
-        tag: 'DAYCARE / 1 DAY',
-      },
-      {
-        id: 'surg-csection',
-        name: 'Normal & C-Section Delivery Maternity Package',
-        category: 'Maternity',
-        stayDays: '2-3 Days Stay',
-        price: 55000,
-        originalPrice: 90000,
-        discountPercent: 38,
-        insuranceCovered: true,
-        tag: 'BABY CARE INCLUDED',
-      },
-      {
-        id: 'surg-angioplasty',
-        name: 'Coronary Angioplasty (PTCA with Drug Eluting Stent)',
-        category: 'Cardiology',
-        stayDays: '2 Days Stay',
-        price: 110000,
-        originalPrice: 165000,
-        discountPercent: 33,
-        insuranceCovered: true,
-        tag: 'CARDIAC CARE',
-      },
-      {
-        id: 'surg-kidney-stone',
-        name: 'Laser Kidney Stone Removal (RIRS / PCNL)',
-        category: 'Urology',
-        stayDays: '1 Day Stay',
-        price: 42000,
-        originalPrice: 70000,
-        discountPercent: 40,
-        insuranceCovered: true,
-        tag: 'NO CUT LASER',
-      },
-      {
-        id: 'surg-cataract',
-        name: 'Micro-Incision Laser Cataract Surgery (Phaco)',
-        category: 'Ophthalmology',
-        stayDays: 'Daycare (4 hrs)',
-        price: 24000,
-        originalPrice: 45000,
-        discountPercent: 46,
-        insuranceCovered: true,
-        tag: 'BLADELESS LASER',
-      },
-      {
-        id: 'surg-appendix',
-        name: 'Laparoscopic Emergency Appendectomy',
-        category: 'GeneralSurgery',
-        stayDays: '1-2 Days Stay',
-        price: 40000,
-        originalPrice: 68000,
-        discountPercent: 41,
-        insuranceCovered: true,
-        tag: 'EMERGENCY / FAST',
-      },
-    ],
-    []
-  );
-
-  // Filtered Hospitals
-  const filteredHospitals = useMemo(() => {
-    return partnerHospitals.filter((hosp) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        hosp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        hosp.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        hosp.specialties.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchCategory =
-        selectedCategory === 'All' ||
-        (selectedCategory === 'CriticalCare' && hosp.icuAvailable > 0) ||
-        (selectedCategory === 'Cardiology' && hosp.specialties.includes('Cardiology')) ||
-        (selectedCategory === 'Orthopedics' && hosp.specialties.includes('Orthopedics')) ||
-        (selectedCategory === 'GeneralSurgery' && hosp.specialties.includes('Laparoscopy')) ||
-        selectedCategory === 'Maternity' ||
-        selectedCategory === 'Urology' ||
-        selectedCategory === 'Ophthalmology';
-
-      return matchSearch && matchCategory;
-    });
-  }, [partnerHospitals, searchQuery, selectedCategory]);
-
-  // Filtered Surgeries
+  // Filtered surgeries based on search query
   const filteredSurgeries = useMemo(() => {
-    return plannedSurgeries.filter((surg) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        surg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        surg.tag.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!searchQuery.trim()) return MASTER_SURGERIES;
+    const q = searchQuery.toLowerCase().trim();
+    return MASTER_SURGERIES.filter(
+      (s) =>
+        s.shortName.toLowerCase().includes(q) ||
+        (s.shortNameHi && s.shortNameHi.toLowerCase().includes(q)) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.nameHi && s.nameHi.toLowerCase().includes(q)) ||
+        s.tag.toLowerCase().includes(q) ||
+        (s.tagHi && s.tagHi.toLowerCase().includes(q)) ||
+        s.category.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
 
-      const matchCategory = selectedCategory === 'All' || surg.category === selectedCategory;
+  // Filtered hospitals based on search query
+  const filteredHospitals = useMemo(() => {
+    if (!searchQuery.trim()) return MASTER_HOSPITALS;
+    const q = searchQuery.toLowerCase().trim();
+    return MASTER_HOSPITALS.filter(
+      (h) =>
+        h.name.toLowerCase().includes(q) ||
+        (h.nameHi && h.nameHi.toLowerCase().includes(q)) ||
+        h.location.toLowerCase().includes(q) ||
+        (h.locationHi && h.locationHi.toLowerCase().includes(q)) ||
+        h.specialties.some((spec) => spec.toLowerCase().includes(q)) ||
+        (h.specialtiesHi && h.specialtiesHi.some((spec) => spec.toLowerCase().includes(q)))
+    );
+  }, [searchQuery]);
 
-      return matchSearch && matchCategory;
-    });
-  }, [plannedSurgeries, searchQuery, selectedCategory]);
+  // Handlers to open bottom sheet
+  const handleOpenProcedureSheet = (surgery: PlannedSurgery) => {
+    setSelectedSurgery(surgery);
+    setSelectedHospital(MASTER_HOSPITALS[0]);
+    setConfirmedBookingId(null);
+    setBottomSheetVisible(true);
+  };
 
-  // Booking Modal Triggers
   const handleOpenHospitalBooking = (hosp: HospitalAdmissionInfo) => {
     setSelectedHospital(hosp);
     setSelectedSurgery(null);
-    setConfirmedBooking(null);
-    setBookingModalVisible(true);
+    setConfirmedBookingId(null);
+    setBottomSheetVisible(true);
   };
 
-  const handleOpenSurgeryBooking = (surg: PlannedSurgery) => {
-    setSelectedSurgery(surg);
-    setSelectedHospital(partnerHospitals[0]);
-    setConfirmedBooking(null);
-    setBookingModalVisible(true);
-  };
-
-  // Confirm Bed / Admission Request via Supabase
+  // Submit Admission Request
   const handleConfirmAdmissionBooking = async () => {
     setIsSubmitting(true);
     const bookingRef = `AN-IPD-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -443,14 +435,14 @@ export default function IpdScreen() {
       user_id: user?.id,
       patient_name: patientName,
       patient_phone: patientPhone,
-      hospital_name: selectedHospital?.name || 'Partner Super Speciality Hospital',
+      hospital_name: selectedHospital?.name || 'Partner Hospital',
       doctor_fee: selectedSurgery ? selectedSurgery.price : 0,
-      slot_time: plannedDate,
-      specialty_requested: selectedSurgery ? selectedSurgery.name : 'Hospital Bed Admission',
+      slot_time: 'Tomorrow, Morning Admission',
+      specialty_requested: selectedSurgery ? selectedSurgery.name : 'Hospital Admission',
       status: 'NEW',
       call_status: 'pending',
-      notes: `Room: ${roomType}. Insurance TPA: ${insuranceType}. Reason: ${
-        admissionReason || 'Hospital Admission & Zero Deposit Cashless Desk'
+      notes: `Room: ${roomType}. Insurance: ${insurancePolicy}. Reason: ${
+        admissionReason || 'Inpatient admission booking assistance.'
       }`,
       created_at: new Date().toISOString(),
     };
@@ -459,19 +451,19 @@ export default function IpdScreen() {
       const supabase = getSupabaseClient();
       await supabase.from('bookings').insert(newBooking);
     } catch {
-      // Offline fallback handling
+      // Offline fallback
     }
 
     setTimeout(() => {
       setIsSubmitting(false);
-      setConfirmedBooking(newBooking);
-    }, 700);
+      setConfirmedBookingId(bookingRef);
+    }, 600);
   };
 
-  // Doctor Admission Slip / Advice Upload Submission
+  // Submit Doctor's Slip Upload
   const handleConfirmAdviceUpload = async () => {
     setIsSubmittingAdvice(true);
-    const adviceRef = `AN-IPD-ADV-${Math.floor(1000 + Math.random() * 9000)}`;
+    const adviceRef = `AN-ADV-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newBooking: Booking = {
       id: `booking-${Date.now()}`,
@@ -481,10 +473,10 @@ export default function IpdScreen() {
       patient_name: patientName,
       patient_phone: patientPhone,
       hospital_name: 'Adityam Hospital Care Concierge Desk',
-      specialty_requested: 'Doctor Admission Advice Slip Submission',
+      specialty_requested: 'Doctor Advice Slip Upload',
       status: 'NEW',
       call_status: 'pending',
-      notes: `Admission Advice Uploaded. Notes: ${adviceNote || 'Doctor advised hospital admission / surgery.'}`,
+      notes: `Slip note: ${adviceNote || 'Doctor advised hospital admission.'}`,
       created_at: new Date().toISOString(),
     };
 
@@ -498,988 +490,1150 @@ export default function IpdScreen() {
     setTimeout(() => {
       setIsSubmittingAdvice(false);
       setAdviceSuccessRef(adviceRef);
-    }, 700);
+    }, 600);
   };
 
+  // Icon for category
+  const iconForCategory = (cat: string) => {
+    const accent = CATEGORY_ACCENT[cat] || '#2563EB';
+    switch (cat) {
+      case 'GeneralSurgery':
+        return <IpdHospitalBedIcon size={22} color={accent} />;
+      case 'Orthopedics':
+        return <BoneJointIcon size={22} color={accent} />;
+      case 'Cardiology':
+        return <HeartPulseIcon size={22} color={accent} />;
+      case 'Maternity':
+        return <ChildCareIcon size={22} color={accent} />;
+      case 'Urology':
+        return <Activity size={22} color={accent} />;
+      default:
+        return <Sparkles size={22} color={accent} />;
+    }
+  };
+
+  const roomOptions = getRoomOptions(isHi);
+
   return (
-    <View className="flex-1 bg-[#F8FAFC]">
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: Math.max(insets.bottom, 16) + 36,
-        }}
-      >
-        {/* 1. Header Section in Royal Medical Blue Gradient (1:1 with OPD & Home) */}
-        <LinearGradient
-          colors={['#172554', '#1E40AF', '#2563EB']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            paddingTop: Math.max(insets.top, 24) + 12,
-            paddingHorizontal: 16,
-            paddingBottom: 22,
-            borderBottomLeftRadius: 28,
-            borderBottomRightRadius: 28,
-            shadowColor: '#1E3A8A',
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.22,
-            shadowRadius: 14,
-            elevation: 6,
-            position: 'relative',
-            overflow: 'hidden',
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <RNStatusBar barStyle="dark-content" backgroundColor="#F8FAFC" translucent={false} />
+
+      {/* Main Content Container with max width constraint for tablets/web */}
+      <View style={{ flex: 1, maxWidth: 600, alignSelf: 'center', width: '100%' }}>
+        {/* Consistent Standard Header & Search Bar */}
+        <AppHeader
+          title={isHi ? 'अस्पताल भर्ती (IPD)' : 'Hospital Admissions'}
+          onPressProfile={() => setProfileVisible(true)}
+        >
+          <AppSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+            placeholder={isHi ? 'सर्जरी, प्रक्रिया या अस्पताल खोजें...' : 'Search surgery, procedure or hospital...'}
+          />
+        </AppHeader>
+
+        {/* SCROLLABLE BODY */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: Math.max(insets.bottom, 16) + 76,
           }}
         >
-          {/* Ambient light glow circle */}
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: -40,
-              right: -30,
-              width: 160,
-              height: 160,
-              borderRadius: 80,
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            }}
-          />
+          {/* 2. ONE HERO ACTION CARD (Merged Upload & Insurance) */}
+          <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+            <View
+              style={{
+                backgroundColor: '#1E40AF',
+                borderRadius: 20,
+                padding: 18,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Tag */}
+              <View
+                style={{
+                  alignSelf: 'flex-start',
+                  backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                  paddingHorizontal: 9,
+                  paddingVertical: 3,
+                  borderRadius: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#BFDBFE' }}>
+                  {isHi ? 'आदित्यम केयर कंसीयर्ज' : 'ADITYAM CARE CONCIERGE'}
+                </Text>
+              </View>
 
-          {/* Top Status & Geolocation Pills - 1:1 Clean with OPD */}
-          <View className="flex-row items-center justify-between mb-3.5 gap-2">
-            <View className="flex-row items-center space-x-1.5 bg-white/15 border border-white/25 px-2.5 py-1 rounded-full shrink min-w-0">
-              <MapPin size={11} color="#BFDBFE" />
-              <Text className="text-[10.5px] font-bold text-white shrink" numberOfLines={1}>
-                South Delhi NCR • 50 km radius
+              <Text style={{ fontSize: 17, fontWeight: '700', color: '#FFFFFF', lineHeight: 22 }}>
+                {isHi
+                  ? 'डॉक्टर का पर्चा है? अपलोड करें, हमारे सलाहकार तुरंत संपर्क करेंगे'
+                  : "Have a doctor's advice? Upload it, an advisor calls you"}
               </Text>
-            </View>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '400',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  marginTop: 4,
+                  lineHeight: 17,
+                }}
+              >
+                {isHi
+                  ? 'हम शीर्ष प्रमाणित अस्पतालों में पैकेज दरों की तुलना करते हैं और कैशलेस बीमा प्री-ऑथ संभालते हैं।'
+                  : 'We compare package rates across top accredited hospitals & handle your cashless insurance pre-auth.'}
+              </Text>
 
-            <View className="flex-row items-center space-x-1 bg-white/20 px-2.5 py-1 rounded-full border border-white/30 shrink-0">
-              <ShieldCheck size={11} color="#FFFFFF" />
-              <Text className="text-[10px] font-bold text-white">0% Advance Deposit</Text>
+              {/* Action Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  setAdviceSuccessRef(null);
+                  setAdviceSheetVisible(true);
+                }}
+                activeOpacity={0.88}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 12,
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  alignSelf: 'flex-start',
+                  marginTop: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Upload size={14} color="#1E40AF" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E40AF' }}>
+                  {isHi ? 'पर्चा अपलोड करें और कॉल पाएं →' : 'Upload Slip & Get Call →'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Title & Tagline */}
-          <Text className="text-[26px] font-black text-white tracking-tight leading-[32px]">
-            {language === 'hi' ? 'अस्पताल भर्ती व सर्जरी केयर' : 'Hospital Care & Admissions'}
-          </Text>
-          <Text className="text-xs font-medium text-blue-100 mt-1 mb-4">
-            {language === 'hi'
-              ? 'बिना अग्रिम भुगतान • 30 मिनट में कैशलेस अप्रूवल • प्राथमिकता बेड'
-              : 'Zero-advance deposit, 30-min cashless insurance & priority bed allotment'}
-          </Text>
+          {/* 3. FOUR-STEP "HOW IT WORKS" STRIP */}
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              padding: 14,
+              marginHorizontal: 16,
+              marginTop: 12,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginBottom: 10 }}>
+              {isHi ? 'अस्पताल कंसीयर्ज कैसे काम करता है' : 'How Hospital Concierge Works'}
+            </Text>
 
-          {/* Search Bar - Exact Match to OPD & Home Floating Search Bar */}
-          <View className="bg-white rounded-full flex-row items-center pl-4 pr-1.5 py-1.5 shadow-lg shadow-blue-950/20 mb-1">
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={
-                language === 'hi'
-                  ? 'अस्पताल, सर्जरी खोजें (जैसे पित्त की थैली, घुटना)...'
-                  : 'Search surgery, hospital, procedure (e.g. Gallbladder, Knee)...'
-              }
-              placeholderTextColor="#94A3B8"
-              className="flex-1 text-sm text-slate-800 font-medium py-1 px-1"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery('')}
-                className="w-7 h-7 rounded-full bg-slate-100 items-center justify-center mr-1"
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
+              {/* Connecting line behind circles */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 15,
+                  left: 24,
+                  right: 24,
+                  height: 2,
+                  backgroundColor: '#E2E8F0',
+                  zIndex: 0,
+                }}
+              />
+
+              {/* Step 1 */}
+              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 2,
+                    borderColor: '#2563EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>1</Text>
+                </View>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
+                  {isHi ? 'पर्चा भेजें\n(Upload)' : 'Upload slip'}
+                </Text>
+              </View>
+
+              {/* Step 2 */}
+              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 2,
+                    borderColor: '#2563EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>2</Text>
+                </View>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
+                  {isHi ? 'सलाहकार कॉल\n(Advisor)' : 'Advisor calls'}
+                </Text>
+              </View>
+
+              {/* Step 3 */}
+              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 2,
+                    borderColor: '#2563EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>3</Text>
+                </View>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
+                  {isHi ? 'दरें तुलना\n(Compare)' : 'Compare'}
+                </Text>
+              </View>
+
+              {/* Step 4 */}
+              <View style={{ alignItems: 'center', width: '23%', zIndex: 1 }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 2,
+                    borderColor: '#2563EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>4</Text>
+                </View>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#0F172A', marginTop: 4, textAlign: 'center', lineHeight: 14 }}>
+                  {isHi ? 'भर्ती सहायता\n(Admission)' : 'Get admitted'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 4. PROCEDURES (Two-Column Tile Grid) */}
+          <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                  {isHi ? 'प्रमुख सर्जरी व उपचार पैकेज' : 'Common Procedures & Packages'}
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
+                  {isHi ? 'कैशलेस बीमा प्री-ऑथ सहायता के साथ निश्चित लागत पैकेज' : 'Fixed-cost packages with pre-auth insurance support'}
+                </Text>
+              </View>
+            </View>
+
+            {filteredSurgeries.length === 0 ? (
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 18,
+                  padding: 24,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}
               >
-                <X size={14} color="#64748B" />
-              </TouchableOpacity>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#64748B' }}>
+                  {isHi ? `"${searchQuery}" से कोई प्रक्रिया नहीं मिली` : `No procedures match "${searchQuery}"`}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  rowGap: 12,
+                }}
+              >
+                {filteredSurgeries.map((s, i) => {
+                  const displayName = isHi && s.nameHi ? s.nameHi : s.name;
+                  const displayShort = isHi && s.shortNameHi ? s.shortNameHi : s.shortName;
+                  const displayStay = isHi && s.stayDaysHi ? s.stayDaysHi : s.stayDays;
+                  const displayTag = isHi && s.tagHi ? s.tagHi : s.tag;
+
+                  return (
+                    <PressableCard
+                      key={s.id}
+                      index={i}
+                      style={{ width: '48.5%' }}
+                      onPress={() => handleOpenProcedureSheet(s)}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: TINT[s.category] || '#F8FAFC',
+                          borderRadius: 22,
+                          padding: 14,
+                          minHeight: 165,
+                          justifyContent: 'space-between',
+                          borderWidth: 1,
+                          borderColor: 'rgba(0, 0, 0, 0.04)',
+                        }}
+                      >
+                        {/* Top White Icon Tile + Tag */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View
+                            style={{
+                              width: 42,
+                              height: 42,
+                              borderRadius: 13,
+                              backgroundColor: '#FFFFFF',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              shadowColor: '#0F172A',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.05,
+                              shadowRadius: 2,
+                              elevation: 1,
+                            }}
+                          >
+                            {iconForCategory(s.category)}
+                          </View>
+
+                          <View
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              paddingHorizontal: 7,
+                              paddingVertical: 2.5,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: '#475569' }}>
+                              {displayStay}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Title & Medical Subtitle */}
+                        <View style={{ marginTop: 10 }}>
+                          <Text
+                            style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', lineHeight: 18 }}
+                            numberOfLines={2}
+                          >
+                            {displayShort}
+                          </Text>
+                          <Text
+                            style={{ fontSize: 10.5, fontWeight: '400', color: '#64748B', marginTop: 2 }}
+                            numberOfLines={1}
+                          >
+                            {displayName}
+                          </Text>
+                        </View>
+
+                        {/* Bottom Row: Feature Tag & Price Pill */}
+                        <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0, 0, 0, 0.05)' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: CATEGORY_ACCENT[s.category] || '#2563EB' }} numberOfLines={1}>
+                              {displayTag}
+                            </Text>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                              {inr(s.price)}*
+                            </Text>
+                          </View>
+
+                          {/* Interactive subtle CTA tap prompt */}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB' }}>
+                              {isHi ? 'परामर्श व पैकेज →' : 'Book Consultation →'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </PressableCard>
+                  );
+                })}
+              </View>
             )}
+          </View>
+
+          {/* 5. TOP ACCREDITED PARTNER HOSPITALS (Horizontal Carousel) */}
+          <View style={{ marginTop: 22, paddingBottom: 10 }}>
+            <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                {isHi ? 'शीर्ष मान्यता प्राप्त अस्पताल नेटवर्क' : 'Top Accredited Partner Hospitals'}
+              </Text>
+              <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
+                {isHi ? 'कैशलेस भर्ती डेस्क और समर्पित मरीज सहायता' : 'Direct cashless admission desk & dedicated patient care'}
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
+            >
+              {filteredHospitals.map((hosp, idx) => {
+                const displayName = isHi && hosp.nameHi ? hosp.nameHi : hosp.name;
+                const displayLoc = isHi && hosp.locationHi ? hosp.locationHi : hosp.location;
+                const displayTag = isHi && hosp.tagHi ? hosp.tagHi : hosp.tag;
+
+                return (
+                  <PressableCard
+                    key={hosp.id}
+                    index={idx}
+                    style={{ width: 280 }}
+                    onPress={() => handleOpenHospitalBooking(hosp)}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Photo with Rating and Distance */}
+                      <View style={{ height: 130, position: 'relative', backgroundColor: '#EFF6FF' }}>
+                        <Image
+                          source={{ uri: hosp.image_url }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                        <LinearGradient
+                          colors={['rgba(15, 23, 42, 0.1)', 'rgba(15, 23, 42, 0.65)']}
+                          style={StyleSheet.absoluteFill}
+                        />
+
+                        {/* Rating Badge */}
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 3,
+                          }}
+                        >
+                          <Star size={11} color="#D97706" fill="#D97706" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F172A' }}>
+                            {hosp.rating}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>
+                            ({hosp.total_reviews})
+                          </Text>
+                        </View>
+
+                        {/* Distance Badge */}
+                        <View
+                          style={{
+                            position: 'absolute',
+                            bottom: 8,
+                            left: 8,
+                            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 10,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <MapPin size={11} color="#93C5FD" />
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#FFFFFF' }}>
+                            {hosp.distance_km} {isHi ? 'किमी दूर' : 'km away'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Content: Name, location, and one tag */}
+                      <View style={{ padding: 14 }}>
+                        <Text
+                          style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', lineHeight: 18 }}
+                          numberOfLines={1}
+                        >
+                          {displayName}
+                        </Text>
+                        <Text
+                          style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 2 }}
+                          numberOfLines={1}
+                        >
+                          {displayLoc}
+                        </Text>
+
+                        {/* Single clean tag */}
+                        <View
+                          style={{
+                            marginTop: 10,
+                            alignSelf: 'flex-start',
+                            backgroundColor: '#EFF6FF',
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: '#2563EB' }}>
+                            {displayTag}
+                          </Text>
+                        </View>
+
+                        {/* Quick Action Button */}
+                        <TouchableOpacity
+                          onPress={() => handleOpenHospitalBooking(hosp)}
+                          activeOpacity={0.85}
+                          style={{
+                            marginTop: 12,
+                            backgroundColor: '#2563EB',
+                            paddingVertical: 9,
+                            borderRadius: 12,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                            {isHi ? 'भर्ती बुक करें →' : 'Book Admission →'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </PressableCard>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* ---------------- 6. BOTTOM SHEET: PROCEDURE & HOSPITAL ADMISSION BOOKING ---------------- */}
+      <Modal
+        visible={bottomSheetVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBottomSheetVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' }}
+        >
+          {/* Backdrop Tap */}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setBottomSheetVisible(false)}
+          />
+
+          {/* Bottom Sheet Card */}
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: Math.max(insets.bottom, 16) + 12,
+              maxHeight: '88%',
+              maxWidth: 520,
+              alignSelf: 'center',
+              width: '100%',
+            }}
+          >
+            {/* Drag Handle */}
             <View
               style={{
                 width: 40,
-                height: 40,
-                borderRadius: 20,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: '#CBD5E1',
+                alignSelf: 'center',
+                marginBottom: 12,
+              }}
+            />
+
+            {/* Header: Title & Close */}
+            <View
+              style={{
+                flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#2563EB',
-                shadowColor: '#2563EB',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 4,
-                elevation: 2,
+                justifyContent: 'space-between',
+                paddingBottom: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#F1F5F9',
               }}
             >
-              <Search size={17} color="#FFFFFF" strokeWidth={2.5} />
-            </View>
-          </View>
-        </LinearGradient>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>
+                  {selectedSurgery
+                    ? (isHi && selectedSurgery.shortNameHi ? selectedSurgery.shortNameHi : selectedSurgery.shortName)
+                    : (selectedHospital ? (isHi && selectedHospital.nameHi ? selectedHospital.nameHi : selectedHospital.name) : '')}
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
+                  {selectedSurgery
+                    ? (isHi && selectedSurgery.nameHi ? selectedSurgery.nameHi : selectedSurgery.name)
+                    : (selectedHospital ? (isHi && selectedHospital.locationHi ? selectedHospital.locationHi : selectedHospital.location) : '')}
+                </Text>
+              </View>
 
-        {/* 2. Categories Capsule Pills Section (1:1 with OPD) */}
-        <View className="pt-4 px-4">
-          <View className="flex-row items-center justify-between mb-2.5 px-0.5">
-            <Text className="text-base font-black text-[#0F172A] tracking-tight">
-              {language === 'hi' ? 'सर्जरी व विशेषज्ञता' : 'Specialization & Surgeries'}
-            </Text>
-            {selectedCategory !== 'All' && (
               <TouchableOpacity
-                onPress={() => setSelectedCategory('All')}
-                className="flex-row items-center space-x-1"
+                onPress={() => setBottomSheetVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Text className="text-xs font-bold text-[#2563EB]">
-                  {language === 'hi' ? 'सभी देखें' : 'Reset to All'}
-                </Text>
-                <X size={12} color="#2563EB" />
+                <X size={16} color="#64748B" />
               </TouchableOpacity>
-            )}
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: 10 }}
-          >
-            {categories.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  onPress={() => setSelectedCategory(cat.id)}
-                  activeOpacity={0.8}
-                  className="mr-2"
-                >
-                  {isSelected ? (
-                    <LinearGradient
-                      colors={['#2563EB', '#1D4ED8']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 16,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        shadowColor: '#2563EB',
-                        shadowOffset: { width: 0, height: 3 },
-                        shadowOpacity: 0.28,
-                        shadowRadius: 6,
-                        elevation: 4,
-                      }}
-                    >
-                      <View className="mr-2">{cat.icon('#FFFFFF')}</View>
-                      <Text className="text-white text-xs font-black tracking-tight">
-                        {cat.label}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    <View
-                      style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 16,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: '#FFFFFF',
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                        shadowColor: '#0F172A',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.04,
-                        shadowRadius: 3,
-                        elevation: 1,
-                      }}
-                    >
-                      <View className="mr-2">{cat.icon(cat.accentColor)}</View>
-                      <Text className="text-[#334155] text-xs font-bold">{cat.label}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* 3. 24x7 Emergency Admission Call Card */}
-        <View className="px-4 mt-4">
-          <TouchableOpacity
-            onPress={() => Linking.openURL('tel:1800123456')}
-            activeOpacity={0.92}
-            className="bg-white rounded-3xl p-4 border border-rose-200 shadow-sm"
-            style={{
-              shadowColor: '#BE123C',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.06,
-              shadowRadius: 8,
-              elevation: 2,
-            }}
-          >
-            <View className="flex-row items-center justify-between mb-2.5">
-              <View className="bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full flex-row items-center space-x-1.5">
-                <View className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-                <Text className="text-[9.5px] font-black text-rose-700 uppercase tracking-wider">
-                  24x7 Emergency Admission Desk
-                </Text>
-              </View>
-              <View className="bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <Text className="text-[9px] font-black text-emerald-700">LIVE BEDS READY</Text>
-              </View>
             </View>
 
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-[14.5px] font-black text-slate-900 leading-snug">
-                  Need an Immediate ICU or Hospital Bed?
-                </Text>
-                <Text className="text-[11px] text-slate-500 font-medium mt-0.5 leading-4">
-                  Direct admission desk with zero advance security deposit & fast triage support.
-                </Text>
-              </View>
-
-              <View className="w-11 h-11 rounded-2xl bg-rose-600 items-center justify-center shadow-md shadow-rose-600/30 shrink-0">
-                <PhoneCall size={20} color="#FFFFFF" strokeWidth={2.5} />
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* 4. Have Doctor's Admission Advice / Surgery Slip? (1:1 with Labs Prescription Card) */}
-        <View className="px-4 mt-4">
-          <TouchableOpacity
-            onPress={() => {
-              setAdviceSuccessRef(null);
-              setAdviceModalVisible(true);
-            }}
-            activeOpacity={0.92}
-            className="bg-white rounded-3xl p-4 border border-blue-200/90 shadow-sm"
-            style={{
-              shadowColor: '#1E3A8A',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.06,
-              shadowRadius: 10,
-              elevation: 2,
-            }}
-          >
-            {/* Header Status Pills */}
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="bg-blue-50 border border-blue-200/80 px-2.5 py-0.5 rounded-full flex-row items-center space-x-1">
-                <Sparkles size={11} color="#2563EB" />
-                <Text className="text-[9.5px] font-black text-[#2563EB] uppercase tracking-wider">
-                  Admission Concierge
-                </Text>
-              </View>
-              <View className="bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex-row items-center space-x-1">
-                <Clock size={10} color="#059669" />
-                <Text className="text-[9.5px] font-black text-emerald-700">30-MIN CASHLESS APPROVAL</Text>
-              </View>
-            </View>
-
-            {/* Middle: Icon + Title + Description */}
-            <View className="flex-row items-start space-x-3.5">
-              <View className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 items-center justify-center shrink-0 mt-0.5">
-                <FileText size={24} color="#2563EB" strokeWidth={2} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[15px] font-black text-[#0F172A] leading-snug">
-                  {language === 'hi'
-                    ? 'डॉक्टर का भर्ती पर्चा / सलाह है?'
-                    : 'Have Doctor’s Admission Advice or Slip?'}
-                </Text>
-                <Text className="text-[11.5px] text-slate-500 font-medium mt-1 leading-4">
-                  {language === 'hi'
-                    ? 'पर्चा अपलोड करें • 30 मिनट में 0% अग्रिम पर कैशलेस अप्रूवल व प्राथमिकता बेड'
-                    : 'Upload admission advice to pre-authorize 100% cashless insurance with zero advance deposit & priority bed allotment.'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Bottom Row: Trust Chips + Dedicated CTA Button */}
-            <View className="flex-row items-center justify-between mt-3.5 pt-3 border-t border-slate-100">
-              <View className="flex-row items-center space-x-2">
-                <View className="bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-                  <Text className="text-[10px] font-bold text-slate-600">✓ 30+ TPAs</Text>
-                </View>
-                <View className="bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-                  <Text className="text-[10px] font-bold text-slate-600">✓ 0% Deposit</Text>
-                </View>
-              </View>
-
-              <LinearGradient
-                colors={['#2563EB', '#1D4ED8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                className="px-4 py-2 rounded-xl flex-row items-center space-x-1.5 shadow-xs"
-              >
-                <Text className="text-white text-xs font-black">
-                  {language === 'hi' ? 'अपलोड करें' : 'Upload Slip'}
-                </Text>
-                <ArrowRight size={13} color="#FFFFFF" strokeWidth={2.5} />
-              </LinearGradient>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* 5. Cashless TPA Insurance Banner */}
-        <View className="px-4 mt-4">
-          <LinearGradient
-            colors={['#EFF6FF', '#DBEAFE']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            className="rounded-3xl p-4 border border-blue-200 flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center space-x-3 flex-1 pr-2">
-              <View className="w-11 h-11 rounded-2xl bg-[#2563EB] items-center justify-center shrink-0">
-                <ShieldCheck size={22} color="#FFFFFF" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-xs font-black text-blue-950">
-                  Cashless Pre-Auth in 30 Mins Across 30+ Insurers
-                </Text>
-                <Text className="text-[11px] text-blue-800 mt-0.5 leading-4">
-                  Star Health, HDFC ERGO, Care, ICICI Lombard, Niva Bupa & All Major TPAs.
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* 6. Planned Surgeries & Package Section */}
-        {filteredSurgeries.length > 0 && (
-          <View className="mt-5 px-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-1 pr-2">
-                <Text className="text-lg font-black text-[#0F172A]">
-                  {language === 'hi' ? 'प्रमुख सर्जरी व पैकेज' : 'Planned Surgeries & Packages'}
-                </Text>
-                <Text className="text-xs text-slate-500 font-medium">
-                  {language === 'hi'
-                    ? 'पारदर्शी पैकेज, कम समय में अस्पताल प्रवास व कैशलेस क्लीयरेंस'
-                    : 'Fixed-price surgical packages with 100% cashless insurance claim'}
-                </Text>
-              </View>
-              <View className="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
-                <Text className="text-[10px] font-black text-emerald-700">UP TO 40% OFF</Text>
-              </View>
-            </View>
-
-            <View style={{ rowGap: 12 }}>
-              {filteredSurgeries.map((surg) => (
+            {confirmedBookingId ? (
+              /* Success View */
+              <View style={{ alignItems: 'center', paddingVertical: 24 }}>
                 <View
-                  key={surg.id}
-                  className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs"
                   style={{
-                    shadowColor: '#1E3A8A',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.04,
-                    shadowRadius: 5,
-                    elevation: 1,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: '#ECFDF5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
                   }}
                 >
-                  {/* Top row: Badge + Stay Duration */}
-                  <View className="flex-row items-center justify-between mb-2">
-                    <View className="bg-blue-50 border border-blue-200/80 px-2.5 py-0.5 rounded-full">
-                      <Text className="text-[9px] font-black text-[#2563EB] tracking-wider uppercase">
-                        {surg.tag}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center space-x-1">
-                      <Clock size={11} color="#64748B" />
-                      <Text className="text-[11px] font-bold text-slate-600">{surg.stayDays}</Text>
-                    </View>
-                  </View>
+                  <CheckCircle2 size={32} color="#059669" />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', textAlign: 'center' }}>
+                  {isHi ? 'भर्ती अनुरोध पंजीकृत हो गया है' : 'Admission Request Registered'}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563EB', marginTop: 4 }}>
+                  {isHi ? 'संदर्भ आईडी: ' : 'Reference ID: '}{confirmedBookingId}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 8,
+                    lineHeight: 18,
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  {isHi
+                    ? 'हमारे वरिष्ठ चिकित्सा सलाहकार 15 मिनट के भीतर आपसे संपर्क कर अस्पताल विकल्प, रूम उपलब्धता और कैशलेस प्री-ऑथ प्रक्रिया शुरू करेंगे।'
+                    : 'Our senior medical advisor will call you within 15 minutes to review hospital options, room availability, and initiate your cashless pre-auth.'}
+                </Text>
 
-                  {/* Surgery Name */}
-                  <Text className="text-[15px] font-black text-[#0F172A] leading-snug">
-                    {surg.name}
+                <TouchableOpacity
+                  onPress={() => setBottomSheetVisible(false)}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    marginTop: 20,
+                    width: '100%',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                    {isHi ? 'पूर्ण' : 'Done'}
                   </Text>
-
-                  {/* Insurance tag */}
-                  <View className="mt-2 flex-row items-center space-x-1 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200/80 self-start">
-                    <ShieldCheck size={11} color="#059669" />
-                    <Text className="text-[10.5px] font-bold text-emerald-700">
-                      100% Cashless Insurance Covered • Zero Deposit
-                    </Text>
-                  </View>
-
-                  {/* Bottom Row: Price & Book CTA */}
-                  <View className="flex-row items-center justify-between mt-3.5 pt-3 border-t border-slate-100">
-                    <View>
-                      <View className="flex-row items-baseline space-x-1.5">
-                        <Text className="text-lg font-black text-[#0F172A]">₹{surg.price}</Text>
-                        <Text className="text-xs line-through text-slate-400 font-medium">
-                          ₹{surg.originalPrice}
-                        </Text>
-                      </View>
-                      <Text className="text-[10px] font-bold text-emerald-600">
-                        Save ₹{surg.originalPrice - surg.price} ({surg.discountPercent}% OFF)
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      onPress={() => handleOpenSurgeryBooking(surg)}
-                      activeOpacity={0.88}
-                    >
-                      <LinearGradient
-                        colors={['#2563EB', '#1D4ED8']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        className="px-3.5 py-2 rounded-xl flex-row items-center space-x-1 shadow-2xs"
-                      >
-                        <Text className="text-white text-xs font-black">Book Package</Text>
-                        <ArrowRight size={12} color="#FFFFFF" strokeWidth={2.5} />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* 7. Partner Hospitals for Admissions (Organic Wave Design 1:1 with OPD) */}
-        <View className="mt-6 px-4">
-          <View className="flex-row items-center justify-between mb-3.5">
-            <View className="flex-1 pr-2">
-              <Text className="text-lg font-black text-[#0F172A]">
-                {language === 'hi' ? 'पार्टनर अस्पताल नेटवर्क' : 'Partner Hospitals for Admission'}
-              </Text>
-              <Text className="text-xs text-slate-500 font-medium">
-                {filteredHospitals.length} Super Speciality Hospitals with Live Bed Access
-              </Text>
-            </View>
-            <View className="bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-full shrink-0">
-              <Text className="text-[10px] font-black text-[#2563EB]">NABH Verified</Text>
-            </View>
-          </View>
-
-          {filteredHospitals.length === 0 ? (
-            <View className="bg-white rounded-3xl p-6 items-center border border-slate-200/90 shadow-sm my-2">
-              <Building2 size={36} color="#94A3B8" />
-              <Text className="text-sm font-bold text-slate-700 mt-2">No hospitals found</Text>
-              <Text className="text-xs text-slate-400 text-center mt-1">
-                Try searching for Max, Apollo, Fortis, or Medanta
-              </Text>
-            </View>
-          ) : (
-            <View style={{ rowGap: 14 }}>
-              {filteredHospitals.map((hosp) => (
-                <View
-                  key={hosp.id}
-                  className="bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm"
-                  style={{
-                    shadowColor: '#1E3A8A',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.06,
-                    shadowRadius: 10,
-                    elevation: 3,
-                  }}
-                >
-                  {/* Photo Header with Curve & Badges */}
-                  <View style={{ height: 138, backgroundColor: '#EFF6FF', position: 'relative' }}>
-                    <Image
-                      source={{ uri: hosp.image_url }}
-                      style={{ width: '100%', height: '100%', position: 'absolute' }}
-                      resizeMode="cover"
-                    />
-
-                    {/* Gradient Overlay for legibility */}
-                    <LinearGradient
-                      colors={['rgba(15, 23, 42, 0.20)', 'transparent', 'rgba(15, 23, 42, 0.45)']}
-                      style={StyleSheet.absoluteFill}
-                      pointerEvents="none"
-                    />
-
-                    {/* Top Row Badges: Partner Privilege & Rating */}
-                    {hosp.featured && (
-                      <View className="absolute top-2.5 left-2.5 bg-amber-100/95 border border-amber-300 px-2.5 py-1 rounded-full">
-                        <Text className="text-[9px] font-black text-amber-900 tracking-wider">
-                          PARTNER PRIVILEGE
-                        </Text>
-                      </View>
-                    )}
-
-                    <View className="absolute top-2.5 right-2.5 bg-white/95 px-2.5 py-1 rounded-full flex-row items-center space-x-1 shadow-xs">
-                      <Star size={11} color="#D97706" fill="#D97706" />
-                      <Text className="text-[10.5px] font-black text-slate-900">{hosp.rating}</Text>
-                      <Text className="text-[9px] text-slate-400">({hosp.total_reviews})</Text>
-                    </View>
-
-                    {/* Distance Pill */}
-                    <View className="absolute bottom-3 left-2.5 bg-slate-900/80 px-2.5 py-1 rounded-full flex-row items-center space-x-1">
-                      <MapPin size={11} color="#93C5FD" />
-                      <Text className="text-[10px] font-bold text-white">
-                        {hosp.distance_km} km away
-                      </Text>
-                    </View>
-
-                    {/* Organic Wave Transition (Exact SVG from OPD) */}
-                    <View
-                      pointerEvents="none"
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: 28,
-                      }}
-                    >
-                      <Svg
-                        width="100%"
-                        height="100%"
-                        viewBox="0 0 360 39"
-                        preserveAspectRatio="none"
-                      >
-                        <Path
-                          d="M0 14 C48 39 95 34 150 20 C205 5 242 35 292 27 C324 23 342 5 360 9 L360 39 L0 39 Z"
-                          fill="#FFFFFF"
-                        />
-                      </Svg>
-                    </View>
-
-                    {/* Pre-Auth Badge on wave */}
-                    <View className="absolute bottom-1 right-2.5 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full flex-row items-center space-x-1">
-                      <Tag size={11} color="#2563EB" />
-                      <Text className="text-[10px] font-black text-[#2563EB]">
-                        {hosp.cashlessPreAuth}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Hospital Details Body */}
-                  <View className="p-4 pt-2">
-                    <Text className="text-base font-black text-[#0F172A] leading-snug">
-                      {hosp.name}
-                    </Text>
-                    <Text className="text-xs text-slate-500 mt-0.5 leading-4" numberOfLines={1}>
-                      {hosp.location}
-                    </Text>
-
-                    {/* Live Bed Counters */}
-                    <View className="flex-row items-center space-x-2 mt-2.5">
-                      <View className="bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl flex-row items-center space-x-1">
-                        <View className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                        <Text className="text-[10.5px] font-black text-rose-700">
-                          {hosp.icuAvailable} ICU Beds Live
-                        </Text>
-                      </View>
-
-                      <View className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-xl flex-row items-center space-x-1">
-                        <Bed size={11} color="#2563EB" />
-                        <Text className="text-[10.5px] font-black text-[#2563EB]">
-                          {hosp.privateRooms} Deluxe Rooms
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* TPA Support Pills */}
-                    <View className="flex-row flex-wrap items-center gap-1.5 mt-2.5">
-                      {hosp.tpaInsurance.slice(0, 4).map((ins, idx) => (
-                        <View
-                          key={idx}
-                          className="bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md"
-                        >
-                          <Text className="text-[9.5px] font-semibold text-slate-600">{ins}</Text>
-                        </View>
-                      ))}
-                    </View>
-
-                    {/* Actions Row: Call Desk + Book Admission (Exact 1:1 with OPD) */}
-                    <View className="flex-row items-center space-x-2 mt-3.5 pt-3 border-t border-slate-100">
-                      <TouchableOpacity
-                        onPress={() => Linking.openURL('tel:1800123456')}
-                        activeOpacity={0.85}
-                        className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white items-center justify-center flex-row space-x-1.5"
-                      >
-                        <PhoneCall size={13} color="#2563EB" />
-                        <Text className="text-xs font-bold text-[#2563EB]">Call Hospital</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => handleOpenHospitalBooking(hosp)}
-                        activeOpacity={0.88}
-                        className="flex-1"
-                      >
-                        <LinearGradient
-                          colors={['#2563EB', '#1D4ED8']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          className="py-2.5 rounded-xl items-center justify-center flex-row space-x-1.5 shadow-2xs"
-                        >
-                          <Text className="text-white text-xs font-black">Book Bed / Care</Text>
-                          <ArrowRight size={13} color="#FFFFFF" strokeWidth={2.5} />
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* 8. Trust Strip */}
-        <View className="px-4 mt-6 mb-4">
-          <View className="bg-blue-50/70 border border-blue-100 rounded-3xl p-4 flex-row items-center space-x-3.5">
-            <View className="w-11 h-11 rounded-2xl bg-white border border-blue-200 items-center justify-center shrink-0">
-              <ShieldCheck size={22} color="#2563EB" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xs font-black text-slate-900">
-                Niramayaa Cashless Admission Guarantee
-              </Text>
-              <Text className="text-[11px] text-slate-500 mt-0.5 leading-4">
-                Zero security deposit, personal care manager assigned at reception, seamless TPA
-                settlement and subsidized room rents.
-              </Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* DOCTOR ADMISSION SLIP / ADVICE UPLOAD MODAL */}
-      <Modal
-        visible={adviceModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setAdviceModalVisible(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-[32px] p-5 max-h-[85%]">
-            {adviceSuccessRef ? (
-              <View className="py-6 items-center">
-                <View className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 items-center justify-center mb-3">
-                  <CheckCircle2 size={36} color="#059669" />
-                </View>
-                <Text className="text-xl font-black text-slate-900 text-center">
-                  Admission Slip Submitted!
-                </Text>
-                <Text className="text-xs text-slate-500 text-center mt-1 px-4 leading-relaxed">
-                  Our hospital bed coordinator & insurance pre-auth desk will review your advice
-                  slip and call you on {patientPhone} within 15 minutes with bed options & 0% deposit
-                  cashless clearance.
-                </Text>
-
-                <View className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-200/80 my-4 space-y-1">
-                  <Text className="text-xs text-slate-500 font-medium">Inquiry Reference</Text>
-                  <Text className="text-sm font-black text-blue-600">{adviceSuccessRef}</Text>
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setAdviceModalVisible(false)}
-                  className="w-full bg-[#2563EB] py-3.5 rounded-2xl items-center"
-                >
-                  <Text className="text-white text-sm font-black">Done</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
-                  <View>
-                    <Text className="text-base font-black text-slate-900">
-                      Upload Admission Advice Slip
-                    </Text>
-                    <Text className="text-xs text-slate-500">
-                      Get 0% advance admission & 30-min cashless clearance
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setAdviceModalVisible(false)}
-                    className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center"
+              /* Booking Form */
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
+                {selectedSurgery && (
+                  /* Package Overview Card */
+                  <View
+                    style={{
+                      backgroundColor: '#EFF6FF',
+                      borderRadius: 16,
+                      padding: 14,
+                      marginBottom: 14,
+                      borderWidth: 1,
+                      borderColor: '#DBEAFE',
+                    }}
                   >
-                    <X size={16} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Upload Box Preview Simulation */}
-                <View className="border-2 border-dashed border-blue-300 rounded-3xl p-5 my-4 items-center justify-center bg-blue-50/40">
-                  <View className="w-12 h-12 rounded-2xl bg-blue-100 items-center justify-center mb-2">
-                    <FileText size={24} color="#2563EB" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                        {isHi ? 'पैकेज विवरण' : 'PACKAGE OVERVIEW'}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#1E40AF' }}>
+                        {isHi && selectedSurgery.stayDaysHi ? selectedSurgery.stayDaysHi : selectedSurgery.stayDays}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 16 }}>
+                      {isHi && selectedSurgery.whatItInvolvesHi ? selectedSurgery.whatItInvolvesHi : selectedSurgery.whatItInvolves}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '500', color: '#64748B' }}>
+                        {isHi ? 'रिकवरी: ' : 'Recovery: '}
+                        {isHi && selectedSurgery.recoveryTimelineHi ? selectedSurgery.recoveryTimelineHi : selectedSurgery.recoveryTimeline}
+                      </Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1D4ED8' }}>
+                        {isHi ? 'न्यूनतम ' : 'From '}{inr(selectedSurgery.price)}*
+                      </Text>
+                    </View>
                   </View>
-                  <Text className="text-xs font-black text-slate-800">
-                    Admission Slip / Prescription Attached
-                  </Text>
-                  <Text className="text-[11px] text-slate-500 text-center mt-0.5">
-                    Our on-call care coordinator will verify diagnosis & book private bed
+                )}
+
+                {/* Visual Room Choice Section */}
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }}>
+                  {isHi ? 'पसंदीदा रूम चुनें' : 'Choose Room Preference'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, marginBottom: 14 }}>
+                  {roomOptions.map((r) => {
+                    const isSelected = roomType === r.id;
+                    return (
+                      <TouchableOpacity
+                        key={r.id}
+                        onPress={() => setRoomType(r.id as any)}
+                        activeOpacity={0.85}
+                        style={{
+                          width: '48.5%',
+                          backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#2563EB' : '#E2E8F0',
+                          borderRadius: 14,
+                          padding: 10,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 10,
+                            backgroundColor: isSelected ? '#DBEAFE' : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {r.icon(isSelected ? '#2563EB' : '#64748B')}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: isSelected ? '#1E40AF' : '#0F172A',
+                            }}
+                            numberOfLines={1}
+                          >
+                            {r.title}
+                          </Text>
+                          <Text
+                            style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}
+                            numberOfLines={1}
+                          >
+                            {r.subtitle}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Patient Information Inputs */}
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 6 }}>
+                  {isHi ? 'मरीज संपर्क विवरण' : 'Patient Contact Details'}
+                </Text>
+                <View style={{ gap: 8, marginBottom: 14 }}>
+                  <TextInput
+                    value={patientName}
+                    onChangeText={setPatientName}
+                    placeholder={isHi ? 'मरीज का पूरा नाम' : 'Patient full name'}
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                    }}
+                  />
+                  <TextInput
+                    value={patientPhone}
+                    onChangeText={setPatientPhone}
+                    placeholder={isHi ? 'कॉल के लिए मोबाइल नंबर' : 'Mobile number for callback'}
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                    }}
+                  />
+                  <TextInput
+                    value={insurancePolicy}
+                    onChangeText={setInsurancePolicy}
+                    placeholder={isHi ? 'स्वास्थ्य बीमा कंपनी (उदा. स्टार हेल्थ, केयर)' : 'Health Insurance provider (e.g. Star Health, Care)'}
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                    }}
+                  />
+                  <TextInput
+                    value={admissionReason}
+                    onChangeText={setAdmissionReason}
+                    placeholder={isHi ? 'संक्षिप्त विवरण (उदा. डॉक्टर ने अगले हफ्ते सर्जरी की सलाह दी)' : 'Brief notes (e.g. doctor advised surgery next week)'}
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                    }}
+                  />
+                </View>
+
+                {/* Cashless guarantee note */}
+                <View
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    borderRadius: 12,
+                    padding: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <ShieldCheck size={16} color="#059669" />
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#065F46', flex: 1 }}>
+                    {isHi
+                      ? 'कैशलेस प्री-ऑथ और प्राथमिकता अस्पताल डेस्क भर्ती हेतु समर्पित सहायता।'
+                      : 'Dedicated assistance for cashless pre-auth & priority hospital desk admission.'}
                   </Text>
                 </View>
 
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Patient Full Name
+                {/* Submit CTA */}
+                <TouchableOpacity
+                  onPress={handleConfirmAdmissionBooking}
+                  disabled={isSubmitting}
+                  activeOpacity={0.88}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: 'center',
+                    shadowColor: '#2563EB',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 5,
+                    elevation: 3,
+                  }}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                      {isHi ? 'भर्ती सहायता का अनुरोध करें' : 'Request Admission Assistance'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ---------------- 7. BOTTOM SHEET: DOCTOR ADVICE SLIP UPLOAD ---------------- */}
+      <Modal
+        visible={adviceSheetVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAdviceSheetVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' }}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setAdviceSheetVisible(false)}
+          />
+
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: Math.max(insets.bottom, 16) + 12,
+              maxHeight: '80%',
+              maxWidth: 520,
+              alignSelf: 'center',
+              width: '100%',
+            }}
+          >
+            {/* Drag Handle */}
+            <View
+              style={{
+                width: 40,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: '#CBD5E1',
+                alignSelf: 'center',
+                marginBottom: 12,
+              }}
+            />
+
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingBottom: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#F1F5F9',
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                  {isHi ? "डॉक्टर का पर्चा अपलोड करें" : "Upload Doctor's Advice Slip"}
                 </Text>
+                <Text style={{ fontSize: 11, fontWeight: '400', color: '#64748B', marginTop: 1 }}>
+                  {isHi ? 'पारदर्शी अस्पताल दरें और बीमा सहायता प्राप्त करें' : 'Get transparent hospital rates & insurance assistance'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setAdviceSheetVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {adviceSuccessRef ? (
+              <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: '#ECFDF5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <CheckCircle2 size={32} color="#059669" />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', textAlign: 'center' }}>
+                  {isHi ? 'पर्चा सफलतापूर्वक प्राप्त हुआ' : 'Slip Received Successfully'}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563EB', marginTop: 4 }}>
+                  {isHi ? 'केस आईडी: ' : 'Case ID: '}{adviceSuccessRef}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 8,
+                    lineHeight: 18,
+                  }}
+                >
+                  {isHi
+                    ? `आदित्यम केयर सलाहकार आपके पर्चे की समीक्षा कर रहे हैं। हम जल्द ही ${patientPhone} पर अस्पताल पैकेज अनुमान के साथ संपर्क करेंगे।`
+                    : `An Adityam care advisor is reviewing your prescription. We will contact you at ${patientPhone} with comparative package estimates.`}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => setAdviceSheetVisible(false)}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    marginTop: 20,
+                    width: '100%',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                    {isHi ? 'पूर्ण' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
+                {/* Upload simulated box */}
+                <View
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 2,
+                    borderStyle: 'dashed',
+                    borderColor: '#93C5FD',
+                    borderRadius: 16,
+                    padding: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Upload size={24} color="#2563EB" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginTop: 8 }}>
+                    {isHi ? 'डॉक्टर का पर्चा संलग्न करें' : "Doctor's prescription attached"}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                    {isHi ? 'पीडीएफ या फोटो (अधिकतम 10 एमबी)' : 'PDF or Image (Max 10 MB)'}
+                  </Text>
+                </View>
+
+                {/* Additional details */}
                 <TextInput
                   value={patientName}
                   onChangeText={setPatientName}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
-                  placeholder="Enter patient name"
+                  placeholder={isHi ? 'मरीज का नाम' : 'Patient name'}
+                  placeholderTextColor="#94A3B8"
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 12,
+                    fontWeight: '500',
+                    color: '#0F172A',
+                    marginBottom: 8,
+                  }}
                 />
 
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Contact Phone Number
-                </Text>
                 <TextInput
                   value={patientPhone}
                   onChangeText={setPatientPhone}
+                  placeholder={isHi ? 'संपर्क फोन नंबर' : 'Contact phone number'}
+                  placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
-                  placeholder="Enter phone"
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 12,
+                    fontWeight: '500',
+                    color: '#0F172A',
+                    marginBottom: 8,
+                  }}
                 />
 
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Doctor Advice / Surgery / Hospital Preference (Optional)
-                </Text>
                 <TextInput
                   value={adviceNote}
                   onChangeText={setAdviceNote}
+                  placeholder={isHi ? 'उपचार या अस्पताल की प्राथमिकता का विवरण लिखें...' : 'Describe advised treatment or specific hospital preference...'}
+                  placeholderTextColor="#94A3B8"
                   multiline
-                  numberOfLines={2}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-semibold mb-4"
-                  placeholder="e.g. Doctor advised Gallbladder Laparoscopic surgery at Max Saket"
+                  numberOfLines={3}
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 12,
+                    fontWeight: '500',
+                    color: '#0F172A',
+                    minHeight: 70,
+                    textAlignVertical: 'top',
+                    marginBottom: 14,
+                  }}
                 />
 
                 <TouchableOpacity
                   onPress={handleConfirmAdviceUpload}
                   disabled={isSubmittingAdvice}
-                  className="w-full bg-[#2563EB] py-3.5 rounded-2xl items-center shadow-md shadow-blue-500/20"
+                  activeOpacity={0.88}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: 'center',
+                    shadowColor: '#2563EB',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 5,
+                    elevation: 3,
+                  }}
                 >
                   {isSubmittingAdvice ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text className="text-white text-sm font-black">
-                      Request Cashless Pre-Auth & Bed Allotment
+                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                      {isHi ? 'पर्चा भेजें और कॉल का अनुरोध करें' : 'Submit Advice & Request Callback'}
                     </Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* ADMISSION & BED BOOKING MODAL */}
-      <Modal
-        visible={bookingModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setBookingModalVisible(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-[32px] p-5 max-h-[88%]">
-            {confirmedBooking ? (
-              <View className="py-6 items-center">
-                <View className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 items-center justify-center mb-3">
-                  <CheckCircle2 size={36} color="#059669" />
-                </View>
-                <Text className="text-xl font-black text-slate-900 text-center">
-                  Admission Request Dispatched!
-                </Text>
-                <Text className="text-xs text-slate-500 text-center mt-1 px-4 leading-relaxed">
-                  Your dedicated Adityam Hospital Care Manager will contact you on {patientPhone} within
-                  10 minutes to verify bed allotment and coordinate 0% deposit cashless clearance.
-                </Text>
-
-                <View className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-200/80 my-4 space-y-2">
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-slate-500 font-medium">Inquiry ID</Text>
-                    <Text className="text-xs font-black text-blue-600">
-                      {confirmedBooking.booking_ref}
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-slate-500 font-medium">Hospital</Text>
-                    <Text className="text-xs font-bold text-slate-800" numberOfLines={1}>
-                      {confirmedBooking.hospital_name}
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-slate-500 font-medium">Room Preference</Text>
-                    <Text className="text-xs font-bold text-blue-700">{roomType} Room</Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-slate-500 font-medium">TPA Insurance</Text>
-                    <Text className="text-xs font-bold text-slate-800">{insuranceType}</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setBookingModalVisible(false)}
-                  className="w-full bg-[#2563EB] py-3.5 rounded-2xl items-center"
-                >
-                  <Text className="text-white text-sm font-black">Done</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
-                  <View className="flex-1 pr-2">
-                    <Text className="text-base font-black text-slate-900">
-                      Book Hospital Admission
-                    </Text>
-                    <Text className="text-xs text-slate-500" numberOfLines={1}>
-                      {selectedHospital?.name}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setBookingModalVisible(false)}
-                    className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center"
-                  >
-                    <X size={16} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Surgery / Procedure if selected */}
-                {selectedSurgery && (
-                  <View className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100 my-3 flex-row items-center justify-between">
-                    <View className="flex-1 pr-2">
-                      <Text className="text-[10px] font-bold text-[#2563EB] uppercase">
-                        Selected Procedure
-                      </Text>
-                      <Text className="text-xs font-black text-slate-900" numberOfLines={1}>
-                        {selectedSurgery.name}
-                      </Text>
-                    </View>
-                    <Text className="text-sm font-black text-blue-700">₹{selectedSurgery.price}</Text>
-                  </View>
-                )}
-
-                {/* Patient Information */}
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mt-3 mb-1.5">
-                  Patient Full Name
-                </Text>
-                <TextInput
-                  value={patientName}
-                  onChangeText={setPatientName}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
-                  placeholder="Enter patient name"
-                />
-
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Phone Number
-                </Text>
-                <TextInput
-                  value={patientPhone}
-                  onChangeText={setPatientPhone}
-                  keyboardType="phone-pad"
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
-                  placeholder="Enter 10-digit mobile number"
-                />
-
-                {/* Room Type Selection */}
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2">
-                  Select Room Preference
-                </Text>
-                <View className="flex-row flex-wrap gap-2 mb-3">
-                  {[
-                    { id: 'DELUXE', label: 'Deluxe Single' },
-                    { id: 'SEMI', label: 'Twin Sharing' },
-                    { id: 'GENERAL', label: 'General Ward' },
-                    { id: 'ICU', label: 'ICU / CCU Bed' },
-                  ].map((r) => (
-                    <TouchableOpacity
-                      key={r.id}
-                      onPress={() => setRoomType(r.id as any)}
-                      className={`px-3.5 py-2 rounded-xl border ${
-                        roomType === r.id
-                          ? 'bg-blue-50 border-[#2563EB]'
-                          : 'bg-white border-slate-200'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-bold ${
-                          roomType === r.id ? 'text-[#2563EB]' : 'text-slate-600'
-                        }`}
-                      >
-                        {r.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Insurance / TPA Selection */}
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2">
-                  Health Insurance / Payment Mode
-                </Text>
-                <View style={{ rowGap: 6 }} className="mb-3">
-                  {[
-                    'Star Health Insurance (Cashless Desk)',
-                    'HDFC ERGO / Care Health Insurance',
-                    'Niva Bupa / ICICI Lombard',
-                    'Other Insurance / TPA Card',
-                    'Self-Pay (Subsidized Platform Rate)',
-                  ].map((ins) => (
-                    <TouchableOpacity
-                      key={ins}
-                      onPress={() => setInsuranceType(ins)}
-                      className={`p-2.5 rounded-xl border flex-row items-center justify-between ${
-                        insuranceType === ins
-                          ? 'bg-blue-50 border-[#2563EB]'
-                          : 'bg-white border-slate-200'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-semibold ${
-                          insuranceType === ins ? 'text-[#2563EB] font-bold' : 'text-slate-700'
-                        }`}
-                      >
-                        {ins}
-                      </Text>
-                      {insuranceType === ins && <CheckCircle2 size={15} color="#2563EB" />}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Admission Timing */}
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2">
-                  Expected Admission Date
-                </Text>
-                <View className="flex-row space-x-2 mb-3">
-                  {['Today (Urgent)', 'Tomorrow', 'Planned Next Week'].map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      onPress={() => setPlannedDate(d)}
-                      className={`flex-1 py-2 rounded-xl border items-center ${
-                        plannedDate === d
-                          ? 'bg-blue-50 border-[#2563EB]'
-                          : 'bg-white border-slate-200'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-bold ${
-                          plannedDate === d ? 'text-[#2563EB]' : 'text-slate-600'
-                        }`}
-                      >
-                        {d}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Reason / Notes */}
-                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Diagnosis / Specific Requirements (Optional)
-                </Text>
-                <TextInput
-                  value={admissionReason}
-                  onChangeText={setAdmissionReason}
-                  multiline
-                  numberOfLines={2}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-semibold mb-4"
-                  placeholder="e.g. Doctor advised Gallbladder Laparoscopic surgery on Friday"
-                />
-
-                {/* Submit Button */}
-                <TouchableOpacity
-                  onPress={handleConfirmAdmissionBooking}
-                  disabled={isSubmitting}
-                  className="w-full bg-[#2563EB] py-3.5 rounded-2xl items-center shadow-md shadow-blue-500/20"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text className="text-white text-sm font-black">
-                      Confirm Admission Request (0% Deposit)
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* Profile & Language Modal */}
+      <ProfileModal visible={profileVisible} onClose={() => setProfileVisible(false)} />
     </View>
   );
 }

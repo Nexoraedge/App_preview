@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Languages,
   Check,
+  Users,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage } from '../../src/context/LanguageContext';
@@ -165,6 +166,19 @@ export default function ProfileScreen() {
 
       {/* Settings / Links */}
       <View className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-6">
+        <TouchableOpacity
+          onPress={() => router.push('/family')}
+          className="p-4 flex-row items-center justify-between border-b border-slate-100"
+        >
+          <View className="flex-row items-center space-x-3">
+            <Users size={18} color="#2563EB" />
+            <Text className="text-xs font-semibold text-slate-800">
+              {language === 'hi' ? 'परिवार के सदस्य (Family Members)' : 'Family Members'}
+            </Text>
+          </View>
+          <Text className="text-xs text-slate-400">›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           onPress={() => alert('Adityam Niramayaa Healthcare Trust Network v1.0.0')}
           className="p-4 flex-row items-center justify-between border-b border-slate-100"

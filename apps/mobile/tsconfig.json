@@ -19,5 +19,9 @@
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "assets",
+    "node_modules"
   ]
 }

@@ -53,7 +53,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { useLanguage } from '../../src/context/LanguageContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { SEED_HOSPITALS } from '@adityam/supabase';
 import type { Doctor } from '@adityam/types';
 import {
@@ -66,7 +66,9 @@ import {
   BoneJointIcon,
   DentalToothIcon,
   DermatologyIcon,
+  AllCategoriesIcon,
 } from '../../components/ServiceIcons';
+import { AppSearchBar } from '../../components/ui/AppSearchBar';
 
 const { width } = Dimensions.get('window');
 
@@ -74,7 +76,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t, language, toggleLanguage } = useLanguage();
-  const [selectedCity, setSelectedCity] = useState('Koramangala, Bengaluru');
+  const [selectedCity, setSelectedCity] = useState('Saket, South Delhi NCR');
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const bannerScrollRef = useRef<ScrollView>(null);
@@ -214,13 +216,7 @@ export default function HomeScreen() {
         <View className="flex-row items-center justify-between">
           {/* Left: Official Brand Logo & Name */}
           <View className="flex-row items-center flex-1 pr-2">
-            <View className="w-11 h-11 rounded-2xl bg-white/20 p-1 items-center justify-center border border-white/30">
-              <Image
-                source={require('../../assets/logo_AN.png')}
-                style={{ width: 34, height: 34 }}
-                resizeMode="contain"
-              />
-            </View>
+
             <View className="ml-2.5">
               <View className="flex-row items-center">
                 <Text className="text-[17px] font-black text-white tracking-tight">
@@ -250,30 +246,39 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Right Action Icons (Language Switcher & Profile Dropdown) */}
-          <View className="flex-row items-center space-x-2">
-            {/* Language Toggle Pill */}
-            <TouchableOpacity
-              onPress={toggleLanguage}
-              activeOpacity={0.8}
-              className="px-2.5 py-1.5 rounded-full bg-white/15 border border-white/25 flex-row items-center space-x-1"
-            >
-              <Languages size={13} color="#FFFFFF" strokeWidth={2.2} />
-              <Text className="text-[11px] font-extrabold text-white">
-                {language === 'en' ? 'हिं' : 'EN'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Profile Icon */}
-            <TouchableOpacity
-              onPress={() => setProfileMenuVisible(true)}
-              activeOpacity={0.8}
-              className="w-10 h-10 rounded-full bg-white/20 border border-white/30 items-center justify-center relative"
-            >
-              <User size={18} color="#FFFFFF" strokeWidth={2.4} />
-              <View className="w-2.5 h-2.5 rounded-full bg-emerald-400 absolute top-1.5 right-1.5 border-2 border-[#1E40AF]" />
-            </TouchableOpacity>
-          </View>
+          {/* Right Action: Profile Avatar Only (Language Switch is inside Profile Menu) */}
+          <TouchableOpacity
+            onPress={() => setProfileMenuVisible(true)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1.5,
+              borderColor: 'rgba(255, 255, 255, 0.35)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+            }}
+          >
+            <User size={19} color="#FFFFFF" strokeWidth={2.4} />
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: '#34D399',
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                borderWidth: 2,
+                borderColor: '#1E40AF',
+              }}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Hero Tagline / Greeting */}
@@ -286,33 +291,12 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Exact Match to OPD Floating Search Bar */}
-        <TouchableOpacity
+        {/* Unified App Search Bar */}
+        <AppSearchBar
           onPress={() => router.push('/search')}
-          activeOpacity={0.92}
-          className="mt-3.5 bg-white rounded-full flex-row items-center pl-4 pr-1.5 py-1.5 shadow-lg shadow-blue-950/20 mb-1"
-        >
-          <Text className="flex-1 text-sm text-[#94A3B8] font-medium py-1 px-1" numberOfLines={1}>
-            {t.searchDoctorPlaceholder || 'Search Doctor, specialty, hospital...'}
-          </Text>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#2563EB',
-              shadowColor: '#2563EB',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 2,
-            }}
-          >
-            <Search size={17} color="#FFFFFF" strokeWidth={2.5} />
-          </View>
-        </TouchableOpacity>
+          placeholder={t.searchDoctorPlaceholder || 'Search doctors, tests, medicines, hospitals...'}
+          style={{ marginTop: 14 }}
+        />
       </LinearGradient>
 
       {/* 2. Top Hero Carousel Banner (16:7 Aspect Ratio) */}
@@ -662,10 +646,10 @@ export default function HomeScreen() {
               }}
             >
               <View className="mr-2">
-                <OpdStethoscopeIcon size={20} color="#FFFFFF" />
+                <AllCategoriesIcon size={20} color="#FFFFFF" />
               </View>
               <Text className="text-white text-xs font-black tracking-tight">
-                All Specialties
+                {language === 'hi' ? 'सभी' : 'All'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

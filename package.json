@@ -10,5 +10,11 @@
     "start:admin": "pnpm --filter @adityam/admin start",
     "lint": "pnpm -r run lint"
   },
-  "packageManager": "pnpm@12.3.4"
+  "packageManager": "pnpm@12.3.4",
+  "pnpm": {
+    "overrides": {
+      "react-native-worklets": "0.10.4",
+      "react-native-reanimated": "4.5.1"
+    }
+  }
 }

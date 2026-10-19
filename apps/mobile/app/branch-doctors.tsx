@@ -7,9 +7,10 @@ import {
   Image,
   Modal,
   Dimensions,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
@@ -47,6 +48,18 @@ import {
   NeurologyBrainIcon,
   AllCategoriesIcon,
 } from '../components/ServiceIcons';
+import {
+  translateHospitalName,
+  translateBranchName,
+  translateAddress,
+  translateSpecialty,
+  translateDoctorName,
+  translateQualification,
+  translateTag,
+  translateSlot,
+  translateTiming,
+  translateLanguageList,
+} from '../src/utils/hindiDictionary';
 
 interface BranchCategoryItem {
   id: string;
@@ -269,25 +282,27 @@ export default function BranchDoctorsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#F8FAFC]">
-      {/* Top Header Banner in Royal Medical Blue (Image 3 Inspiration with Curved Bottom) */}
-      <LinearGradient
-        colors={['#172554', '#1E40AF', '#2563EB']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
-          paddingTop: Math.max(insets.top, 24) + 6,
-          paddingHorizontal: 18,
-          paddingBottom: 22,
-          borderBottomLeftRadius: 28,
-          borderBottomRightRadius: 28,
-          shadowColor: '#1E3A8A',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.22,
-          shadowRadius: 14,
-          elevation: 6,
-        }}
-      >
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#172554' }}>
+      <RNStatusBar barStyle="light-content" backgroundColor="#172554" translucent={false} />
+      <View className="flex-1 bg-[#F8FAFC]">
+        {/* Top Header Banner in Royal Medical Blue */}
+        <LinearGradient
+          colors={['#172554', '#1E40AF', '#2563EB']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            paddingTop: 12,
+            paddingHorizontal: 18,
+            paddingBottom: 22,
+            borderBottomLeftRadius: 28,
+            borderBottomRightRadius: 28,
+            shadowColor: '#1E3A8A',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.22,
+            shadowRadius: 14,
+            elevation: 6,
+          }}
+        >
         {/* Navigation & Title Row */}
         <View className="flex-row items-center space-x-3 mb-2.5">
           <TouchableOpacity
@@ -300,10 +315,12 @@ export default function BranchDoctorsScreen() {
 
           <View className="flex-1">
             <Text className="text-white text-lg font-black tracking-tight" numberOfLines={1}>
-              {hospital?.name}
+              {translateHospitalName(hospital?.name || '', language === 'hi')}
             </Text>
             <Text className="text-blue-200 text-xs font-semibold" numberOfLines={1}>
-              Verified Hospital Partner • Adityam Network
+              {language === 'hi'
+                ? 'सत्यापित अस्पताल पार्टनर • आदित्यम नेटवर्क'
+                : 'Verified Hospital Partner • Adityam Network'}
             </Text>
           </View>
 
@@ -330,16 +347,21 @@ export default function BranchDoctorsScreen() {
               <View className="flex-1">
                 <View className="flex-row items-center space-x-1.5">
                   <Text className="text-[10px] uppercase font-bold text-blue-200 tracking-wider">
-                    Select Branch
+                    {language === 'hi' ? 'शाखा चुनें' : 'Select Branch'}
                   </Text>
                   {branches.length > 1 && (
                     <View className="bg-white/20 px-1.5 py-0.2 rounded">
-                      <Text className="text-[9px] font-bold text-white">{branches.length} branches</Text>
+                      <Text className="text-[9px] font-bold text-white">
+                        {branches.length} {language === 'hi' ? 'शाखाएं' : 'branches'}
+                      </Text>
                     </View>
                   )}
                 </View>
                 <Text className="text-white text-sm font-black mt-0.5" numberOfLines={1}>
-                  {activeBranch?.name} {activeBranch?.distance_km ? `• ${activeBranch.distance_km} km` : ''}
+                  {translateBranchName(activeBranch?.name || '', language === 'hi')}{' '}
+                  {activeBranch?.distance_km
+                    ? `• ${activeBranch.distance_km} ${language === 'hi' ? 'किमी' : 'km'}`
+                    : ''}
                 </Text>
               </View>
             </View>
@@ -354,11 +376,15 @@ export default function BranchDoctorsScreen() {
         <View className="flex-row items-center space-x-1.5 mt-2.5 px-0.5">
           <MapPin size={11} color="#BFDBFE" />
           <Text className="text-blue-100 text-[11px] font-medium flex-1" numberOfLines={1}>
-            {activeBranch?.address}
+            {translateAddress(activeBranch?.address || '', language === 'hi')}
           </Text>
           <View className="bg-white/20 px-2 py-0.5 rounded-full border border-white/30">
             <Text className="text-white text-[10px] font-bold">
-              {activeBranch?.distance_km ? `${activeBranch.distance_km} km` : 'Nearby'}
+              {activeBranch?.distance_km
+                ? `${activeBranch.distance_km} ${language === 'hi' ? 'किमी' : 'km'}`
+                : language === 'hi'
+                ? 'नजदीक'
+                : 'Nearby'}
             </Text>
           </View>
         </View>
@@ -376,11 +402,16 @@ export default function BranchDoctorsScreen() {
         <View className="py-4 px-4">
           <View className="flex-row items-center justify-between mb-2.5 px-0.5">
             <Text className="text-base font-black text-[#182F3B] tracking-tight">
-              Specialties
+              {language === 'hi' ? 'विशेषज्ञताएं' : 'Specialties'}
             </Text>
             <View className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60">
               <Text className="text-xs font-bold text-[#2563EB]">
-                {filteredDoctors.length} {filteredDoctors.length === 1 ? 'Specialist' : 'Specialists'}
+                {filteredDoctors.length}{' '}
+                {language === 'hi'
+                  ? 'विशेषज्ञ'
+                  : filteredDoctors.length === 1
+                  ? 'Specialist'
+                  : 'Specialists'}
               </Text>
             </View>
           </View>
@@ -564,10 +595,10 @@ export default function BranchDoctorsScreen() {
                                   className="text-white text-base font-black tracking-tight leading-tight"
                                   numberOfLines={1}
                                 >
-                                  {topDoctors[0].name}
+                                  {translateDoctorName(topDoctors[0].name, language === 'hi')}
                                 </Text>
                                 <Text className="text-blue-100 text-xs font-semibold mt-0.5">
-                                  {topDoctors[0].specialty}
+                                  {translateSpecialty(topDoctors[0].specialty, language === 'hi')}
                                 </Text>
                               </View>
 
@@ -613,7 +644,8 @@ export default function BranchDoctorsScreen() {
                               <View className="flex-row items-center space-x-1 mt-1">
                                 <Clock size={10} color="#BFDBFE" />
                                 <Text className="text-blue-100 text-[10px] font-semibold">
-                                  Slot: {topDoctors[0].next_available_slot}
+                                  {language === 'hi' ? 'स्लॉट: ' : 'Slot: '}
+                                  {translateSlot(topDoctors[0].next_available_slot, language === 'hi')}
                                 </Text>
                               </View>
                             </View>
@@ -751,10 +783,10 @@ export default function BranchDoctorsScreen() {
                                           className="text-white text-base font-black tracking-tight leading-tight"
                                           numberOfLines={1}
                                         >
-                                          {doc.name}
+                                          {translateDoctorName(doc.name, language === 'hi')}
                                         </Text>
                                         <Text className="text-blue-100 text-xs font-semibold mt-0.5">
-                                          {doc.specialty}
+                                          {translateSpecialty(doc.specialty, language === 'hi')}
                                         </Text>
                                       </View>
 
@@ -775,7 +807,7 @@ export default function BranchDoctorsScreen() {
                                     <View className="flex-row items-center space-x-1 mt-1">
                                       <Star size={11} color="#FBBF24" fill="#FBBF24" />
                                       <Text className="text-white text-xs font-bold">
-                                        {doc.rating} ({doc.total_reviews} Review)
+                                        {doc.rating} ({doc.total_reviews} {language === 'hi' ? 'समीक्षा' : 'Review'})
                                       </Text>
                                     </View>
 
@@ -795,12 +827,12 @@ export default function BranchDoctorsScreen() {
                                         className="text-white text-[10.5px] font-semibold leading-tight"
                                         numberOfLines={2}
                                       >
-                                        {doc.qualification}
+                                        {translateQualification(doc.qualification, language === 'hi')}
                                       </Text>
                                       <View className="flex-row items-center space-x-1 mt-1">
                                         <Clock size={10} color="#BFDBFE" />
                                         <Text className="text-blue-100 text-[10px] font-semibold">
-                                          Slot: {doc.next_available_slot}
+                                          {language === 'hi' ? 'समय: ' : 'Slot: '}{translateSlot(doc.next_available_slot, language === 'hi')}
                                         </Text>
                                       </View>
                                     </View>
@@ -860,12 +892,12 @@ export default function BranchDoctorsScreen() {
               <View className="flex-row items-center justify-between mb-3 px-0.5">
                 <Text className="text-base font-black text-[#182F3B] tracking-tight">
                   {selectedSpecialty === 'All'
-                    ? (t.topSpecialistsTitle || 'All Specialists')
-                    : `${selectedSpecialty} Specialists`}
+                    ? (language === 'hi' ? 'सभी विशेषज्ञ' : t.topSpecialistsTitle || 'All Specialists')
+                    : (language === 'hi' ? `${translateSpecialty(selectedSpecialty, true)} विशेषज्ञ` : `${selectedSpecialty} Specialists`)}
                 </Text>
                 <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
                   <Text className="text-xs font-bold text-[#2563EB]">
-                    {filteredDoctors.length} {filteredDoctors.length === 1 ? 'Specialist' : 'Specialists'}
+                    {filteredDoctors.length} {language === 'hi' ? 'विशेषज्ञ' : filteredDoctors.length === 1 ? 'Specialist' : 'Specialists'}
                   </Text>
                 </View>
               </View>
@@ -894,21 +926,23 @@ export default function BranchDoctorsScreen() {
                         <View className="bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-full flex-row items-center space-x-1.5">
                           <Award size={12} color="#2563EB" />
                           <Text className="text-[10px] font-black text-[#2563EB] uppercase tracking-wider">
-                            Top Specialist
+                            {language === 'hi' ? 'शीर्ष विशेषज्ञ' : 'Top Specialist'}
                           </Text>
                         </View>
                       ) : (
                         <View className="bg-slate-100 px-2.5 py-1 rounded-full flex-row items-center space-x-1">
                           <Building2 size={11} color="#64748B" />
                           <Text className="text-[10px] font-bold text-slate-600">
-                            {activeBranch?.name}
+                            {translateBranchName(activeBranch?.name || '', language === 'hi')}
                           </Text>
                         </View>
                       )}
 
                       <View className="flex-row items-center space-x-1 bg-emerald-50 border border-emerald-200/70 px-2.5 py-1 rounded-full">
                         <ShieldCheck size={12} color="#16A34A" />
-                        <Text className="text-[10.5px] font-bold text-emerald-700">Verified Partner</Text>
+                        <Text className="text-[10.5px] font-bold text-emerald-700">
+                          {language === 'hi' ? 'सत्यापित पार्टनर' : 'Verified Partner'}
+                        </Text>
                       </View>
                     </View>
 
@@ -931,7 +965,7 @@ export default function BranchDoctorsScreen() {
                       <View className="flex-1">
                         <View className="flex-row items-start justify-between">
                           <Text className="text-[16px] font-black text-[#0F172A] flex-1 leading-tight mr-1">
-                            {doctor.name}
+                            {translateDoctorName(doctor.name, language === 'hi')}
                           </Text>
                           {/* Favorite Heart Toggle */}
                           <TouchableOpacity
@@ -951,7 +985,7 @@ export default function BranchDoctorsScreen() {
                         <View className="flex-row items-center space-x-2 mt-1">
                           <View className="bg-[#EFF6FF] px-2.5 py-0.5 rounded-md border border-blue-200/70">
                             <Text className="text-[11px] font-black text-[#2563EB]">
-                              {doctor.specialty}
+                              {translateSpecialty(doctor.specialty, language === 'hi')}
                             </Text>
                           </View>
 
@@ -967,12 +1001,17 @@ export default function BranchDoctorsScreen() {
                         </View>
 
                         {/* Qualifications & Experience */}
-                        <Text className="text-xs text-slate-600 font-semibold mt-1 leading-snug">
-                          {doctor.qualification}
-                        </Text>
-                        <Text className="text-[11px] font-medium text-slate-500 mt-0.5">
-                          {doctor.experience_years} years clinical practice
-                        </Text>
+                        <View className="mt-1.5 flex-row items-center flex-wrap gap-1.5">
+                          <View className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                            <Text className="text-[11px] font-bold text-slate-800">
+                              {translateQualification(doctor.qualification, language === 'hi')}
+                            </Text>
+                          </View>
+                          <Text className="text-[11px] font-medium text-slate-500">
+                            • {doctor.experience_years}{' '}
+                            {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -982,14 +1021,15 @@ export default function BranchDoctorsScreen() {
                         <View className="flex-row items-center space-x-1.5">
                           <View className="w-2 h-2 rounded-full bg-emerald-500" />
                           <Text className="text-xs font-black text-emerald-800">
-                            Available: {doctor.next_available_slot}
+                            {language === 'hi' ? 'उपलब्ध: ' : 'Available: '}
+                            {translateSlot(doctor.next_available_slot, language === 'hi')}
                           </Text>
                         </View>
 
                         <View className="flex-row items-center space-x-1">
                           <Globe size={11} color="#059669" />
                           <Text className="text-[10.5px] font-bold text-emerald-700">
-                            {doctor.languages?.join(', ') || 'English, Hindi'}
+                            {translateLanguageList(doctor.languages, language === 'hi')}
                           </Text>
                         </View>
                       </View>
@@ -998,66 +1038,35 @@ export default function BranchDoctorsScreen() {
                         <View className="flex-row items-center space-x-1 mt-1.5 pt-1.5 border-t border-emerald-100/60">
                           <Calendar size={11} color="#059669" />
                           <Text className="text-[10.5px] text-emerald-800/80 font-semibold">
-                            OPD Schedule: {doctor.opd_timing}
+                            {language === 'hi' ? 'ओपीडी समय: ' : 'OPD Schedule: '}{translateTiming(doctor.opd_timing, language === 'hi')}
                           </Text>
                         </View>
                       )}
                     </View>
 
-                    {/* Bottom Fee & Quick Action Row */}
+                    {/* Bottom Fee & Single Obvious Book CTA */}
                     <View className="mt-3.5 pt-3 border-t border-slate-100 flex-row items-center justify-between">
-                      {/* Left: Consultation Fee */}
+                      {/* Left: Consultation Fee (Clean, uncluttered, non-button styling) */}
                       <View>
-                        <Text className="text-[9.5px] text-slate-400 uppercase font-black tracking-wider">
-                          Consultation Fee
+                        <Text className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                          {language === 'hi' ? 'परामर्श शुल्क' : 'Consultation Fee'}
                         </Text>
-                        <View className="flex-row items-center space-x-1.5 mt-0.5">
-                          <Text className="text-lg font-black text-[#0F172A]">
-                            ₹{doctor.discounted_fee}
-                          </Text>
-                          <Text className="text-xs text-slate-400 line-through">
-                            ₹{doctor.consultation_fee}
-                          </Text>
-                          <View className="bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded">
-                            <Text className="text-[9.5px] font-black text-amber-700">
-                              25% OFF
-                            </Text>
-                          </View>
-                        </View>
+                        <Text className="text-base font-bold text-[#0F172A] mt-0.5">
+                          ₹{doctor.discounted_fee || doctor.consultation_fee}
+                        </Text>
                       </View>
 
-                      {/* Right: Quick Action Buttons & Book Consultation */}
-                      <View className="flex-row items-center space-x-1.5">
-                        {/* Direct Call Button */}
-                        <TouchableOpacity
-                          onPress={() => handleInitiateDoctorBooking(doctor)}
-                          activeOpacity={0.8}
-                          className="w-10 h-10 rounded-2xl bg-[#EFF6FF] border border-blue-200/80 items-center justify-center active:scale-95"
-                        >
-                          <PhoneCall size={15} color="#2563EB" />
-                        </TouchableOpacity>
-
-                        {/* Video Consult Button */}
-                        <TouchableOpacity
-                          onPress={() => handleInitiateDoctorBooking(doctor)}
-                          activeOpacity={0.8}
-                          className="w-10 h-10 rounded-2xl bg-[#EFF6FF] border border-blue-200/80 items-center justify-center active:scale-95"
-                        >
-                          <Video size={15} color="#2563EB" />
-                        </TouchableOpacity>
-
-                        {/* Primary Book Consultation CTA */}
-                        <TouchableOpacity
-                          onPress={() => handleInitiateDoctorBooking(doctor)}
-                          activeOpacity={0.85}
-                          className="bg-[#2563EB] active:bg-[#1D4ED8] px-3.5 py-2.5 rounded-2xl flex-row items-center space-x-1 shadow-sm shadow-blue-500/25"
-                        >
-                          <Text className="text-white text-xs font-black">
-                            Book Consult
-                          </Text>
-                          <ChevronRight size={13} color="#FFFFFF" strokeWidth={3} />
-                        </TouchableOpacity>
-                      </View>
+                      {/* Right: One Single Obvious Book Button */}
+                      <TouchableOpacity
+                        onPress={() => handleInitiateDoctorBooking(doctor)}
+                        activeOpacity={0.88}
+                        className="bg-[#2563EB] active:bg-[#1D4ED8] px-4 py-2.5 rounded-xl flex-row items-center space-x-1.5 shadow-sm"
+                      >
+                        <Text className="text-white text-xs font-bold">
+                          {language === 'hi' ? 'अपॉइंटमेंट बुक करें' : 'Book In-Clinic Visit'}
+                        </Text>
+                        <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 );
@@ -1078,7 +1087,9 @@ export default function BranchDoctorsScreen() {
           <View className="bg-white rounded-t-3xl p-6 shadow-2xl">
             <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
               <Text className="text-base font-bold text-[#182F3B]">
-                {confirmedBooking ? 'Consultation Confirmed!' : 'Priority OPD Doctor Booking'}
+                {confirmedBooking
+                  ? (language === 'hi' ? 'परामर्श की पुष्टि हुई!' : 'Consultation Confirmed!')
+                  : (language === 'hi' ? 'प्राथमिकता ओपीडी डॉक्टर बुकिंग' : 'Priority OPD Doctor Booking')}
               </Text>
               <TouchableOpacity
                 onPress={() => setBookingModalVisible(false)}
@@ -1094,28 +1105,41 @@ export default function BranchDoctorsScreen() {
                   <CheckCircle2 size={32} color="#3B82F6" />
                 </View>
                 <Text className="text-xl font-bold text-[#182F3B]">
-                  Concierge Dispatched
+                  {language === 'hi' ? 'कंसीयर्ज कॉल शुरू हुई' : 'Concierge Dispatched'}
                 </Text>
                 <Text className="text-xs font-mono font-bold text-[#3B82F6] mt-1">
-                  Reference: {confirmedBooking.booking_ref}
+                  {language === 'hi' ? 'संदर्भ आईडी: ' : 'Reference: '}{confirmedBooking.booking_ref}
                 </Text>
                 <Text className="text-xs text-slate-600 text-center mt-3 px-4 leading-relaxed">
-                  Your priority slot for{' '}
-                  <Text className="font-bold text-[#182F3B]">
-                    {confirmedBooking.doctor_name}
-                  </Text>{' '}
-                  at {confirmedBooking.hospital_name} ({confirmedBooking.branch_name}) has been submitted to the real-time CRM. Our desk coordinator is connecting you now!
+                  {language === 'hi' ? (
+                    <>
+                      <Text className="font-bold text-[#182F3B]">
+                        {translateDoctorName(confirmedBooking.doctor_name || '', true)}
+                      </Text>{' '}
+                      के लिए आपका प्राथमिकता स्लॉट {translateHospitalName(confirmedBooking.hospital_name || '', true)} ({translateBranchName(confirmedBooking.branch_name || '', true)}) में दर्ज कर दिया गया है। हमारे समन्वयक आपसे संपर्क कर रहे हैं!
+                    </>
+                  ) : (
+                    <>
+                      Your priority slot for{' '}
+                      <Text className="font-bold text-[#182F3B]">
+                        {confirmedBooking.doctor_name}
+                      </Text>{' '}
+                      at {confirmedBooking.hospital_name} ({confirmedBooking.branch_name}) has been submitted to the real-time CRM. Our desk coordinator is connecting you now!
+                    </>
+                  )}
                 </Text>
 
                 <View className="w-full bg-[#F8FAFC] p-4 rounded-xl border border-slate-200 mt-5">
                   <Text className="text-[11px] font-bold text-[#182F3B] uppercase">
-                    Exotel Virtual Telephony Route
+                    {language === 'hi' ? 'एक्सोटेल वर्चुअल टेलीफोनी' : 'Exotel Virtual Telephony Route'}
                   </Text>
                   <Text className="text-xs font-mono font-bold text-slate-800 mt-0.5">
                     +91 11 4000 8800 ➔ {user?.phone || '+91 99999 99999'}
                   </Text>
                   <Text className="text-[10px] text-[#3B82F6] font-semibold mt-1">
-                    ✓ Masked calling protects your identity and number.
+                    {language === 'hi'
+                      ? '✓ आपका नंबर और व्यक्तिगत पहचान 100% गोपनीय रहती है।'
+                      : '✓ Masked calling protects your identity and number.'}
                   </Text>
                 </View>
 
@@ -1123,7 +1147,7 @@ export default function BranchDoctorsScreen() {
                   onPress={() => setBookingModalVisible(false)}
                   className="w-full bg-[#3B82F6] py-3.5 rounded-xl items-center mt-5 shadow-sm shadow-blue-500/30"
                 >
-                  <Text className="text-white font-bold text-xs">Done</Text>
+                  <Text className="text-white font-bold text-xs">{language === 'hi' ? 'पूर्ण' : 'Done'}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -1133,13 +1157,13 @@ export default function BranchDoctorsScreen() {
                   <View className="bg-[#EFF6FF] p-3.5 rounded-2xl border border-blue-200/80 mb-3 flex-row items-center justify-between">
                     <View className="flex-1 mr-2">
                       <Text className="text-sm font-bold text-[#182F3B]">
-                        {selectedDoctor.name}
+                        {translateDoctorName(selectedDoctor.name, language === 'hi')}
                       </Text>
                       <Text className="text-xs font-semibold text-[#2563EB]">
-                        {selectedDoctor.specialty} • {selectedDoctor.qualification}
+                        {translateSpecialty(selectedDoctor.specialty, language === 'hi')} • {translateQualification(selectedDoctor.qualification, language === 'hi')}
                       </Text>
                       <Text className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-                        Slot: {selectedDoctor.next_available_slot}
+                        {language === 'hi' ? 'समय: ' : 'Slot: '}{translateSlot(selectedDoctor.next_available_slot, language === 'hi')}
                       </Text>
                     </View>
                     <View className="items-end">
@@ -1156,23 +1180,23 @@ export default function BranchDoctorsScreen() {
                 {/* Hospital & Branch */}
                 <View className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3">
                   <Text className="text-xs font-bold text-[#182F3B]">
-                    Hospital Unit: {hospital?.name}
+                    {language === 'hi' ? 'अस्पताल: ' : 'Hospital Unit: '}{translateHospitalName(hospital?.name || '', language === 'hi')}
                   </Text>
                   <Text className="text-[11px] text-slate-600 mt-0.5">
-                    Branch: {activeBranch?.name} ({activeBranch?.address})
+                    {language === 'hi' ? 'शाखा: ' : 'Branch: '}{translateBranchName(activeBranch?.name || '', language === 'hi')} ({translateAddress(activeBranch?.address || '', language === 'hi')})
                   </Text>
                 </View>
 
                 {/* Patient Information */}
                 <View className="bg-[#FFF9F0] p-3 rounded-xl border border-[#CF8A40]/30 mb-4">
                   <Text className="text-xs font-bold text-[#182F3B]">
-                    Patient Information:
+                    {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
                   </Text>
                   <Text className="text-xs text-slate-700 mt-1">
-                    Name: <Text className="font-bold">{user?.full_name || 'Dr. Vikram Malhotra'}</Text>
+                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Dr. Vikram Malhotra'}</Text>
                   </Text>
                   <Text className="text-xs text-slate-700">
-                    Phone: <Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
+                    {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
                   </Text>
                 </View>
 
@@ -1183,7 +1207,9 @@ export default function BranchDoctorsScreen() {
                 >
                   <PhoneCall size={16} color="#FFFFFF" />
                   <Text className="text-white font-bold text-sm">
-                    {isSubmitting ? 'Dispatching to CRM...' : 'Confirm & Call Concierge'}
+                    {isSubmitting
+                      ? (language === 'hi' ? 'सीधे जोड़ रहे हैं...' : 'Dispatching to CRM...')
+                      : (language === 'hi' ? 'पुष्टि करें और कॉल करें' : 'Confirm & Call Concierge')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1212,10 +1238,10 @@ export default function BranchDoctorsScreen() {
             <View className="flex-row items-center justify-between pb-3.5 border-b border-slate-100">
               <View>
                 <Text className="text-base font-black text-[#182F3B]">
-                  Select Hospital Branch
+                  {language === 'hi' ? 'अस्पताल शाखा चुनें' : 'Select Hospital Branch'}
                 </Text>
                 <Text className="text-xs text-slate-500 font-medium mt-0.5">
-                  {hospital?.name} • {branches.length} Locations
+                  {translateHospitalName(hospital?.name || '', language === 'hi')} • {branches.length} {language === 'hi' ? 'शाखाएं' : 'Locations'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1253,23 +1279,23 @@ export default function BranchDoctorsScreen() {
                             isSelected ? 'text-[#2563EB]' : 'text-[#182F3B]'
                           }`}
                         >
-                          {b.name}
+                          {translateBranchName(b.name, language === 'hi')}
                         </Text>
                       </View>
                       <Text className="text-xs text-slate-500 mt-1" numberOfLines={1}>
-                        {b.address}
+                        {translateAddress(b.address, language === 'hi')}
                       </Text>
                       <View className="flex-row items-center space-x-2 mt-2">
                         {b.distance_km && (
                           <View className="bg-slate-100 px-2 py-0.5 rounded-full">
                             <Text className="text-[10px] font-bold text-slate-700">
-                              {b.distance_km} km away
+                              {b.distance_km} {language === 'hi' ? 'किमी दूर' : 'km away'}
                             </Text>
                           </View>
                         )}
                         <View className="bg-blue-50 px-2 py-0.5 rounded-full">
                           <Text className="text-[10px] font-bold text-[#2563EB]">
-                            {b.doctors.length} Specialists
+                            {b.doctors.length} {language === 'hi' ? 'विशेषज्ञ' : 'Specialists'}
                           </Text>
                         </View>
                       </View>
@@ -1291,6 +1317,7 @@ export default function BranchDoctorsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }

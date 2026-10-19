@@ -46,6 +46,15 @@ import {
   NeurologyBrainIcon,
   AllCategoriesIcon,
 } from '../../components/ServiceIcons';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppSearchBar } from '../../components/ui/AppSearchBar';
+import { ProfileModal } from '../../components/ui/ProfileModal';
+import {
+  translateHospitalName,
+  translateBranchName,
+  translateAddress,
+  translateSpecialty,
+} from '../../src/utils/hindiDictionary';
 
 interface SpecialtyCategory {
   id: string;
@@ -62,6 +71,7 @@ export default function OpdConciergeScreen() {
 
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [profileVisible, setProfileVisible] = useState(false);
 
   // Track which hospital branch carousels are expanded (default all hidden)
   const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
@@ -236,102 +246,19 @@ export default function OpdConciergeScreen() {
           paddingBottom: Math.max(insets.bottom, 16) + 85,
         }}
       >
-        {/* Modern Header Section matching user reference in Royal Medical Blue (Image 3 Inspiration) */}
-        <LinearGradient
-          colors={['#172554', '#1E40AF', '#2563EB']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            paddingTop: Math.max(insets.top, 24) + 12,
-            paddingHorizontal: 20,
-            paddingBottom: 22,
-            borderBottomLeftRadius: 28,
-            borderBottomRightRadius: 28,
-            shadowColor: '#1E3A8A',
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.22,
-            shadowRadius: 14,
-            elevation: 6,
-            position: 'relative',
-            overflow: 'hidden',
-          }}
+        {/* Consistent Standard Header & Search Bar */}
+        <AppHeader
+          title={language === 'hi' ? 'विशेषज्ञ डॉक्टर' : 'Doctor Consults'}
+          onPressProfile={() => setProfileVisible(true)}
+          style={{ backgroundColor: '#F8FAFC' }}
         >
-          {/* Ambient light glow */}
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: -40,
-              right: -30,
-              width: 160,
-              height: 160,
-              borderRadius: 80,
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            }}
+          <AppSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+            placeholder={t.searchDoctorPlaceholder || 'Search doctor, specialty, hospital...'}
           />
-
-          {/* Top Status & Geolocation Pill */}
-          <View className="flex-row items-center justify-between mb-3.5">
-            <View className="flex-row items-center space-x-1.5 bg-white/15 border border-white/25 px-3 py-1 rounded-full">
-              <MapPin size={12} color="#BFDBFE" />
-              <Text className="text-[11px] font-bold text-white">
-                South Delhi NCR • 50 km radius
-              </Text>
-            </View>
-
-            <View className="flex-row items-center space-x-1 bg-white/20 px-2.5 py-1 rounded-full border border-white/30">
-              <ShieldCheck size={12} color="#FFFFFF" />
-              <Text className="text-[10px] font-bold text-white">NABH Accredited</Text>
-            </View>
-          </View>
-
-          {/* Heading: "Find Your Health Specialist" */}
-          <Text className="text-[28px] font-black text-white tracking-tight leading-[34px]">
-            {t.opdPageTitle}
-          </Text>
-          <Text className="text-xs font-medium text-blue-100 mt-1 mb-4">
-            {t.opdPageSub}
-          </Text>
-
-          {/* Image 3 Floating Search Doctor Pill */}
-          <View className="bg-white rounded-full flex-row items-center pl-4 pr-1.5 py-1.5 shadow-lg shadow-blue-950/20 mb-1">
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={t.searchDoctorPlaceholder}
-              placeholderTextColor="#94A3B8"
-              className="flex-1 text-sm text-slate-800 font-medium py-1 px-1"
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery('')}
-                className="p-1.5 mr-1 rounded-full bg-slate-100"
-              >
-                <X size={14} color="#64748B" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="overflow-hidden rounded-full shadow-sm"
-            >
-              <LinearGradient
-                colors={['#2563EB', '#1D4ED8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Search size={17} color="#FFFFFF" strokeWidth={2.5} />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+        </AppHeader>
 
         {/* Categories Capsule Pills Section (Image 3 Inspiration) */}
         <View className="pt-4 px-5">
@@ -344,7 +271,9 @@ export default function OpdConciergeScreen() {
                 onPress={() => setSelectedSpecialty('All')}
                 className="flex-row items-center space-x-1"
               >
-                <Text className="text-xs font-bold text-[#2563EB]">Reset to All</Text>
+                <Text className="text-xs font-bold text-[#2563EB]">
+                  {language === 'hi' ? 'सभी देखें' : 'Reset to All'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -424,7 +353,9 @@ export default function OpdConciergeScreen() {
                 {t.hospitalNetworksTitle}
               </Text>
               <Text className="text-xs text-slate-500 font-medium">
-                {filteredHospitals.length} {filteredHospitals.length === 1 ? 'Hospital Network' : 'Hospital Networks'} available
+                {language === 'hi'
+                  ? `${filteredHospitals.length} अस्पताल नेटवर्क उपलब्ध`
+                  : `${filteredHospitals.length} ${filteredHospitals.length === 1 ? 'Hospital Network' : 'Hospital Networks'} available`}
               </Text>
             </View>
           </View>
@@ -653,7 +584,9 @@ export default function OpdConciergeScreen() {
                             fontWeight: '800',
                           }}
                         >
-                          {hospital.discount_percentage}% OFF OPD
+                          {language === 'hi'
+                            ? `${hospital.discount_percentage}% छूट (ओपीडी)`
+                            : `${hospital.discount_percentage}% OFF OPD`}
                         </Text>
                       </View>
                     )}
@@ -671,7 +604,7 @@ export default function OpdConciergeScreen() {
                         letterSpacing: -0.3,
                       }}
                     >
-                      {hospital.name}
+                      {translateHospitalName(hospital.name, language === 'hi')}
                     </Text>
 
                     <Text
@@ -683,7 +616,7 @@ export default function OpdConciergeScreen() {
                         marginTop: 2,
                       }}
                     >
-                      {hospital.address}
+                      {translateAddress(hospital.address, language === 'hi')}
                     </Text>
 
                     {/* 3. Sleek Single-Line Tags & Stats */}
@@ -716,7 +649,7 @@ export default function OpdConciergeScreen() {
                                 fontWeight: '700',
                               }}
                             >
-                              {spec}
+                              {translateSpecialty(spec, language === 'hi')}
                             </Text>
                           </View>
                         ))}
@@ -727,14 +660,19 @@ export default function OpdConciergeScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <Building2 size={13} color="#2563EB" />
                           <Text style={{ color: '#1E293B', fontSize: 11, fontWeight: '700' }}>
-                            {branches.length} {branches.length === 1 ? 'Branch' : 'Branches'}
+                            {branches.length}{' '}
+                            {language === 'hi'
+                              ? 'शाखाएं'
+                              : branches.length === 1
+                              ? 'Branch'
+                              : 'Branches'}
                           </Text>
                         </View>
                         <Text style={{ color: '#CBD5E1' }}>•</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                           <UserCheck size={13} color="#16A34A" />
                           <Text style={{ color: '#1E293B', fontSize: 11, fontWeight: '700' }}>
-                            {totalDoctors}+ Dr.
+                            {totalDoctors}+ {language === 'hi' ? 'डॉक्टर' : 'Dr.'}
                           </Text>
                         </View>
                       </View>
@@ -775,7 +713,7 @@ export default function OpdConciergeScreen() {
                             fontWeight: '700',
                           }}
                         >
-                          Call Hospital
+                          {language === 'hi' ? 'कॉल करें' : 'Call Hospital'}
                         </Text>
                       </TouchableOpacity>
 
@@ -810,7 +748,9 @@ export default function OpdConciergeScreen() {
                           }}
                           numberOfLines={1}
                         >
-                          {isBranchesOpen ? 'Hide Branches' : 'Explore Hospital'}
+                          {language === 'hi'
+                            ? (isBranchesOpen ? 'शाखाएं छिपाएं' : 'अस्पताल व डॉक्टर')
+                            : (isBranchesOpen ? 'Hide Branches' : 'Explore Hospital')}
                         </Text>
 
                         {isBranchesOpen ? (
@@ -839,12 +779,12 @@ export default function OpdConciergeScreen() {
                             marginBottom: 8,
                           }}
                         >
-                          Hospital Branches ({branches.length})
+                          {language === 'hi' ? `अस्पताल शाखाएं (${branches.length})` : `Hospital Branches (${branches.length})`}
                         </Text>
 
                         {branches.length === 0 ? (
                           <Text style={{ color: '#64748B', fontSize: 11 }}>
-                            No branches available.
+                            {language === 'hi' ? 'कोई शाखा उपलब्ध नहीं है।' : 'No branches available.'}
                           </Text>
                         ) : (
                           <ScrollView
@@ -884,7 +824,7 @@ export default function OpdConciergeScreen() {
                                       fontWeight: '800',
                                     }}
                                   >
-                                    {branch.name}
+                                    {translateBranchName(branch.name, language === 'hi')}
                                   </Text>
 
                                   {branch.is_main_branch && (
@@ -903,7 +843,7 @@ export default function OpdConciergeScreen() {
                                           fontWeight: '800',
                                         }}
                                       >
-                                        MAIN
+                                        {language === 'hi' ? 'मुख्य' : 'MAIN'}
                                       </Text>
                                     </View>
                                   )}
@@ -917,9 +857,9 @@ export default function OpdConciergeScreen() {
                                     marginTop: 4,
                                   }}
                                 >
-                                  {branch.area}
+                                  {translateAddress(branch.area, language === 'hi')}
                                   {branch.distance_km != null
-                                    ? ` · ${branch.distance_km} km`
+                                    ? ` · ${branch.distance_km} ${language === 'hi' ? 'किमी' : 'km'}`
                                     : ''}
                                 </Text>
 
@@ -939,7 +879,9 @@ export default function OpdConciergeScreen() {
                                       marginLeft: 4,
                                     }}
                                   >
-                                    {branch.doctors?.length || 0} Verified Doctors
+                                    {language === 'hi'
+                                      ? `${branch.doctors?.length || 0} सत्यापित डॉक्टर`
+                                      : `${branch.doctors?.length || 0} Verified Doctors`}
                                   </Text>
                                 </View>
 
@@ -961,7 +903,7 @@ export default function OpdConciergeScreen() {
                                       fontWeight: '800',
                                     }}
                                   >
-                                    View Doctors
+                                    {language === 'hi' ? 'डॉक्टर देखें' : 'View Doctors'}
                                   </Text>
                                   <ChevronRight
                                     size={13}
@@ -994,7 +936,9 @@ export default function OpdConciergeScreen() {
           <View className="bg-white rounded-t-3xl p-6 shadow-2xl">
             <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
               <Text className="text-base font-bold text-[#182F3B]">
-                {confirmedBooking ? 'Request Dispatched!' : 'Priority OPD General Desk'}
+                {confirmedBooking
+                  ? (language === 'hi' ? 'अनुरोध सफलतापूर्वक भेजा गया!' : 'Request Dispatched!')
+                  : (language === 'hi' ? 'प्राथमिकता ओपीडी जनरल डेस्क' : 'Priority OPD General Desk')}
               </Text>
               <TouchableOpacity
                 onPress={() => setBookingModalVisible(false)}
@@ -1010,24 +954,28 @@ export default function OpdConciergeScreen() {
                   <CheckCircle2 size={32} color="#3B82F6" />
                 </View>
                 <Text className="text-xl font-bold text-[#182F3B]">
-                  Concierge Call Dispatched
+                  {language === 'hi' ? 'कॉल कनेक्ट की जा रही है' : 'Concierge Call Dispatched'}
                 </Text>
                 <Text className="text-xs font-mono font-bold text-[#3B82F6] mt-1">
-                  Reference: {confirmedBooking.booking_ref}
+                  {language === 'hi' ? 'संदर्भ संख्या:' : 'Reference:'} {confirmedBooking.booking_ref}
                 </Text>
                 <Text className="text-xs text-slate-600 text-center mt-3 px-4 leading-relaxed">
-                  Our hospital desk coordinator at {confirmedBooking.hospital_name} has received your request and is connecting you via Exotel masked telephony!
+                  {language === 'hi'
+                    ? `${translateHospitalName(confirmedBooking.hospital_name || '', true)} में हमारे अस्पताल डेस्क समन्वयक को आपका अनुरोध प्राप्त हो गया है और वे एक्सोटेल टेलीफोनी द्वारा आपसे संपर्क कर रहे हैं!`
+                    : `Our hospital desk coordinator at ${confirmedBooking.hospital_name} has received your request and is connecting you via Exotel masked telephony!`}
                 </Text>
 
                 <View className="w-full bg-[#F8FAFC] p-4 rounded-xl border border-slate-200 mt-5">
                   <Text className="text-[11px] font-bold text-[#182F3B] uppercase">
-                    Virtual Telephony Route
+                    {language === 'hi' ? 'वर्चुअल टेलीफोनी रूट' : 'Virtual Telephony Route'}
                   </Text>
                   <Text className="text-xs font-mono font-bold text-slate-800 mt-0.5">
                     +91 11 4000 8800 ➔ {user?.phone || '+91 99999 99999'}
                   </Text>
                   <Text className="text-[10px] text-[#3B82F6] font-semibold mt-1">
-                    ✓ Your personal number remains 100% confidential.
+                    {language === 'hi'
+                      ? '✓ आपका व्यक्तिगत नंबर 100% गोपनीय रहता है।'
+                      : '✓ Your personal number remains 100% confidential.'}
                   </Text>
                 </View>
 
@@ -1035,30 +983,32 @@ export default function OpdConciergeScreen() {
                   onPress={() => setBookingModalVisible(false)}
                   className="w-full bg-[#3B82F6] py-3.5 rounded-xl items-center mt-5 shadow-sm shadow-blue-500/30"
                 >
-                  <Text className="text-white font-bold text-xs">Done</Text>
+                  <Text className="text-white font-bold text-xs">
+                    {language === 'hi' ? 'पूर्ण' : 'Done'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View className="py-4">
                 <Text className="text-sm font-bold text-[#182F3B]">
-                  {selectedHospital?.name}
+                  {translateHospitalName(selectedHospital?.name || '', language === 'hi')}
                 </Text>
                 <Text className="text-xs text-slate-500 mt-0.5">
-                  {selectedHospital?.address}
+                  {translateAddress(selectedHospital?.address || '', language === 'hi')}
                 </Text>
 
                 <View className="bg-[#FFF9F0] p-3.5 rounded-xl border border-[#CF8A40]/30 my-4">
                   <Text className="text-xs font-bold text-[#182F3B]">
-                    Patient Information:
+                    {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
                   </Text>
                   <Text className="text-xs text-slate-700 mt-1">
-                    Name: <Text className="font-bold">{user?.full_name || 'Dr. Vikram Malhotra'}</Text>
+                    {language === 'hi' ? 'नाम: ' : 'Name: '}<Text className="font-bold">{user?.full_name || 'Dr. Vikram Malhotra'}</Text>
                   </Text>
                   <Text className="text-xs text-slate-700">
-                    Phone: <Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
+                    {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text className="font-bold">{user?.phone || '+91 99999 99999'}</Text>
                   </Text>
                   <Text className="text-xs text-slate-700">
-                    Specialty: <Text className="font-bold text-[#3B82F6]">{selectedSpecialty}</Text>
+                    {language === 'hi' ? 'विशेषज्ञता: ' : 'Specialty: '}<Text className="font-bold text-[#3B82F6]">{translateSpecialty(selectedSpecialty, language === 'hi')}</Text>
                   </Text>
                 </View>
 
@@ -1069,7 +1019,9 @@ export default function OpdConciergeScreen() {
                 >
                   <PhoneCall size={16} color="#FFFFFF" />
                   <Text className="text-white font-bold text-sm">
-                    {isSubmitting ? 'Dispatching to CRM...' : 'Confirm & Call General Desk'}
+                    {isSubmitting
+                      ? (language === 'hi' ? 'सीधे जोड़ रहे हैं...' : 'Dispatching to CRM...')
+                      : (language === 'hi' ? 'पुष्टि करें और जनरल डेस्क को कॉल करें' : 'Confirm & Call General Desk')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1077,6 +1029,9 @@ export default function OpdConciergeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Profile & Language Modal */}
+      <ProfileModal visible={profileVisible} onClose={() => setProfileVisible(false)} />
     </View>
   );
 }
