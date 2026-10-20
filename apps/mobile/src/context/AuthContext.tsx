@@ -11,7 +11,7 @@ interface AuthContextType {
   dependents: Dependent[];
   isLoggedIn: boolean;
   loginAsTestUser: () => void;
-  loginWithPhone: (phone: string, otp: string, fullName?: string) => boolean;
+  loginWithPhone: (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => boolean;
   logout: () => void;
   addDependent: (dependent: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => void;
   deductWallet: (amount: number) => void;
@@ -29,6 +29,8 @@ const TEST_USER: User = {
   wallet_balance: 2500.00,
   is_verified: true,
   role: 'patient',
+  aadhaar_last_four: '4592',
+  abha_id: '91-4582-9011',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -117,13 +119,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveUserSession(TEST_USER);
   };
 
-  const loginWithPhone = (phone: string, otp: string, fullName?: string) => {
+  const loginWithPhone = (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => {
     const cleanName = fullName?.trim() || 'Rahul Jain';
+    const cleanAadhaar = aadhaarLastFour?.trim() || '4592';
     // App Store review bypass: phone 9999999999 or OTP 123456
     if (phone.includes('9999999999')) {
       const reviewerUser: User = {
         ...TEST_USER,
         full_name: cleanName !== 'Rahul Jain' ? cleanName : TEST_USER.full_name,
+        aadhaar_last_four: cleanAadhaar,
       };
       saveUserSession(reviewerUser);
       return true;
@@ -140,6 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       wallet_balance: 2500.00,
       is_verified: true,
       role: 'patient',
+      aadhaar_last_four: cleanAadhaar,
+      abha_id: `91-${cleanAadhaar.repeat(2).slice(0, 4)}-9011`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

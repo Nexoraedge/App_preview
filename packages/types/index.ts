@@ -16,6 +16,8 @@ export interface User {
   is_verified: boolean;
   role: UserRole;
   avatar_url?: string | null;
+  aadhaar_last_four?: string | null;
+  abha_id?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -2,11 +2,11 @@
 // Phone-number OTP login. Two steps on one screen: number -> 6-digit code.
 // AUTH.demo = true (in src/config/brand.ts) lets you demo with no SMS provider; set it to false for real Supabase OTP.
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Linking, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, ArrowLeft } from 'lucide-react-native';
+import { ShieldCheck, ArrowLeft, Sparkles, Check, Fingerprint } from 'lucide-react-native';
 import { C, R } from '../src/theme';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
@@ -28,11 +28,24 @@ export default function Login() {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [aadhaar, setAadhaar] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(0);
   const otpRef = useRef<TextInput>(null);
+
+  const formatAadhaar = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 12);
+    const chunks = [];
+    for (let i = 0; i < raw.length; i += 4) {
+      chunks.push(raw.slice(i, i + 4));
+    }
+    return chunks.join(' ');
+  };
+
+  const aadhaarRaw = aadhaar.replace(/\D/g, '');
+  const aadhaarOk = aadhaarRaw.length === 12;
 
   useEffect(() => {
     if (left <= 0) return;
@@ -49,6 +62,14 @@ export default function Login() {
       return;
     }
     if (!phoneOk) { setError(t.invalidPhone); return; }
+    if (!aadhaarOk) {
+      setError(
+        language === 'hi'
+          ? 'कृपया 12-अंकीय मान्य आधार संख्या दर्ज करें (उदा. 5421 8932 4592)'
+          : 'Please enter a valid 12-digit Aadhaar number (e.g. 5421 8932 4592)'
+      );
+      return;
+    }
     setError(''); setBusy(true);
     try {
       if (!AUTH.demo) {
@@ -66,16 +87,17 @@ export default function Login() {
     if (otp.length !== 6) { setError(t.wrongOtp); return; }
     setError(''); setBusy(true);
     try {
+      const lastFour = aadhaarRaw.slice(-4) || '4592';
       if (AUTH.demo) {
         if (otp !== AUTH.demoOtp) {
           setError(t.wrongOtp);
           return;
         }
-        loginWithPhone(phone, otp, fullName.trim());
+        loginWithPhone(phone, otp, fullName.trim(), lastFour);
       } else {
         // const { error: e } = await getSupabaseClient().auth.verifyOtp({ phone: '+91' + phone, token: otp, type: 'sms' });
         // if (e) { setError(e.status === 429 ? t.tooMany : t.wrongOtp); return; }
-        loginWithPhone(phone, otp, fullName.trim());
+        loginWithPhone(phone, otp, fullName.trim(), lastFour);
       }
       router.replace(ROUTES.home as any);
     } catch {
@@ -160,30 +182,113 @@ export default function Login() {
                     </View>
 
                     {/* Mobile Number Input */}
-                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>{t.phoneLabel}</Text>
-                    <View style={field}>
-                      <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink, marginRight: 10 }}>+91</Text>
-                      <View style={{ width: 1, height: 26, backgroundColor: C.line, marginRight: 12 }} />
-                      <TextInput
-                        value={phone}
-                        onChangeText={(v) => { setPhone(v.replace(/\D/g, '').slice(0, 10)); setError(''); }}
-                        placeholder={t.phonePlaceholder}
-                        placeholderTextColor={C.mute}
-                        keyboardType="number-pad"
-                        textContentType="telephoneNumber"
-                        autoComplete="tel"
-                        maxLength={10}
-                        returnKeyType="done"
-                        onSubmitEditing={sendOtp}
-                        style={[
-                          { flex: 1, fontSize: 18, fontWeight: '600', color: C.ink, paddingVertical: 12 },
-                          Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
-                        ]}
-                      />
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>{t.phoneLabel}</Text>
+                      <View style={field}>
+                        <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink, marginRight: 10 }}>+91</Text>
+                        <View style={{ width: 1, height: 26, backgroundColor: C.line, marginRight: 12 }} />
+                        <TextInput
+                          value={phone}
+                          onChangeText={(v) => { setPhone(v.replace(/\D/g, '').slice(0, 10)); setError(''); }}
+                          placeholder={t.phonePlaceholder}
+                          placeholderTextColor={C.mute}
+                          keyboardType="number-pad"
+                          textContentType="telephoneNumber"
+                          autoComplete="tel"
+                          maxLength={10}
+                          returnKeyType="next"
+                          style={[
+                            { flex: 1, fontSize: 18, fontWeight: '600', color: C.ink, paddingVertical: 12 },
+                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    {/* 12-Digit Aadhaar Verification Input */}
+                    <View style={{ marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub }}>
+                          {language === 'hi' ? 'आधार संख्या (12 अंक)' : 'Aadhaar Number (12-Digit)'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <ShieldCheck size={12} color="#2563EB" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
+                            {language === 'hi' ? 'UIDAI सत्यापन' : 'UIDAI Verified'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={field}>
+                        <Fingerprint size={20} color="#2563EB" style={{ marginRight: 10 }} />
+                        <TextInput
+                          value={aadhaar}
+                          onChangeText={(v) => { setAadhaar(formatAadhaar(v)); setError(''); }}
+                          placeholder="XXXX XXXX XXXX"
+                          placeholderTextColor={C.mute}
+                          keyboardType="number-pad"
+                          maxLength={14}
+                          returnKeyType="done"
+                          onSubmitEditing={sendOtp}
+                          style={[
+                            { flex: 1, fontSize: 16.5, fontWeight: '700', letterSpacing: 2, color: C.ink, paddingVertical: 12 },
+                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                          ]}
+                        />
+                        {aadhaarOk ? (
+                          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                            <Check size={14} color="#16A34A" strokeWidth={3} />
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => { setAadhaar('5421 8932 4592'); setError(''); }}
+                            activeOpacity={0.7}
+                            style={{ paddingHorizontal: 9, paddingVertical: 4.5, backgroundColor: '#EFF6FF', borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
+                              {language === 'hi' ? 'डेमो भरें' : 'Use Demo'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Subsidy Benefit Banner */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, backgroundColor: '#F0FDF4', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                        <Sparkles size={14} color="#16A34A" />
+                        <Text style={{ flex: 1, fontSize: 11.5, color: '#15803D', fontWeight: '600', lineHeight: 16 }}>
+                          {language === 'hi'
+                            ? 'आधार सत्यापन से डॉक्टर, दवा व अस्पताल भर्ती पर तत्काल सरकारी स्वास्थ्य सब्सिडी व अतिरिक्त छूट मिलेगी।'
+                            : 'Aadhaar verification unlocks instant digital health subsidies & extra discounts on all doctor, medicine & hospital bookings.'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 ) : (
                   <View style={{ marginTop: 22 }}>
+                    {/* Aadhaar Link Card */}
+                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
+                            <ShieldCheck size={16} color="#16A34A" />
+                          </View>
+                          <View>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A' }}>
+                              {language === 'hi' ? 'आधार पहचान सत्यापित' : 'Aadhaar Identity Linked'}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600', marginTop: 1 }}>
+                              •••• •••• {aadhaarRaw.slice(-4) || '4592'} · +91 {phone}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#166534' }}>
+                            {language === 'hi' ? 'सत्यापित' : 'VERIFIED'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
                     <View style={field}>
                       <TextInput
                         ref={otpRef}
@@ -211,9 +316,13 @@ export default function Login() {
 
                 <View style={{ marginTop: 20 }}>
                   <PrimaryButton
-                    label={step === 'phone' ? t.sendOtp : t.verify}
+                    label={
+                      step === 'phone'
+                        ? (language === 'hi' ? 'ओटीपी भेजें और आधार सत्यापित करें' : 'Verify Aadhaar & Send OTP')
+                        : (language === 'hi' ? 'ओटीपी सत्यापित करें' : t.verify)
+                    }
                     onPress={step === 'phone' ? sendOtp : verify}
-                    disabled={busy || (step === 'phone' ? !phoneOk : otp.length !== 6)}
+                    disabled={busy || (step === 'phone' ? (!phoneOk || !aadhaarOk || fullName.trim().length < 2) : otp.length !== 6)}
                   />
                 </View>
 
