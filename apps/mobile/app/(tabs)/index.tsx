@@ -52,6 +52,7 @@ import {
   translateQualification,
   translateSlot,
 } from '../../src/utils/hindiDictionary';
+import { getDoctorAvatar } from '../../src/utils/doctorAvatars';
 import { SEED_HOSPITALS } from '@adityam/supabase';
 import type { Doctor } from '@adityam/types';
 import {
@@ -495,22 +496,6 @@ export default function HomeScreen() {
     }, 500);
   }, []);
 
-  const getDoctorAvatar = (doctor: Doctor) => {
-    const nameLower = doctor.name.toLowerCase();
-    if (nameLower.includes('satish')) {
-      return require('../../assets/doc/Satish-jain.png');
-    }
-    if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
-      return doctor.avatar_url;
-    }
-    if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
-      return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
-    }
-    if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
-      return 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
-  };
 
   const topDoctorCardWidth = Math.min(width - 48, 330);
   const trustCardWidth = Math.floor((width - 32 - 10) / 2);
@@ -1220,21 +1205,16 @@ export default function HomeScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
                         {/* Doctor Image (Balanced 3:4 aspect ratio) */}
                         <View style={{ width: 90, position: 'relative' }}>
-                          {(() => {
-                            const avatarSrc = getDoctorAvatar(doc);
-                            return (
-                              <Image
-                                source={typeof avatarSrc === 'number' ? avatarSrc : { uri: avatarSrc }}
-                                style={{
-                                  width: 90,
-                                  height: 118,
-                                  borderRadius: 16,
-                                  backgroundColor: '#DBEAFE',
-                                }}
-                                resizeMode="cover"
-                              />
-                            );
-                          })()}
+                          <Image
+                            source={getDoctorAvatar(doc)}
+                            style={{
+                              width: 90,
+                              height: 118,
+                              borderRadius: 16,
+                              backgroundColor: '#DBEAFE',
+                            }}
+                            resizeMode="cover"
+                          />
                           <View
                             style={{
                               position: 'absolute',

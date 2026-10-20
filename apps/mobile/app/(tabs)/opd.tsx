@@ -62,6 +62,7 @@ import {
   translateSlot,
   translateTiming,
 } from '../../src/utils/hindiDictionary';
+import { getDoctorAvatar } from '../../src/utils/doctorAvatars';
 
 interface SpecialtyCategory {
   id: string;
@@ -374,30 +375,6 @@ export default function OpdConciergeScreen() {
     const topIds = new Set(topDoctors.map((d) => d.id));
     return filteredDoctors.filter((d) => !topIds.has(d.id));
   }, [filteredDoctors, showTopDoctors, topDoctors]);
-
-  // Avatar Cache & Memoized Helper
-  const avatarCache = useMemo(() => new Map<string, any>(), []);
-  const getDoctorAvatar = useCallback(
-    (doctor: Doctor) => {
-      if (avatarCache.has(doctor.id)) return avatarCache.get(doctor.id)!;
-      let url: any = 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
-      const nameLower = doctor.name.toLowerCase();
-      if (nameLower.includes('satish')) {
-        url = require('../../assets/doc/Satish-jain.png');
-      } else if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
-        url = doctor.avatar_url;
-      } else {
-        if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
-          url = 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
-        } else if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
-          url = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
-        }
-      }
-      avatarCache.set(doctor.id, url);
-      return url;
-    },
-    [avatarCache]
-  );
 
   // Slots Cache & Memoized Helper (Pre-calculated so renders never block)
   const slotsCache = useMemo(() => new Map<string, string[]>(), [language]);
@@ -1308,7 +1285,7 @@ export default function OpdConciergeScreen() {
                                 {/* Doctor Portrait with verified check badge (Balanced 3:4 aspect ratio) */}
                                 <View style={{ width: 90, position: 'relative' }}>
                                   <Image
-                                    source={typeof avatar === 'number' ? avatar : { uri: avatar }}
+                                    source={avatar}
                                     style={{
                                       width: 90,
                                       height: 118,
@@ -1531,7 +1508,7 @@ export default function OpdConciergeScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
                           <View style={{ position: 'relative' }}>
                             <Image
-                              source={typeof avatar === 'number' ? avatar : { uri: avatar }}
+                              source={avatar}
                               style={{
                                 width: 78,
                                 height: 98,

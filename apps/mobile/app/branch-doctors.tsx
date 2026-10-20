@@ -62,6 +62,7 @@ import {
   translateTiming,
   translateLanguageList,
 } from '../src/utils/hindiDictionary';
+import { getDoctorAvatar } from '../src/utils/doctorAvatars';
 
 interface BranchCategoryItem {
   id: string;
@@ -161,21 +162,6 @@ export default function BranchDoctorsScreen() {
     }
 
     return [translateSlot(s1, isHi), translateSlot(s2, isHi), translateSlot(s3, isHi)];
-  };
-
-  // Helper to ensure all doctors have crisp, high-res clinical portraits
-  const getDoctorAvatar = (doctor: Doctor) => {
-    if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
-      return doctor.avatar_url;
-    }
-    const nameLower = doctor.name.toLowerCase();
-    if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
-      return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
-    }
-    if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
-      return 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
   };
 
   // DYNAMIC CATEGORIES: ONLY show categories that are ACTUALLY available at this specific branch!
@@ -645,7 +631,7 @@ export default function BranchDoctorsScreen() {
                                 {/* Doctor Portrait */}
                                 <View style={{ width: 92, position: 'relative' }}>
                                   <Image
-                                    source={{ uri: getDoctorAvatar(doc) }}
+                                    source={getDoctorAvatar(doc)}
                                     style={{
                                       width: 92,
                                       height: 140,
@@ -886,7 +872,7 @@ export default function BranchDoctorsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
                           <View style={{ position: 'relative' }}>
                             <Image
-                              source={{ uri: avatar }}
+                              source={avatar}
                               style={{
                                 width: 78,
                                 height: 98,
