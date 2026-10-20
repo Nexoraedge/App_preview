@@ -106,7 +106,7 @@ export default function Login() {
   };
 
   const link = (label: string, url: string) => (
-    <Text onPress={() => Linking.openURL(url).catch(() => {})} style={{ color: C.brand, fontWeight: '700' }}>{label}</Text>
+    <Text onPress={() => Linking.openURL(url).catch(() => { })} style={{ color: C.brand, fontWeight: '700' }}>{label}</Text>
   );
 
   const field = {
@@ -168,7 +168,7 @@ export default function Login() {
                         <TextInput
                           value={fullName}
                           onChangeText={(v) => { setFullName(v); setError(''); }}
-                          placeholder={language === 'hi' ? 'उदा. राहुल जैन' : 'e.g. Rahul Jain'}
+                          placeholder={language === 'hi' ? 'उदा. अभिषेक जैन' : 'e.g. Abhishek Jain'}
                           placeholderTextColor={C.mute}
                           autoCapitalize="words"
                           autoComplete="name"

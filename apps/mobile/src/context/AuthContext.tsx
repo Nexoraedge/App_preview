@@ -22,7 +22,7 @@ interface AuthContextType {
 const TEST_USER: User = {
   id: '00000000-0000-0000-0000-000000000001',
   phone: '+91 99999 99999',
-  full_name: 'Rahul Jain',
+  full_name: 'Abhishek Jain',
   age: 34,
   gender: 'Male',
   city: 'Delhi NCR',
@@ -120,13 +120,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithPhone = (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => {
-    const cleanName = fullName?.trim() || 'Rahul Jain';
+    const cleanName = fullName?.trim() || 'Abhishek Jain';
     const cleanAadhaar = aadhaarLastFour?.trim() || '4592';
     // App Store review bypass: phone 9999999999 or OTP 123456
     if (phone.includes('9999999999')) {
       const reviewerUser: User = {
         ...TEST_USER,
-        full_name: cleanName !== 'Rahul Jain' ? cleanName : TEST_USER.full_name,
+        full_name: cleanName !== 'Abhishek Jain' ? cleanName : TEST_USER.full_name,
         aadhaar_last_four: cleanAadhaar,
       };
       saveUserSession(reviewerUser);

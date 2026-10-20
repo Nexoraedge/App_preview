@@ -1205,16 +1205,24 @@ export default function HomeScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
                         {/* Doctor Image (Balanced 3:4 aspect ratio) */}
                         <View style={{ width: 90, position: 'relative' }}>
-                          <Image
-                            source={getDoctorAvatar(doc)}
+                          <View
                             style={{
                               width: 90,
                               height: 118,
                               borderRadius: 16,
+                              overflow: 'hidden',
                               backgroundColor: '#DBEAFE',
                             }}
-                            resizeMode="cover"
-                          />
+                          >
+                            <Image
+                              source={getDoctorAvatar(doc)}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                              }}
+                              resizeMode="cover"
+                            />
+                          </View>
                           <View
                             style={{
                               position: 'absolute',

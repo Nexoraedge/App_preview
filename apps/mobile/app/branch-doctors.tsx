@@ -630,16 +630,24 @@ export default function BranchDoctorsScreen() {
                               <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
                                 {/* Doctor Portrait */}
                                 <View style={{ width: 92, position: 'relative' }}>
-                                  <Image
-                                    source={getDoctorAvatar(doc)}
+                                  <View
                                     style={{
                                       width: 92,
                                       height: 140,
                                       borderRadius: 16,
+                                      overflow: 'hidden',
                                       backgroundColor: '#DBEAFE',
                                     }}
-                                    resizeMode="cover"
-                                  />
+                                  >
+                                    <Image
+                                      source={getDoctorAvatar(doc)}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                      }}
+                                      resizeMode="cover"
+                                    />
+                                  </View>
                                 </View>
 
                                 {/* Doctor Info & Slots */}
@@ -870,16 +878,22 @@ export default function BranchDoctorsScreen() {
                       >
                         {/* Doctor Profile Info Row (Name, Experience, Rating, Qualification) */}
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
-                          <View style={{ position: 'relative' }}>
+                          <View
+                            style={{
+                              width: 84,
+                              height: 108,
+                              borderRadius: 18,
+                              overflow: 'hidden',
+                              backgroundColor: '#EFF6FF',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                            }}
+                          >
                             <Image
                               source={avatar}
                               style={{
-                                width: 78,
-                                height: 98,
-                                borderRadius: 16,
-                                backgroundColor: '#EFF6FF',
-                                borderWidth: 1,
-                                borderColor: '#F1F5F9',
+                                width: '100%',
+                                height: '100%',
                               }}
                               resizeMode="cover"
                             />

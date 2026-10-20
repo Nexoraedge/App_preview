@@ -1284,16 +1284,24 @@ export default function OpdConciergeScreen() {
                               <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
                                 {/* Doctor Portrait with verified check badge (Balanced 3:4 aspect ratio) */}
                                 <View style={{ width: 90, position: 'relative' }}>
-                                  <Image
-                                    source={avatar}
+                                  <View
                                     style={{
                                       width: 90,
                                       height: 118,
                                       borderRadius: 16,
+                                      overflow: 'hidden',
                                       backgroundColor: '#DBEAFE',
                                     }}
-                                    resizeMode="cover"
-                                  />
+                                  >
+                                    <Image
+                                      source={avatar}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                      }}
+                                      resizeMode="cover"
+                                    />
+                                  </View>
                                   <View
                                     style={{
                                       position: 'absolute',
@@ -1506,16 +1514,22 @@ export default function OpdConciergeScreen() {
                       >
                         {/* Doctor Profile Info Row */}
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
-                          <View style={{ position: 'relative' }}>
+                          <View
+                            style={{
+                              width: 84,
+                              height: 108,
+                              borderRadius: 18,
+                              overflow: 'hidden',
+                              backgroundColor: '#EFF6FF',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                            }}
+                          >
                             <Image
                               source={avatar}
                               style={{
-                                width: 78,
-                                height: 98,
-                                borderRadius: 16,
-                                backgroundColor: '#EFF6FF',
-                                borderWidth: 1,
-                                borderColor: '#F1F5F9',
+                                width: '100%',
+                                height: '100%',
                               }}
                               resizeMode="cover"
                             />

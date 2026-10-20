@@ -77,12 +77,12 @@ export default function ProfileScreen() {
     Alert.alert(
       isHi ? 'रिव्यूअर अकाउंट तैयार' : 'Reviewer Account Ready',
       isHi
-        ? 'डॉ. विक्रम मल्होत्रा टेस्ट प्रोफाइल (₹2,500 वॉलेट) पर स्विच किया गया।'
-        : 'Switched to Rahul Jain test profile with ₹2,500 wallet.'
+        ? 'अभिषेक जैन टेस्ट प्रोफाइल (₹2,500 वॉलेट) पर स्विच किया गया।'
+        : 'Switched to Abhishek Jain test profile with ₹2,500 wallet.'
     );
   };
 
-  const userName = user?.full_name || (isHi ? 'डॉ. विक्रम मल्होत्रा' : 'Rahul Jain');
+  const userName = user?.full_name || (isHi ? 'अभिषेक जैन' : 'Abhishek Jain');
   const userPhone = user?.phone || '+91 99999 99999';
   const userCity = user?.city || (isHi ? 'दिल्ली एनसीआर' : 'Delhi NCR');
   const initial = userName.charAt(0).toUpperCase();
