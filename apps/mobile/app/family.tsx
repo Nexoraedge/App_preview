@@ -12,6 +12,7 @@ import {
   TextInput,
   Alert,
   StatusBar as RNStatusBar,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -123,6 +124,7 @@ const inputStyle = {
   paddingHorizontal: 14,
   fontSize: 15,
   color: C.ink,
+  ...(Platform.OS === 'web' ? ({ outline: 'none', outlineStyle: 'none' } as any) : {}),
 } as const;
 
 export default function FamilyScreen() {

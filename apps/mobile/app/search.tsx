@@ -536,14 +536,17 @@ export default function SearchScreen() {
               placeholderTextColor="#94A3B8"
               selectionColor="#1D4ED8"
               returnKeyType="search"
-              style={{
-                flex: 1,
-                marginLeft: 10,
-                fontSize: 14.5,
-                color: C.ink,
-                fontWeight: '600',
-                paddingVertical: 0,
-              }}
+              style={[
+                {
+                  flex: 1,
+                  marginLeft: 10,
+                  fontSize: 14.5,
+                  color: C.ink,
+                  fontWeight: '600',
+                  paddingVertical: 0,
+                },
+                Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+              ]}
             />
             {query.length > 0 && (
               <TouchableOpacity

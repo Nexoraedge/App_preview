@@ -151,7 +151,10 @@ export default function Login() {
                           autoCapitalize="words"
                           autoComplete="name"
                           returnKeyType="next"
-                          style={{ flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 12 }}
+                          style={[
+                            { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 12 },
+                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                          ]}
                         />
                       </View>
                     </View>
@@ -172,7 +175,10 @@ export default function Login() {
                         maxLength={10}
                         returnKeyType="done"
                         onSubmitEditing={sendOtp}
-                        style={{ flex: 1, fontSize: 18, fontWeight: '600', color: C.ink, paddingVertical: 12 }}
+                        style={[
+                          { flex: 1, fontSize: 18, fontWeight: '600', color: C.ink, paddingVertical: 12 },
+                          Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                        ]}
                       />
                     </View>
                   </View>
@@ -191,7 +197,10 @@ export default function Login() {
                         maxLength={6}
                         returnKeyType="done"
                         onSubmitEditing={verify}
-                        style={{ flex: 1, fontSize: 24, fontWeight: '800', letterSpacing: 8, color: C.ink, textAlign: 'center', paddingVertical: 12 }}
+                        style={[
+                          { flex: 1, fontSize: 24, fontWeight: '800', letterSpacing: 8, color: C.ink, textAlign: 'center', paddingVertical: 12 },
+                          Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                        ]}
                       />
                     </View>
                     {AUTH.demo ? <Text style={{ fontSize: 13, color: C.warn, marginTop: 8, lineHeight: 20 }}>{t.demoNote(AUTH.demoOtp)}</Text> : null}

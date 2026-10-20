@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleProp,
   ViewStyle,
+  Platform,
 } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 
@@ -84,13 +85,16 @@ export function AppSearchBar({
           autoFocus={autoFocus}
           returnKeyType="search"
           onSubmitEditing={onSubmit}
-          style={{
-            flex: 1,
-            fontSize: 14.5,
-            color: '#0F172A',
-            fontWeight: '500',
-            paddingVertical: 0,
-          }}
+          style={[
+            {
+              flex: 1,
+              fontSize: 14.5,
+              color: '#0F172A',
+              fontWeight: '500',
+              paddingVertical: 0,
+            },
+            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+          ]}
         />
       )}
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar as RNStatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,7 +16,42 @@ const queryClient = new QueryClient({
   },
 });
 
+const injectFocusOutlineReset = () => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const styleId = 'disable-input-outline-style';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        /* Remove browser focus outline (blue/black/orange box) on all inputs */
+        input, textarea, select, [contenteditable="true"] {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+          box-shadow: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+        input:focus, textarea:focus, select:focus,
+        input:focus-visible, textarea:focus-visible, select:focus-visible,
+        *:focus, *:focus-visible {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+          box-shadow: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }
+};
+
+injectFocusOutlineReset();
+
 export default function RootLayout() {
+  useEffect(() => {
+    injectFocusOutlineReset();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

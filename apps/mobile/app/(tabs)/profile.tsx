@@ -161,7 +161,11 @@ export default function ProfileScreen() {
         {/* SCROLLABLE PROFILE BODY */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 16,
+            paddingBottom: Math.max(insets.bottom, 24) + 40,
+          }}
         >
           {/* 1. HERO PATIENT IDENTITY CARD */}
           <View

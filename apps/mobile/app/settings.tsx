@@ -1247,16 +1247,19 @@ export default function SettingsScreen() {
                   value={editName}
                   onChangeText={setEditName}
                   placeholder="Rahul Jain"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    color: '#0F172A',
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 
@@ -1270,16 +1273,19 @@ export default function SettingsScreen() {
                   onChangeText={setEditEmail}
                   keyboardType="email-address"
                   placeholder="rahul.jain@example.com"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    color: '#0F172A',
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 
@@ -1292,16 +1298,19 @@ export default function SettingsScreen() {
                   value={editCity}
                   onChangeText={setEditCity}
                   placeholder="Delhi NCR"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    color: '#0F172A',
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 
@@ -1314,16 +1323,19 @@ export default function SettingsScreen() {
                   value={editBloodGroup}
                   onChangeText={setEditBloodGroup}
                   placeholder="O+ Positive"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    color: '#0F172A',
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 
@@ -1337,16 +1349,19 @@ export default function SettingsScreen() {
                   onChangeText={setEditEmergencyPhone}
                   keyboardType="phone-pad"
                   placeholder="+91 98112 44550"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    color: '#0F172A',
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 
@@ -1691,18 +1706,21 @@ export default function SettingsScreen() {
                   placeholder="DELETE"
                   placeholderTextColor="#94A3B8"
                   autoCapitalize="characters"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1.5,
-                    borderColor: deleteConfirmationText.trim() === 'DELETE' ? '#DC2626' : '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    fontSize: 14,
-                    fontWeight: '700',
-                    color: '#991B1B',
-                    letterSpacing: 1,
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1.5,
+                      borderColor: deleteConfirmationText.trim() === 'DELETE' ? '#DC2626' : '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      fontWeight: '700',
+                      color: '#991B1B',
+                      letterSpacing: 1,
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
               </View>
 

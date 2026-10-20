@@ -1596,17 +1596,20 @@ export default function IpdScreen() {
                     onChangeText={setPatientName}
                     placeholder={isHi ? 'मरीज का पूरा नाम' : 'Patient full name'}
                     placeholderTextColor="#94A3B8"
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      fontSize: 12,
-                      fontWeight: '500',
-                      color: '#0F172A',
-                    }}
+                    style={[
+                      {
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        fontSize: 12,
+                        fontWeight: '500',
+                        color: '#0F172A',
+                      },
+                      Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                    ]}
                   />
                   <TextInput
                     value={patientPhone}
@@ -1614,51 +1617,60 @@ export default function IpdScreen() {
                     placeholder={isHi ? 'कॉल के लिए मोबाइल नंबर' : 'Mobile number for callback'}
                     placeholderTextColor="#94A3B8"
                     keyboardType="phone-pad"
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      fontSize: 12,
-                      fontWeight: '500',
-                      color: '#0F172A',
-                    }}
+                    style={[
+                      {
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        fontSize: 12,
+                        fontWeight: '500',
+                        color: '#0F172A',
+                      },
+                      Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                    ]}
                   />
                   <TextInput
                     value={insurancePolicy}
                     onChangeText={setInsurancePolicy}
                     placeholder={isHi ? 'स्वास्थ्य बीमा कंपनी (उदा. स्टार हेल्थ, केयर)' : 'Health Insurance provider (e.g. Star Health, Care)'}
                     placeholderTextColor="#94A3B8"
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      fontSize: 12,
-                      fontWeight: '500',
-                      color: '#0F172A',
-                    }}
+                    style={[
+                      {
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        fontSize: 12,
+                        fontWeight: '500',
+                        color: '#0F172A',
+                      },
+                      Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                    ]}
                   />
                   <TextInput
                     value={admissionReason}
                     onChangeText={setAdmissionReason}
                     placeholder={isHi ? 'संक्षिप्त विवरण (उदा. डॉक्टर ने अगले हफ्ते सर्जरी की सलाह दी)' : 'Brief notes (e.g. doctor advised surgery next week)'}
                     placeholderTextColor="#94A3B8"
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      fontSize: 12,
-                      fontWeight: '500',
-                      color: '#0F172A',
-                    }}
+                    style={[
+                      {
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        fontSize: 12,
+                        fontWeight: '500',
+                        color: '#0F172A',
+                      },
+                      Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                    ]}
                   />
                 </View>
 
@@ -1875,18 +1887,21 @@ export default function IpdScreen() {
                   onChangeText={setPatientName}
                   placeholder={isHi ? 'मरीज का नाम' : 'Patient name'}
                   placeholderTextColor="#94A3B8"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    fontSize: 12,
-                    fontWeight: '500',
-                    color: '#0F172A',
-                    marginBottom: 8,
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                      marginBottom: 8,
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
 
                 <TextInput
@@ -1895,18 +1910,21 @@ export default function IpdScreen() {
                   placeholder={isHi ? 'संपर्क फोन नंबर' : 'Contact phone number'}
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    fontSize: 12,
-                    fontWeight: '500',
-                    color: '#0F172A',
-                    marginBottom: 8,
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                      marginBottom: 8,
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
 
                 <TextInput
@@ -1916,20 +1934,23 @@ export default function IpdScreen() {
                   placeholderTextColor="#94A3B8"
                   multiline
                   numberOfLines={3}
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    fontSize: 12,
-                    fontWeight: '500',
-                    color: '#0F172A',
-                    minHeight: 70,
-                    textAlignVertical: 'top',
-                    marginBottom: 14,
-                  }}
+                  style={[
+                    {
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: '#0F172A',
+                      minHeight: 70,
+                      textAlignVertical: 'top',
+                      marginBottom: 14,
+                    },
+                    Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                  ]}
                 />
 
                 <TouchableOpacity

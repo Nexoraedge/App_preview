@@ -519,13 +519,16 @@ export default function AppointmentsScreen() {
                   : 'Search doctor, hospital or booking ID...'
               }
               placeholderTextColor="#94A3B8"
-              style={{
-                flex: 1,
-                fontSize: 13,
-                fontWeight: '500',
-                color: '#0F172A',
-                padding: 0,
-              }}
+              style={[
+                {
+                  flex: 1,
+                  fontSize: 13,
+                  fontWeight: '500',
+                  color: '#0F172A',
+                  padding: 0,
+                },
+                Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+              ]}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

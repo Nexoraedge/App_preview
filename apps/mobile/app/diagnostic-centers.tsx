@@ -8,6 +8,7 @@ import {
   Modal,
   ActivityIndicator,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -593,6 +594,7 @@ export default function DiagnosticCentersScreen() {
                   onChangeText={setPatientName}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
                   placeholder="Enter patient full name"
+                  style={Platform.OS === 'web' ? ({ outline: 'none', outlineStyle: 'none' } as any) : undefined}
                 />
 
                 <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-1.5">
@@ -604,6 +606,7 @@ export default function DiagnosticCentersScreen() {
                   keyboardType="phone-pad"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-semibold mb-3"
                   placeholder="Enter 10-digit mobile number"
+                  style={Platform.OS === 'web' ? ({ outline: 'none', outlineStyle: 'none' } as any) : undefined}
                 />
 
                 {/* Date Selection */}

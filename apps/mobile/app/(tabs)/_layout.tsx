@@ -152,6 +152,12 @@ function UiverseBottomNav({ state, descriptors, navigation }: any) {
   );
 
   const currentRouteName = state.routes[state.index]?.name;
+
+  // Never render bottom navigation bar on Profile page or non-tab routes
+  if (currentRouteName === 'profile' || !ALLOWED_TABS.includes(currentRouteName)) {
+    return null;
+  }
+
   const activeIdx = Math.max(
     0,
     visibleRoutes.findIndex((r: any) => r.name === currentRouteName)
@@ -335,6 +341,7 @@ export default function TabLayout() {
         options={{
           href: null,
           title: 'Profile',
+          tabBarStyle: { display: 'none' },
         }}
       />
     </Tabs>
