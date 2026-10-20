@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   StatusBar as RNStatusBar,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -278,35 +279,35 @@ const MASTER_SURGERIES: PlannedSurgery[] = [
 const MASTER_HOSPITALS: HospitalAdmissionInfo[] = [
   {
     id: 'hosp-1',
-    name: 'Jain ENT ',
-    nameHi: 'मैक्स सुपर स्पेशियलिटी अस्पताल (Max Hospital)',
+    name: 'Jain ENT Hospital',
+    nameHi: 'जैन ईएनटी अस्पताल (Jain ENT Hospital)',
     location: 'Press Enclave Marg, Saket',
     locationHi: 'प्रेस एन्क्लेव मार्ग, साकेत',
-    distance_km: 1.4,
+    distance_km: 1.2,
     image_url:
       'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=80',
-    rating: 4.9,
-    total_reviews: 420,
-    tag: 'NABH Accredited Partner',
-    tagHi: 'NABH मान्यता प्राप्त पार्टनर',
-    specialties: ['Cardiology', 'Orthopedics', 'Laparoscopy'],
-    specialtiesHi: ['हृदय रोग', 'हड्डी व जोड़', 'लैप्रोस्कोपी'],
+    rating: 5.0,
+    total_reviews: 680,
+    tag: 'Best Hospital • 5★ Rated',
+    tagHi: 'सर्वश्रेष्ठ अस्पताल • 5★ प्रमाणित',
+    specialties: ['ENT & Micro-Surgery', 'Head & Neck', 'Laparoscopy'],
+    specialtiesHi: ['ईएनटी व माइक्रो-सर्जरी', 'सिर व गर्दन', 'लैप्रोस्कोपी'],
   },
   {
     id: 'hosp-2',
-    name: 'Indraprastha Apollo Hospitals',
-    nameHi: 'इंद्रप्रस्थ अपोलो अस्पताल (Apollo Hospitals)',
-    location: 'Mathura Road, Sarita Vihar',
-    locationHi: 'मथुरा रोड, सरिता विहार',
-    distance_km: 8.1,
+    name: 'CSK Hospital',
+    nameHi: 'सीएसके अस्पताल (CSK Hospital)',
+    location: 'Outer Ring Road, South Extension',
+    locationHi: 'आउटर रिंग रोड, साउथ एक्सटेंशन',
+    distance_km: 2.5,
     image_url:
       'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80',
-    rating: 4.8,
-    total_reviews: 490,
-    tag: 'JCI & NABH Certified',
-    tagHi: 'JCI व NABH प्रमाणित',
-    specialties: ['Cardiac Surgery', 'Joint Care', 'Transplant'],
-    specialtiesHi: ['कार्डियक सर्जरी', 'जोड़ देखभाल', 'अंग प्रत्यारोपण'],
+    rating: 5.0,
+    total_reviews: 540,
+    tag: 'Best Hospital • NABH & JCI',
+    tagHi: 'सर्वश्रेष्ठ अस्पताल • NABH व JCI',
+    specialties: ['Laparoscopic Surgery', 'Joint Care', 'Cardiac Care'],
+    specialtiesHi: ['लैप्रोस्कोपिक सर्जरी', 'हड्डी व जोड़', 'हृदय रोग'],
   },
   {
     id: 'hosp-3',
@@ -426,6 +427,14 @@ export default function IpdScreen() {
         s.category.toLowerCase().includes(q)
     );
   }, [searchQuery, selectedCategory]);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 500);
+  }, []);
 
   // Filtered hospitals based on search query
   const filteredHospitals = useMemo(() => {
@@ -575,6 +584,14 @@ export default function IpdScreen() {
         {/* SCROLLABLE BODY */}
         <ScrollView
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['#1E40AF', '#2563EB']}
+              tintColor="#1E40AF"
+            />
+          }
           contentContainerStyle={{
             paddingBottom: Math.max(insets.bottom, 16) + 110,
           }}
@@ -760,7 +777,6 @@ export default function IpdScreen() {
               }}
             >
               {[
-                { icon: '🚕', en: 'Free cab pickup', hi: 'निःशुल्क कैब' },
                 { icon: '💳', en: '0% EMI option', hi: '0% ईएमआई' },
                 { icon: '🛡️', en: 'Cashless insurance', hi: 'कैशलेस बीमा' },
               ].map((item, idx) => (

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   NativeScrollEvent,
   StatusBar as RNStatusBar,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,8 +98,8 @@ const CORE_SERVICES = [
     titleHi: 'डॉक्टर परामर्श',
     subEn: 'In-Clinic Visits',
     subHi: 'क्लिनिक अपॉइंटमेंट',
-    badgeEn: 'Partner Clinics',
-    badgeHi: 'पार्टनर क्लिनिक',
+    badgeEn: 'Top Clinics',
+    badgeHi: 'क्लिनिक',
     bg: '#F0F7FF',
     border: '#BFDBFE',
     iconBg: '#DBEAFE',
@@ -113,9 +114,9 @@ const CORE_SERVICES = [
     titleEn: 'Hospital Care',
     titleHi: 'अस्पताल भर्ती',
     subEn: 'Planned Treatment',
-    subHi: 'नियोजित इलाज व भर्ती',
-    badgeEn: 'Partner Hospitals',
-    badgeHi: 'पार्टनर अस्पताल',
+    subHi: 'नियोजित भर्ती',
+    badgeEn: 'Top Hospitals',
+    badgeHi: 'अस्पताल',
     bg: '#F5F3FF',
     border: '#DDD6FE',
     iconBg: '#EDE9FE',
@@ -275,12 +276,13 @@ function ServiceCard({
         onPress={onPress}
         style={{
           backgroundColor: service.bg,
-          borderRadius: 22,
-          padding: 14,
+          borderRadius: 20,
+          padding: 12,
           borderWidth: 1.2,
           borderColor: service.border,
-          minHeight: 126,
+          minHeight: 120,
           justifyContent: 'space-between',
+          overflow: 'hidden',
           shadowColor: '#0F172A',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.05,
@@ -289,31 +291,35 @@ function ServiceCard({
         }}
       >
         {/* Top row: Icon container + Distinct Soft Badge */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           <View
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
+              width: 38,
+              height: 38,
+              borderRadius: 12,
               backgroundColor: service.iconBg,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <IconComp size={24} color={service.iconColor} />
+            <IconComp size={20} color={service.iconColor} />
           </View>
           <View
             style={{
               backgroundColor: service.badgeBg,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
+              paddingHorizontal: 7,
+              paddingVertical: 2.5,
               borderRadius: 999,
+              maxWidth: '58%',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <Text
               numberOfLines={1}
+              ellipsizeMode="tail"
               style={{
-                fontSize: 9.5,
+                fontSize: 9,
                 fontWeight: '700',
                 color: service.badgeFg,
                 letterSpacing: 0.2,
@@ -456,7 +462,7 @@ export default function HomeScreen() {
     return 'साकेत, साउथ दिल्ली NCR';
   };
 
-  // Top Featured Doctors for the Home Screen Carousel
+  // Top Featured Doctors for the Home Screen Carousel (Dr. Satish Jain on top with 5 stars)
   const homeTopDoctors: Doctor[] = useMemo(() => {
     const list: Doctor[] = [];
     SEED_HOSPITALS.forEach((h) => {
@@ -468,6 +474,11 @@ export default function HomeScreen() {
         });
       });
     });
+    list.sort((a, b) => {
+      if (a.name.includes('Satish Jain')) return -1;
+      if (b.name.includes('Satish Jain')) return 1;
+      return (b.rating ?? 0) - (a.rating ?? 0);
+    });
     return list.slice(0, 4);
   }, []);
 
@@ -476,11 +487,22 @@ export default function HomeScreen() {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 500);
+  }, []);
+
   const getDoctorAvatar = (doctor: Doctor) => {
+    const nameLower = doctor.name.toLowerCase();
+    if (nameLower.includes('satish')) {
+      return require('../../assets/doc/Satish-jain.png');
+    }
     if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
       return doctor.avatar_url;
     }
-    const nameLower = doctor.name.toLowerCase();
     if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
       return 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
     }
@@ -499,6 +521,14 @@ export default function HomeScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#1E40AF', '#2563EB']}
+            tintColor="#1E40AF"
+          />
+        }
         contentContainerStyle={{
           // Generous bottom padding so the floating glass tab bar never cuts off the appointment or offers cards
           paddingBottom: Math.max(insets.bottom, 24) + 140,
@@ -1190,16 +1220,21 @@ export default function HomeScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
                         {/* Doctor Image (Balanced 3:4 aspect ratio) */}
                         <View style={{ width: 90, position: 'relative' }}>
-                          <Image
-                            source={{ uri: getDoctorAvatar(doc) }}
-                            style={{
-                              width: 90,
-                              height: 118,
-                              borderRadius: 16,
-                              backgroundColor: '#DBEAFE',
-                            }}
-                            resizeMode="cover"
-                          />
+                          {(() => {
+                            const avatarSrc = getDoctorAvatar(doc);
+                            return (
+                              <Image
+                                source={typeof avatarSrc === 'number' ? avatarSrc : { uri: avatarSrc }}
+                                style={{
+                                  width: 90,
+                                  height: 118,
+                                  borderRadius: 16,
+                                  backgroundColor: '#DBEAFE',
+                                }}
+                                resizeMode="cover"
+                              />
+                            );
+                          })()}
                           <View
                             style={{
                               position: 'absolute',

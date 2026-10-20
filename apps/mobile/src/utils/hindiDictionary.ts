@@ -2,7 +2,9 @@
 // Comprehensive clinical localization mapping for Hospitals, Branches, Doctors, Qualifications, Specialties, Addresses, Slots, and Timings
 
 export const HOSPITAL_NAMES: Record<string, string> = {
-  'Jain ENT ': 'मैक्स सुपर स्पेशियलिटी हॉस्पिटल',
+  'Jain ENT Hospital': 'जैन ईएनटी अस्पताल',
+  'Jain ENT': 'जैन ईएनटी अस्पताल',
+  'CSK Hospital': 'सीएसके अस्पताल',
   'Indraprastha Apollo Hospitals': 'इंद्रप्रस्थ अपोलो हॉस्पिटल्स',
   'Fortis Healthcare': 'फोर्टिस हेल्थकेयर',
   'Medanta - The Medicity': 'मेदांता - द मेडिसिटी',

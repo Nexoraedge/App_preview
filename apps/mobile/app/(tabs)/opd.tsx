@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   Linking,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -213,7 +214,7 @@ export default function OpdConciergeScreen() {
   );
 
   // TanStack Query for PostGIS Nearby Hospitals
-  const { data: hospitals = [], isLoading } = useQuery({
+  const { data: hospitals = [], isLoading, refetch } = useQuery({
     queryKey: ['nearby-hospitals', selectedSpecialty],
     queryFn: () =>
       fetchNearbyHospitals(
@@ -222,6 +223,16 @@ export default function OpdConciergeScreen() {
         selectedSpecialty === 'All' ? undefined : selectedSpecialty
       ),
   });
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  }, [refetch]);
 
   // Flattened doctors across all hospitals and branches
   const allDoctors = useMemo<FlattenedDoctor[]>(() => {
@@ -342,12 +353,18 @@ export default function OpdConciergeScreen() {
     return list;
   }, [allDoctors, selectedSpecialty, searchQuery, sortBy]);
 
-  // Top Doctors Spotlight: Selected top specialists (only shown when 2 or more doctors are available)
+  // Top Doctors Spotlight: Selected top specialists (Dr. Satish Jain strictly on top with 5 stars)
   const showTopDoctors = filteredDoctors.length >= 2;
   const topDoctors = useMemo(() => {
     if (!showTopDoctors) return [];
     return [...filteredDoctors]
-      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (b.total_reviews ?? 0) - (a.total_reviews ?? 0))
+      .sort((a, b) => {
+        const aSatish = a.name.includes('Satish Jain');
+        const bSatish = b.name.includes('Satish Jain');
+        if (aSatish && !bSatish) return -1;
+        if (!aSatish && bSatish) return 1;
+        return (b.rating ?? 0) - (a.rating ?? 0) || (b.total_reviews ?? 0) - (a.total_reviews ?? 0);
+      })
       .slice(0, 3);
   }, [filteredDoctors, showTopDoctors]);
 
@@ -359,15 +376,17 @@ export default function OpdConciergeScreen() {
   }, [filteredDoctors, showTopDoctors, topDoctors]);
 
   // Avatar Cache & Memoized Helper
-  const avatarCache = useMemo(() => new Map<string, string>(), []);
+  const avatarCache = useMemo(() => new Map<string, any>(), []);
   const getDoctorAvatar = useCallback(
     (doctor: Doctor) => {
       if (avatarCache.has(doctor.id)) return avatarCache.get(doctor.id)!;
-      let url = 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
-      if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
+      let url: any = 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80';
+      const nameLower = doctor.name.toLowerCase();
+      if (nameLower.includes('satish')) {
+        url = require('../../assets/doc/Satish-jain.png');
+      } else if (doctor.avatar_url && doctor.avatar_url.startsWith('http') && !doctor.avatar_url.includes('undefined')) {
         url = doctor.avatar_url;
       } else {
-        const nameLower = doctor.name.toLowerCase();
         if (nameLower.includes('meenakshi') || nameLower.includes('anita') || nameLower.includes('sunita')) {
           url = 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80';
         } else if (nameLower.includes('vikramaditya') || nameLower.includes('ashok')) {
@@ -531,6 +550,14 @@ export default function OpdConciergeScreen() {
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#2563EB']}
+            tintColor="#2563EB"
+          />
+        }
         contentContainerStyle={{
           paddingBottom: Math.max(insets.bottom, 12) + (selectedSlotDoctor ? 150 : 90),
         }}
@@ -1281,7 +1308,7 @@ export default function OpdConciergeScreen() {
                                 {/* Doctor Portrait with verified check badge (Balanced 3:4 aspect ratio) */}
                                 <View style={{ width: 90, position: 'relative' }}>
                                   <Image
-                                    source={{ uri: avatar }}
+                                    source={typeof avatar === 'number' ? avatar : { uri: avatar }}
                                     style={{
                                       width: 90,
                                       height: 118,
@@ -1504,7 +1531,7 @@ export default function OpdConciergeScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
                           <View style={{ position: 'relative' }}>
                             <Image
-                              source={{ uri: avatar }}
+                              source={typeof avatar === 'number' ? avatar : { uri: avatar }}
                               style={{
                                 width: 78,
                                 height: 98,

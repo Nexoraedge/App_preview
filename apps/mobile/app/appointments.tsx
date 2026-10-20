@@ -3,7 +3,7 @@
 // Supports Upcoming consultations, Past/Completed visits, Digital Appointment Slips/QR,
 // Directions, Prescription download simulation, and Hindi/English localization.
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   Share,
   Dimensions,
   Platform,
+  RefreshControl,
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -90,13 +91,13 @@ const SEED_APPOINTMENTS: EnrichedAppointment[] = [
     bookingRef: 'AN-OPD-7821',
     serviceType: 'OPD_CONCIERGE',
     status: 'CONFIRMED',
-    doctorName: 'Dr. Sathish Jain',
-    doctorNameHi: 'डॉ. राजेश शर्मा',
-    specialty: 'Cardiology',
-    specialtyHi: 'हृदय रोग विशेषज्ञ (Cardiology)',
-    qualification: 'MBBS, MD, DM (Cardiology) • AIIMS New Delhi',
+    doctorName: 'Dr. Satish Jain',
+    doctorNameHi: 'डॉ. सतीश जैन',
+    specialty: 'ENT & Head-Neck Surgery',
+    specialtyHi: 'ईएनटी व हेड-नेक विशेषज्ञ',
+    qualification: 'MBBS, MS (ENT), DLO • 24+ Yrs Exp • 5.0 ★',
     hospitalName: 'Jain ENT Hospital',
-    hospitalNameHi: 'जैन ईएनटी हॉस्पिटल',
+    hospitalNameHi: 'जैन ईएनटी अस्पताल',
     hospitalAddress: 'Press Enclave Marg, Saket, New Delhi',
     hospitalAddressHi: 'प्रेस एन्क्लेव मार्ग, साकेत, नई दिल्ली',
     patientName: 'Rahul Jain',
@@ -106,10 +107,10 @@ const SEED_APPOINTMENTS: EnrichedAppointment[] = [
     slotTime: '10:30 AM',
     tokenNumber: 14,
     roomNumber: 'OPD Block B, Room 204',
-    doctorFee: 1200,
+    doctorFee: 800,
     paymentStatus: 'PAID',
     isUpcoming: true,
-    notes: 'Routine hypertension and lipid profile review.',
+    notes: 'Ear & sinus consultation with Dr. Satish Jain.',
     createdDate: 'Oct 19, 2026',
   },
   {
@@ -117,15 +118,15 @@ const SEED_APPOINTMENTS: EnrichedAppointment[] = [
     bookingRef: 'AN-IPD-4412',
     serviceType: 'IPD_ENQUIRY',
     status: 'CONFIRMED',
-    doctorName: 'Dr. Prakash Chandwani',
+    doctorName: 'Dr. Alok Verma & Surgery Team',
     doctorNameHi: 'डॉ. आलोक वर्मा व सर्जरी टीम',
     specialty: 'Laparoscopic Surgery',
     specialtyHi: 'लैप्रोस्कोपिक सर्जरी (General Surgery)',
-    qualification: 'MS (General Surgery), FIAGES • 18+ Yrs Exp',
-    hospitalName: 'CKS Hospital',
-    hospitalNameHi: 'सीकेएस अस्पताल',
-    hospitalAddress: 'Mathura Road, Sarita Vihar, New Delhi',
-    hospitalAddressHi: 'मथुरा रोड, सरिता विहार, नई दिल्ली',
+    qualification: 'MS (General Surgery), FIAGES • 18+ Yrs Exp • 5.0 ★',
+    hospitalName: 'CSK Hospital',
+    hospitalNameHi: 'सीएसके अस्पताल',
+    hospitalAddress: 'A-24, Outer Ring Road, South Extension, New Delhi',
+    hospitalAddressHi: 'साउथ एक्सटेंशन, नई दिल्ली',
     patientName: 'Rahul Jain',
     patientPhone: '+91 98112 44550',
     slotDate: 'Friday, Oct 24',
@@ -242,71 +243,71 @@ export default function AppointmentsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch real bookings from Supabase if available
-  useEffect(() => {
-    let isMounted = true;
-    async function loadBookings() {
-      try {
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('*')
-          .order('created_at', { ascending: false });
+  const loadBookings = useCallback(async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0 && isMounted) {
-          // Merge with seeds
-          const realMapped: EnrichedAppointment[] = data.map((b: Booking, idx: number) => {
-            const isUpc = b.status === 'NEW' || b.status === 'CONFIRMED' || b.status === 'CALLING';
-            return {
-              id: b.id,
-              bookingRef: b.booking_ref || `AN-${b.service_type.slice(0, 3)}-${1000 + idx}`,
-              serviceType: b.service_type,
-              status: b.status,
-              doctorName: b.doctor_name || 'Consultant Doctor',
-              doctorNameHi: b.doctor_name || 'परामर्शदाता डॉक्टर',
-              specialty: b.specialty_requested || 'General Consultation',
-              specialtyHi: b.specialty_requested || 'सामान्य परामर्श',
-              qualification: 'Certified Specialist',
-              hospitalName: b.hospital_name || 'Adityam Partner Hospital',
-              hospitalNameHi: b.hospital_name || 'आदित्यम पार्टनर अस्पताल',
-              hospitalAddress: b.branch_name || 'Hospital Campus Desk',
-              hospitalAddressHi: b.branch_name || 'अस्पताल परिसर डेस्क',
-              patientName: b.patient_name || user?.full_name || 'Rahul Jain',
-              patientPhone: b.patient_phone || user?.phone || '+91 98112 44550',
-              slotDate: b.slot_time ? b.slot_time.split(',')[0] || 'Scheduled Date' : 'Scheduled Date',
-              slotDateHi: b.slot_time ? b.slot_time.split(',')[0] || 'नियत तिथि' : 'नियत तिथि',
-              slotTime: b.slot_time && b.slot_time.includes(',') ? b.slot_time.split(',')[1].trim() : '11:00 AM',
-              tokenNumber: 10 + (idx % 20),
-              roomNumber: 'OPD Desk Room 101',
-              doctorFee: b.doctor_fee || 800,
-              paymentStatus: b.status === 'PAID' ? 'PAID' : 'PAY_AT_CLINIC',
-              isUpcoming: isUpc,
-              notes: b.notes || 'Hospital booking confirmed.',
-              createdDate: new Date(b.created_at).toLocaleDateString(),
-            };
-          });
+      if (!error && data && data.length > 0) {
+        // Merge with seeds
+        const realMapped: EnrichedAppointment[] = data.map((b: Booking, idx: number) => {
+          const isUpc = b.status === 'NEW' || b.status === 'CONFIRMED' || b.status === 'CALLING';
+          return {
+            id: b.id,
+            bookingRef: b.booking_ref || `AN-${b.service_type.slice(0, 3)}-${1000 + idx}`,
+            serviceType: b.service_type,
+            status: b.status,
+            doctorName: b.doctor_name || 'Dr. Satish Jain',
+            doctorNameHi: b.doctor_name || 'डॉ. सतीश जैन',
+            specialty: b.specialty_requested || 'ENT & Head-Neck Surgery',
+            specialtyHi: b.specialty_requested || 'ईएनटी व हेड-नेक विशेषज्ञ',
+            qualification: 'Certified Specialist • 5.0 ★',
+            hospitalName: b.hospital_name || 'Jain ENT Hospital',
+            hospitalNameHi: b.hospital_name || 'जैन ईएनटी अस्पताल',
+            hospitalAddress: b.branch_name || 'Hospital Campus Desk',
+            hospitalAddressHi: b.branch_name || 'अस्पताल परिसर डेस्क',
+            patientName: b.patient_name || user?.full_name || 'Rahul Jain',
+            patientPhone: b.patient_phone || user?.phone || '+91 98112 44550',
+            slotDate: b.slot_time ? b.slot_time.split(',')[0] || 'Scheduled Date' : 'Scheduled Date',
+            slotDateHi: b.slot_time ? b.slot_time.split(',')[0] || 'नियत तिथि' : 'नियत तिथि',
+            slotTime: b.slot_time && b.slot_time.includes(',') ? b.slot_time.split(',')[1].trim() : '11:00 AM',
+            tokenNumber: 10 + (idx % 20),
+            roomNumber: 'OPD Desk Room 101',
+            doctorFee: b.doctor_fee || 800,
+            paymentStatus: b.status === 'PAID' ? 'PAID' : 'PAY_AT_CLINIC',
+            isUpcoming: isUpc,
+            notes: b.notes || 'Hospital booking confirmed.',
+            createdDate: new Date(b.created_at).toLocaleDateString(),
+          };
+        });
 
-          // Avoid duplicate refs
-          const existingRefs = new Set(realMapped.map((r) => r.bookingRef));
-          const combined = [...realMapped, ...SEED_APPOINTMENTS.filter((s) => !existingRefs.has(s.bookingRef))];
-          setAppointments(combined);
-        }
-      } catch {
-        // Fallback to local seeds
+        // Avoid duplicate refs
+        const existingRefs = new Set(realMapped.map((r) => r.bookingRef));
+        const combined = [...realMapped, ...SEED_APPOINTMENTS.filter((s) => !existingRefs.has(s.bookingRef))];
+        setAppointments(combined);
+      } else {
+        setAppointments([...SEED_APPOINTMENTS]);
       }
+    } catch {
+      setAppointments([...SEED_APPOINTMENTS]);
     }
-    loadBookings();
-    return () => {
-      isMounted = false;
-    };
   }, [user]);
 
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
+
   // Handle Manual Refresh
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
+    await loadBookings();
     setTimeout(() => {
       setIsRefreshing(false);
-    }, 400);
-  };
+    }, 450);
+  }, [loadBookings]);
 
   // Filter appointments
   const filteredAppointments = useMemo(() => {
@@ -426,64 +427,66 @@ export default function AppointmentsScreen() {
             justifyContent: 'space-between',
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
             <TouchableOpacity
               onPress={() => router.back()}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
+                width: 34,
+                height: 34,
+                borderRadius: 10,
                 backgroundColor: '#F1F5F9',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <ArrowLeft size={18} color="#0F172A" />
+              <ArrowLeft size={17} color="#0F172A" />
             </TouchableOpacity>
 
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 }} numberOfLines={1}>
                 {isHi ? 'मेरी अपॉइंटमेंट्स' : 'My Appointments'}
               </Text>
-              <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '500', marginTop: 1 }}>
-                {isHi ? 'आगामी व पिछली सभी विज़िट्स' : 'Upcoming & past consultations'}
+              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 1 }} numberOfLines={1}>
+                {isHi ? 'आगामी व पिछली विज़िट्स' : 'Upcoming & past consultations'}
               </Text>
             </View>
           </View>
 
           {/* Quick Actions */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <TouchableOpacity
               onPress={handleRefresh}
               disabled={isRefreshing}
+              activeOpacity={0.7}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: '#EFF6FF',
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                backgroundColor: isRefreshing ? '#DBEAFE' : '#EFF6FF',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <RefreshCw size={16} color="#2563EB" />
+              <RefreshCw size={15} color="#2563EB" />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => router.push('/opd')}
+              activeOpacity={0.85}
               style={{
                 backgroundColor: '#2563EB',
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 6.5,
+                borderRadius: 10,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 5,
+                gap: 4,
               }}
             >
-              <Plus size={14} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-                {isHi ? 'नया बुक करें' : 'Book New'}
+              <Plus size={13} color="#FFFFFF" strokeWidth={2.5} />
+              <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' }}>
+                {isHi ? 'नई बुकिंग' : 'Book New'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -685,6 +688,14 @@ export default function AppointmentsScreen() {
         {/* SCROLLABLE APPOINTMENTS LIST */}
         <ScrollView
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['#2563EB']}
+              tintColor="#2563EB"
+            />
+          }
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingBottom: Math.max(insets.bottom, 16) + 36,
@@ -950,37 +961,38 @@ export default function AppointmentsScreen() {
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        gap: 8,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
                         <Calendar size={14} color="#2563EB" />
-                        <View>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>
                             {displayDate} • {apt.slotTime}
                           </Text>
-                          <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 1 }}>
+                          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 1 }} numberOfLines={1}>
                             {apt.roomNumber}
                           </Text>
                         </View>
                       </View>
 
-                      <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ alignItems: 'flex-end', flexShrink: 0, marginLeft: 6 }}>
                         <View
                           style={{
                             backgroundColor: '#FFFFFF',
                             borderWidth: 1,
                             borderColor: '#E2E8F0',
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 8,
+                            paddingHorizontal: 7,
+                            paddingVertical: 2,
+                            borderRadius: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF' }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF' }}>
                             {isHi ? 'टोकन ' : 'Token '}#{apt.tokenNumber}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#059669', marginTop: 2 }}>
-                          {inr(apt.doctorFee)} {apt.paymentStatus === 'PAID' ? (isHi ? 'भुगतान पूर्ण' : 'Paid') : (isHi ? 'काउंटर पर देय' : 'Pay at Counter')}
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669', marginTop: 2 }}>
+                          {inr(apt.doctorFee)} {apt.paymentStatus === 'PAID' ? (isHi ? '• भुगतान' : '• Paid') : (isHi ? '• काउंटर' : '• at Desk')}
                         </Text>
                       </View>
                     </View>
@@ -995,7 +1007,7 @@ export default function AppointmentsScreen() {
                         paddingTop: 10,
                         borderTopWidth: 1,
                         borderTopColor: '#F1F5F9',
-                        gap: 8,
+                        gap: 6,
                       }}
                     >
                       {isUpcoming ? (
