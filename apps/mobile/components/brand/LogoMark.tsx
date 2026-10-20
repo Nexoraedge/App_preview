@@ -6,16 +6,18 @@ import { Image, ImageSourcePropType, View } from 'react-native';
 export function LogoMark({
   size = 56,
   source,
+  widthMultiplier = 1.35,
 }: {
   size?: number;
   color?: string;
   source?: ImageSourcePropType;
+  widthMultiplier?: number;
 }) {
-  const resolvedSource = source || require('../../assets/logo-an.png');
+  const resolvedSource = source || require('../../assets/logo-new.png');
   return (
     <Image
       source={resolvedSource}
-      style={{ width: size, height: size }}
+      style={{ width: size * widthMultiplier, height: size }}
       resizeMode="contain"
     />
   );

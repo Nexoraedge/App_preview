@@ -24,7 +24,7 @@ export function getSupabaseClient(): SupabaseClient {
 export const SEED_HOSPITALS: Hospital[] = [
   {
     id: '22222222-2222-2222-2222-222222222201',
-    name: 'Max Super Speciality Hospital',
+    name: 'Jain ENT ',
     slug: 'max-super-speciality-saket',
     address: '1, 2, Press Enclave Marg, Saket Institutional Area, New Delhi',
     city: 'New Delhi',
@@ -61,7 +61,7 @@ export const SEED_HOSPITALS: Hospital[] = [
             id: 'doc-max-1',
             hospital_id: '22222222-2222-2222-2222-222222222201',
             branch_id: 'branch-max-saket',
-            name: 'Dr. Rajiv Agarwal',
+            name: 'Dr. Sathish Jain',
             specialty: 'Cardiology',
             qualification: 'MBBS, MD, DM (Cardiology)',
             experience_years: 18,
@@ -650,7 +650,7 @@ export const SEED_BOOKINGS: Booking[] = [
     patient_name: 'Rahul Jain',
     patient_phone: '+919999999999',
     hospital_id: '22222222-2222-2222-2222-222222222201',
-    hospital_name: 'Max Super Speciality Hospital, Saket',
+    hospital_name: 'Jain ENT , Saket',
     specialty_requested: 'Cardiology',
     status: 'NEW',
     call_status: 'pending',

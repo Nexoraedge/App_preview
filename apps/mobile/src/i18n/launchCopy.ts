@@ -17,7 +17,7 @@ export interface LaunchCopy {
 }
 
 const en: LaunchCopy = {
-  tagline: 'Healthcare without fear',
+  tagline: 'Every Step Toward Better Health',
   skip: 'Skip',
   next: 'Next',
   start: 'Get started',
@@ -52,7 +52,7 @@ const en: LaunchCopy = {
 };
 
 const hi: LaunchCopy = {
-  tagline: 'बिना डर के स्वास्थ्य सेवा',
+  tagline: 'बेहतर स्वास्थ्य की ओर हर कदम',
   skip: 'छोड़ें',
   next: 'आगे',
   start: 'शुरू करें',

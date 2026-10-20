@@ -612,12 +612,12 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Hero Tagline / Greeting: 100% Bilingual without English mixing */}
+          {/* Hero Tagline / Greeting: Simple, clear, and welcoming */}
           <View style={{ marginTop: 14 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 19, fontWeight: '900', letterSpacing: -0.3 }}>
-              {isHi ? 'हेल्थकेयर कंसीयर्ज' : 'Healthcare Concierge'}
+            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>
+              {isHi ? 'आपका स्वास्थ्य साथी' : 'Your Health Partner'}
             </Text>
-            <Text style={{ color: '#DBEAFE', fontSize: 12.5, fontWeight: '500', marginTop: 2 }}>
+            <Text style={{ color: '#DBEAFE', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
               {isHi
                 ? 'सत्यापित डॉक्टर, डायग्नोस्टिक टेस्ट्स व अस्पताल सेवाएं'
                 : 'Book verified doctors, diagnostic scans & hospital care'}

@@ -64,7 +64,7 @@ INSERT INTO public.hospitals (
 ) VALUES 
 (
     '22222222-2222-2222-2222-222222222201',
-    'Max Super Speciality Hospital, Saket',
+    'Jain ENT , Saket',
     'max-super-speciality-saket',
     '1, 2, Press Enclave Marg, Saket Institutional Area, New Delhi',
     'New Delhi',
@@ -178,7 +178,7 @@ INSERT INTO public.hospitals (
 ),
 (
     '22222222-2222-2222-2222-222222222207',
-    'BLK-Max Super Speciality Hospital',
+    'BLK-Jain ENT ',
     'blk-max-super-speciality',
     'Pusa Road, Radha Soami Satsang, Rajendra Place, New Delhi',
     'New Delhi',
@@ -230,7 +230,7 @@ INSERT INTO public.bookings (
     'Rahul Jain',
     '+919999999999',
     '22222222-2222-2222-2222-222222222201',
-    'Max Super Speciality Hospital, Saket',
+    'Jain ENT , Saket',
     'Cardiology',
     'NEW',
     'pending',

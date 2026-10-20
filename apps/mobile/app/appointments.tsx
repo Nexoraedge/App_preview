@@ -90,13 +90,13 @@ const SEED_APPOINTMENTS: EnrichedAppointment[] = [
     bookingRef: 'AN-OPD-7821',
     serviceType: 'OPD_CONCIERGE',
     status: 'CONFIRMED',
-    doctorName: 'Dr. Rajesh Sharma',
+    doctorName: 'Dr. Sathish Jain',
     doctorNameHi: 'डॉ. राजेश शर्मा',
     specialty: 'Cardiology',
     specialtyHi: 'हृदय रोग विशेषज्ञ (Cardiology)',
     qualification: 'MBBS, MD, DM (Cardiology) • AIIMS New Delhi',
-    hospitalName: 'Max Super Speciality Hospital',
-    hospitalNameHi: 'मैक्स सुपर स्पेशियलिटी अस्पताल',
+    hospitalName: 'Jain ENT Hospital',
+    hospitalNameHi: 'जैन ईएनटी हॉस्पिटल',
     hospitalAddress: 'Press Enclave Marg, Saket, New Delhi',
     hospitalAddressHi: 'प्रेस एन्क्लेव मार्ग, साकेत, नई दिल्ली',
     patientName: 'Rahul Jain',
@@ -117,13 +117,13 @@ const SEED_APPOINTMENTS: EnrichedAppointment[] = [
     bookingRef: 'AN-IPD-4412',
     serviceType: 'IPD_ENQUIRY',
     status: 'CONFIRMED',
-    doctorName: 'Dr. Alok Verma & Surgery Team',
+    doctorName: 'Dr. Prakash Chandwani',
     doctorNameHi: 'डॉ. आलोक वर्मा व सर्जरी टीम',
     specialty: 'Laparoscopic Surgery',
     specialtyHi: 'लैप्रोस्कोपिक सर्जरी (General Surgery)',
     qualification: 'MS (General Surgery), FIAGES • 18+ Yrs Exp',
-    hospitalName: 'Indraprastha Apollo Hospitals',
-    hospitalNameHi: 'इंद्रप्रस्थ अपोलो अस्पताल',
+    hospitalName: 'CKS Hospital',
+    hospitalNameHi: 'सीकेएस अस्पताल',
     hospitalAddress: 'Mathura Road, Sarita Vihar, New Delhi',
     hospitalAddressHi: 'मथुरा रोड, सरिता विहार, नई दिल्ली',
     patientName: 'Rahul Jain',
@@ -737,8 +737,8 @@ export default function AppointmentsScreen() {
                     ? 'आपकी कोई आगामी डॉक्टर विज़िट निर्धारित नहीं है। पार्टनर अस्पतालों में शीर्ष डॉक्टरों से परामर्श लें।'
                     : 'You have no upcoming consultations scheduled. Book a visit with top verified specialists.'
                   : isHi
-                  ? 'पिछला कोई विज़िट रिकॉर्ड नहीं मिला।'
-                  : 'No past completed consultations found in your account.'}
+                    ? 'पिछला कोई विज़िट रिकॉर्ड नहीं मिला।'
+                    : 'No past completed consultations found in your account.'}
               </Text>
 
               <TouchableOpacity
@@ -814,8 +814,8 @@ export default function AppointmentsScreen() {
                               apt.serviceType === 'OPD_CONCIERGE'
                                 ? '#EFF6FF'
                                 : apt.serviceType === 'IPD_ENQUIRY'
-                                ? '#F5F3FF'
-                                : '#ECFDF5',
+                                  ? '#F5F3FF'
+                                  : '#ECFDF5',
                             paddingHorizontal: 8,
                             paddingVertical: 3,
                             borderRadius: 7,
@@ -829,8 +829,8 @@ export default function AppointmentsScreen() {
                                 apt.serviceType === 'OPD_CONCIERGE'
                                   ? '#1D4ED8'
                                   : apt.serviceType === 'IPD_ENQUIRY'
-                                  ? '#7C3AED'
-                                  : '#059669',
+                                    ? '#7C3AED'
+                                    : '#059669',
                               textTransform: 'uppercase',
                               letterSpacing: 0.3,
                             }}
@@ -838,8 +838,8 @@ export default function AppointmentsScreen() {
                             {apt.serviceType === 'OPD_CONCIERGE'
                               ? isHi ? 'ओपीडी परामर्श' : 'OPD Consultation'
                               : apt.serviceType === 'IPD_ENQUIRY'
-                              ? isHi ? 'अस्पताल भर्ती' : 'Hospital Admission'
-                              : isHi ? 'लैब टेस्ट' : 'Diagnostic Lab'}
+                                ? isHi ? 'अस्पताल भर्ती' : 'Hospital Admission'
+                                : isHi ? 'लैब टेस्ट' : 'Diagnostic Lab'}
                           </Text>
                         </View>
 
@@ -857,8 +857,8 @@ export default function AppointmentsScreen() {
                           backgroundColor: isCancelled
                             ? '#FEF2F2'
                             : isUpcoming
-                            ? '#ECFDF5'
-                            : '#F1F5F9',
+                              ? '#ECFDF5'
+                              : '#F1F5F9',
                           paddingHorizontal: 8,
                           paddingVertical: 3,
                           borderRadius: 8,
@@ -881,8 +881,8 @@ export default function AppointmentsScreen() {
                           {isCancelled
                             ? isHi ? 'रद्द' : 'Cancelled'
                             : isUpcoming
-                            ? isHi ? 'पुष्टि' : 'Confirmed'
-                            : isHi ? 'संपन्न' : 'Completed'}
+                              ? isHi ? 'पुष्टि' : 'Confirmed'
+                              : isHi ? 'संपन्न' : 'Completed'}
                         </Text>
                       </View>
                     </View>
@@ -898,8 +898,8 @@ export default function AppointmentsScreen() {
                             apt.serviceType === 'OPD_CONCIERGE'
                               ? '#EFF6FF'
                               : apt.serviceType === 'IPD_ENQUIRY'
-                              ? '#F5F3FF'
-                              : '#ECFDF5',
+                                ? '#F5F3FF'
+                                : '#ECFDF5',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}

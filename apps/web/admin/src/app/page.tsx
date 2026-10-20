@@ -148,7 +148,7 @@ export default function CallCenterDashboard() {
 
   // Mock simulator to trigger incoming request from mobile app
   const simulateIncomingPatientRequest = () => {
-    const randomHospital = ['Max Super Speciality Hospital, Saket', 'Fortis Memorial Gurugram', 'Medanta - The Medicity'][Math.floor(Math.random() * 3)];
+    const randomHospital = ['Jain ENT , Saket', 'Fortis Memorial Gurugram', 'Medanta - The Medicity'][Math.floor(Math.random() * 3)];
     const randomNames = ['Aman Jain', 'Priya Deshmukh', 'Rajeev Kapoor', 'Ananya Gupta', 'Kavita Chawla'];
     const randomPatient = randomNames[Math.floor(Math.random() * randomNames.length)];
     const mockRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -232,8 +232,8 @@ export default function CallCenterDashboard() {
             <button
               onClick={() => setActiveTab('ALL')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'ALL'
-                  ? 'bg-[#3A7BD5] text-white shadow-md'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#3A7BD5] text-white shadow-md'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <div className="flex items-center space-x-3">
@@ -248,8 +248,8 @@ export default function CallCenterDashboard() {
             <button
               onClick={() => setActiveTab('OPD_CONCIERGE')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'OPD_CONCIERGE'
-                  ? 'bg-[#3A7BD5] text-white shadow-md'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#3A7BD5] text-white shadow-md'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <div className="flex items-center space-x-3">
@@ -264,8 +264,8 @@ export default function CallCenterDashboard() {
             <button
               onClick={() => setActiveTab('PHARMACY_SCAN_PAY')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'PHARMACY_SCAN_PAY'
-                  ? 'bg-[#3A7BD5] text-white shadow-md'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#3A7BD5] text-white shadow-md'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <div className="flex items-center space-x-3">
@@ -280,8 +280,8 @@ export default function CallCenterDashboard() {
             <button
               onClick={() => setActiveTab('IPD_ENQUIRY')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'IPD_ENQUIRY'
-                  ? 'bg-[#3A7BD5] text-white shadow-md'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#3A7BD5] text-white shadow-md'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <div className="flex items-center space-x-3">
@@ -333,8 +333,8 @@ export default function CallCenterDashboard() {
                   key={status}
                   onClick={() => setStatusFilter(status)}
                   className={`px-3 py-1.5 rounded-md font-medium transition ${statusFilter === status
-                      ? 'bg-white text-[#1D2D50] shadow-sm font-semibold'
-                      : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-[#1D2D50] shadow-sm font-semibold'
+                    : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
                   {status}
@@ -465,8 +465,8 @@ export default function CallCenterDashboard() {
                       key={booking.id}
                       onClick={() => setSelectedBooking(booking)}
                       className={`p-3.5 rounded-lg cursor-pointer transition relative mb-1.5 ${isSelected
-                          ? 'bg-blue-50/80 border border-[#3A7BD5]/40 shadow-sm'
-                          : 'hover:bg-slate-50 border border-transparent'
+                        ? 'bg-blue-50/80 border border-[#3A7BD5]/40 shadow-sm'
+                        : 'hover:bg-slate-50 border border-transparent'
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
@@ -475,12 +475,12 @@ export default function CallCenterDashboard() {
                         </span>
                         <span
                           className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${booking.status === 'NEW'
-                              ? 'bg-rose-100 text-rose-700 animate-pulse'
-                              : booking.status === 'CALLING'
-                                ? 'bg-amber-100 text-amber-800'
-                                : booking.status === 'CONFIRMED' || booking.status === 'PAID'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-slate-100 text-slate-600'
+                            ? 'bg-rose-100 text-rose-700 animate-pulse'
+                            : booking.status === 'CALLING'
+                              ? 'bg-amber-100 text-amber-800'
+                              : booking.status === 'CONFIRMED' || booking.status === 'PAID'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-100 text-slate-600'
                             }`}
                         >
                           {booking.status}

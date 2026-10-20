@@ -2,7 +2,7 @@
 // Comprehensive clinical localization mapping for Hospitals, Branches, Doctors, Qualifications, Specialties, Addresses, Slots, and Timings
 
 export const HOSPITAL_NAMES: Record<string, string> = {
-  'Max Super Speciality Hospital': 'मैक्स सुपर स्पेशियलिटी हॉस्पिटल',
+  'Jain ENT ': 'मैक्स सुपर स्पेशियलिटी हॉस्पिटल',
   'Indraprastha Apollo Hospitals': 'इंद्रप्रस्थ अपोलो हॉस्पिटल्स',
   'Fortis Healthcare': 'फोर्टिस हेल्थकेयर',
   'Medanta - The Medicity': 'मेदांता - द मेडिसिटी',
@@ -112,7 +112,7 @@ export const SPECIALTIES: Record<string, string> = {
 };
 
 export const DOCTORS: Record<string, string> = {
-  'Dr. Rajiv Agarwal': 'डॉ. राजीव अग्रवाल',
+  'Dr. Satish Jain': 'डॉ. सतीश जैन',
   'Dr. Meenakshi Sundaram': 'डॉ. मीनाक्षी सुंदरम',
   'Dr. Vikramaditya Sen': 'डॉ. विक्रमादित्य सेन',
   'Dr. Anita Deshmukh': 'डॉ. अनिता देशमुख',

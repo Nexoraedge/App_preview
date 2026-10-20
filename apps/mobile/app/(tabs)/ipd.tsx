@@ -278,7 +278,7 @@ const MASTER_SURGERIES: PlannedSurgery[] = [
 const MASTER_HOSPITALS: HospitalAdmissionInfo[] = [
   {
     id: 'hosp-1',
-    name: 'Max Super Speciality Hospital',
+    name: 'Jain ENT ',
     nameHi: 'मैक्स सुपर स्पेशियलिटी अस्पताल (Max Hospital)',
     location: 'Press Enclave Marg, Saket',
     locationHi: 'प्रेस एन्क्लेव मार्ग, साकेत',
@@ -601,8 +601,8 @@ export default function IpdScreen() {
                   marginBottom: 8,
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#BFDBFE' }}>
-                  {isHi ? 'आदित्यम निरामया केयर कंसीयर्ज' : 'ADITYAM NIRAMAYAA CARE CONCIERGE'}
+                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#BFDBFE', letterSpacing: 0.5 }}>
+                  {isHi ? 'आदित्यम अस्पताल सहायता' : 'ADITYAM HOSPITAL CARE DESK'}
                 </Text>
               </View>
 
@@ -650,35 +650,49 @@ export default function IpdScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Merged Thin 4-Step Concierge Row */}
+              {/* 4-Step How it Works: 2x2 Responsive Grid with zero overflow */}
               <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.16)' }}>
-                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#BFDBFE', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#BFDBFE', marginBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase' }}>
                   {isHi ? '4 आसान चरणों में सहायता' : 'How it works in 4 simple steps'}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {[
                     { step: '1', title: isHi ? 'पर्चा भेजें' : 'Upload slip' },
                     { step: '2', title: isHi ? 'सलाहकार कॉल' : 'Advisor calls' },
-                    { step: '3', title: isHi ? 'दरें तुलना' : 'Compare' },
-                    { step: '4', title: isHi ? 'भर्ती सहायता' : 'Get admitted' },
-                  ].map((st, sIdx) => (
-                    <View key={st.step} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View
-                          style={{
-                            width: 18,
-                            height: 18,
-                            borderRadius: 9,
-                            backgroundColor: 'rgba(255, 255, 255, 0.22)',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#FFFFFF' }}>{st.step}</Text>
-                        </View>
-                        <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#FFFFFF' }}>{st.title}</Text>
+                    { step: '3', title: isHi ? 'दरें तुलना' : 'Compare rates' },
+                    { step: '4', title: isHi ? 'कैशलेस भर्ती' : 'Get admitted' },
+                  ].map((st) => (
+                    <View
+                      key={st.step}
+                      style={{
+                        flexBasis: '48%',
+                        flexGrow: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 7,
+                        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                        paddingHorizontal: 9,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 9,
+                          backgroundColor: '#FFFFFF',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '900', color: '#1E40AF' }}>{st.step}</Text>
                       </View>
-                      {sIdx < 3 && <ChevronRight size={11} color="rgba(255, 255, 255, 0.45)" />}
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', flex: 1 }} numberOfLines={1}>
+                        {st.title}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -728,7 +742,7 @@ export default function IpdScreen() {
             })}
           </ScrollView>
 
-          {/* 3.5 CONCIERGE TRUST STRIP */}
+          {/* 3.5 HOSPITAL CARE TRUST STRIP */}
           <View style={{ marginHorizontal: 16, marginTop: 12 }}>
             <View
               style={{
@@ -739,18 +753,31 @@ export default function IpdScreen() {
                 paddingVertical: 8,
                 paddingHorizontal: 12,
                 flexDirection: 'row',
+                flexWrap: 'wrap',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                gap: 6,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                <ShieldCheck size={14} color="#2563EB" />
-                <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#1E40AF' }} numberOfLines={1}>
-                  {isHi
-                    ? 'निःशुल्क कैब सहायता • 0% ब्याज ईएमआई • बीमा कागजी मदद'
-                    : 'Free cab pickup • 0% EMI support • Insurance paperwork'}
-                </Text>
-              </View>
+              {[
+                { icon: '🚕', en: 'Free cab pickup', hi: 'निःशुल्क कैब' },
+                { icon: '💳', en: '0% EMI option', hi: '0% ईएमआई' },
+                { icon: '🛡️', en: 'Cashless insurance', hi: 'कैशलेस बीमा' },
+              ].map((item, idx) => (
+                <View
+                  key={idx}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <Text style={{ fontSize: 11 }}>{item.icon}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                    {isHi ? item.hi : item.en}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
 

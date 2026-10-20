@@ -135,7 +135,7 @@ interface Translations {
 const translations: Record<Language, Translations> = {
   en: {
     appName: 'Adityam Niramayaa',
-    tagline: 'Healthcare without fear',
+    tagline: 'Every Step Toward Better Health',
     locationDefault: 'Koramangala, Bengaluru',
     greetingUser: 'Good Morning, Hardik 👋',
     healthMotto: "Take care of your health, it's your greatest asset.",
@@ -252,7 +252,7 @@ const translations: Record<Language, Translations> = {
   },
   hi: {
     appName: 'आदित्यम् निरामया',
-    tagline: 'बिना डर के स्वास्थ्य सेवा',
+    tagline: 'बेहतर स्वास्थ्य की ओर हर कदम',
     locationDefault: 'कोरमंगला, बेंगलुरु',
     greetingUser: 'शुभ प्रभात, हार्दिक 👋',
     healthMotto: 'अपनी सेहत का ख्याल रखें, यह सबसे बड़ी पूंजी है।',

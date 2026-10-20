@@ -125,7 +125,7 @@ const SEARCH_DATABASE: SearchItem[] = [
   // --- Hospitals ---
   {
     id: 'h1',
-    title: 'Max Super Speciality Hospital',
+    title: 'Jain ENT ',
     titleHi: 'मैक्स सुपर स्पेशलिटी हॉस्पिटल',
     subtitle: 'Saket, New Delhi • 25% Off OPD • NABH & JCI Accredited',
     subtitleHi: 'साकेत, नई दिल्ली • ओपीडी पर 25% छूट • NABH मान्यता प्राप्त',
