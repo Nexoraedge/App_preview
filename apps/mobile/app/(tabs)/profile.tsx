@@ -481,17 +481,17 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'रक्त समूह' : 'Blood Group'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>O+ Positive</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>O+ Positive</Text>
               </View>
               <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'एलर्जी' : 'Allergies'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#059669', marginTop: 2 }}>{isHi ? 'कोई ज्ञात नहीं' : 'None Known'}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#059669', marginTop: 2 }}>{isHi ? 'कोई ज्ञात नहीं' : 'None Known'}</Text>
               </View>
               <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'प्राथमिक डॉक्टर' : 'Primary Doctor'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>Dr. Sharma</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>Dr. Satish ji</Text>
               </View>
             </View>
           </View>
