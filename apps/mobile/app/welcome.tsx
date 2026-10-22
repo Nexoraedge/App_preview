@@ -25,26 +25,96 @@ const card = {
   elevation: 8,
 } as const;
 
-function ServicesArt({ c }: { c: ReturnType<typeof pickCopy> }) {
-  const items = [
-    { Icon: Stethoscope, label: c.services.doctors, bg: C.brandSoft, fg: C.brand },
-    { Icon: FlaskConical, label: c.services.labs, bg: C.goodSoft, fg: C.good },
-    { Icon: Pill, label: c.services.pharmacy, bg: C.warnSoft, fg: C.warn },
-    { Icon: Building2, label: c.services.hospital, bg: C.dangerSoft, fg: C.danger },
-  ];
+import { Image } from 'react-native';
+import { Sparkles, HeartHandshake, ShieldCheck } from 'lucide-react-native';
+
+const muniBlessingImg = require('../assets/muni_aditya_blessing_aura.jpg');
+
+function InspirationArt({ c, isHi }: { c: ReturnType<typeof pickCopy>; isHi: boolean }) {
   return (
     <View style={card}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-        {items.map(({ Icon, label, bg, fg }) => (
-          <View key={label} style={{ width: '47%', flexGrow: 1, backgroundColor: bg, borderRadius: R.lg, paddingVertical: 18, alignItems: 'center', gap: 8 }}>
-            <Icon size={28} color={fg} />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: C.ink }}>{label}</Text>
-          </View>
-        ))}
+      {/* Top Sacred Tag */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 }}>
+        <Sparkles size={14} color="#D97706" />
+        <Text style={{ fontSize: 13, fontWeight: '800', color: '#D97706', letterSpacing: 0.5 }}>
+          {isHi ? '।। ॐ अर्हम् • जय जिनेन्द्र ।।' : 'Om Arham • Jai Jinendra'}
+        </Text>
+        <Sparkles size={14} color="#D97706" />
       </View>
-      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, backgroundColor: C.brandSoft, paddingHorizontal: 12, paddingVertical: 7, borderRadius: R.pill }}>
-        <MapPin size={14} color={C.brand} />
-        <Text style={{ fontSize: 13, fontWeight: '700', color: C.brand }}>{c.nearYou}</Text>
+
+      {/* Divine Portrait with Golden Aura Frame */}
+      <View style={{ alignItems: 'center', marginVertical: 4 }}>
+        <View
+          style={{
+            width: 140,
+            height: 140,
+            borderRadius: 70,
+            borderWidth: 3,
+            borderColor: '#F59E0B',
+            overflow: 'hidden',
+            backgroundColor: '#0F172A',
+            shadowColor: '#F59E0B',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 10,
+            elevation: 6,
+          }}
+        >
+          <Image
+            source={muniBlessingImg}
+            style={{ width: '100%', height: '100%', borderRadius: 70 }}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Honorific Under Photo */}
+        <Text style={{ fontSize: 14.5, fontWeight: '900', color: C.ink, textAlign: 'center', marginTop: 10, lineHeight: 20 }}>
+          {isHi
+            ? 'परम पूज्य मुनि 108 श्री आदित्य सागर जी महाराज'
+            : 'Pujya Muni 108 Shri Aditya Sagar Ji Maharaj'}
+        </Text>
+        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#B45309', textAlign: 'center', marginTop: 2 }}>
+          {isHi ? 'पावन प्रेरणा एवं मंगल आशीर्वाद' : 'Divine Inspiration & Sacred Blessings'}
+        </Text>
+      </View>
+
+      {/* Origin Banner */}
+      <View
+        style={{
+          marginTop: 12,
+          backgroundColor: '#FFFBEB',
+          borderRadius: R.md,
+          paddingVertical: 9,
+          paddingHorizontal: 12,
+          borderWidth: 1,
+          borderColor: '#FDE68A',
+          alignItems: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 12, fontWeight: '800', color: '#92400E', textAlign: 'center' }}>
+          {isHi
+            ? 'प्रणेता: पूज्य मुनिश्री • संकल्प: अभिषेक जैन'
+            : 'Inspired by: Muni Aditya Sagar Ji • Vision: Abhishek Jain'}
+        </Text>
+      </View>
+
+      {/* 3 Sacred Values Pills */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 6, marginTop: 12 }}>
+        <View style={{ flex: 1, backgroundColor: '#FEF3C7', paddingVertical: 6, borderRadius: R.pill, alignItems: 'center' }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E' }}>
+            {isHi ? '🕊️ अनुकम्पा' : '🕊️ Compassion'}
+          </Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#EFF6FF', paddingVertical: 6, borderRadius: R.pill, alignItems: 'center' }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF' }}>
+            {isHi ? '🩺 सेवा' : '🩺 Service'}
+          </Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#ECFDF5', paddingVertical: 6, borderRadius: R.pill, alignItems: 'center' }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#065F46' }}>
+            {isHi ? '🤝 मर्यादा' : '🤝 Dignity'}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -136,7 +206,7 @@ export default function Welcome() {
     listRef.current?.scrollToIndex({ index: index + 1, animated: true });
   };
 
-  const arts = [ServicesArt, BookingArt, FamilyArt];
+  const arts = [InspirationArt, BookingArt, FamilyArt];
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -174,7 +244,7 @@ export default function Welcome() {
               <View style={{ width, paddingHorizontal: 24 }}>
                 <Animated.View style={{ flex: 1, justifyContent: 'center', opacity: op, transform: [{ translateX: tx }, { scale: compact ? 0.92 : 1 }] }}>
                   <View style={{ maxWidth: 420, width: '100%', alignSelf: 'center' }}>
-                    <Art c={c} />
+                    <Art c={c} isHi={language === 'hi'} />
                   </View>
                 </Animated.View>
               </View>

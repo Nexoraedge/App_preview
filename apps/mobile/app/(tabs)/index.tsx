@@ -69,6 +69,7 @@ import {
 } from '../../components/ServiceIcons';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { JaiJinendraBlessingModal } from '../../components/ui/JaiJinendraBlessingModal';
 import { SkeletonBox } from '../../components/ui/SkeletonBox';
 
 const docHeroImg = require('../../assets/doc.png');
@@ -373,6 +374,7 @@ export default function HomeScreen() {
 
   const [selectedCity, setSelectedCity] = useState('Saket, South Delhi NCR');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [blessingModalVisible, setBlessingModalVisible] = useState(true);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const bannerScrollRef = useRef<ScrollView>(null);
@@ -592,39 +594,63 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Right Action: Profile Avatar with Active Indicator */}
-            <TouchableOpacity
-              onPress={() => setProfileModalVisible(true)}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Open profile"
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 21,
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                borderWidth: 1.5,
-                borderColor: 'rgba(255, 255, 255, 0.35)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-              }}
-            >
-              <User size={19} color="#FFFFFF" strokeWidth={2.4} />
-              <View
+            {/* Right Action: Blessings Pill + Profile Avatar with Active Indicator */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => setBlessingModalVisible(true)}
+                activeOpacity={0.75}
                 style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: '#34D399',
-                  position: 'absolute',
-                  top: 2,
-                  right: 2,
-                  borderWidth: 2,
-                  borderColor: '#1E40AF',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: '#FEF3C7',
+                  paddingHorizontal: 9,
+                  paddingVertical: 5,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: '#F59E0B',
+                  marginRight: 8,
                 }}
-              />
-            </TouchableOpacity>
+              >
+                <Sparkles size={11} color="#B45309" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E' }}>
+                  {isHi ? 'मंगलाशीर्वाद' : 'Blessings'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setProfileModalVisible(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile"
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(255, 255, 255, 0.35)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                }}
+              >
+                <User size={19} color="#FFFFFF" strokeWidth={2.4} />
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: '#34D399',
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    borderWidth: 2,
+                    borderColor: '#1E40AF',
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Hero Tagline / Greeting: Simple, clear, and welcoming */}
@@ -1864,6 +1890,9 @@ export default function HomeScreen() {
 
       {/* Global Profile & Language Switcher Modal */}
       <ProfileModal visible={profileModalVisible} onClose={() => setProfileModalVisible(false)} />
+
+      {/* Opening Mangal Ashirwad / Sacred Blessing Modal */}
+      <JaiJinendraBlessingModal visible={blessingModalVisible} onClose={() => setBlessingModalVisible(false)} />
     </View>
   );
 }

@@ -199,6 +199,22 @@ export function AnimatedSplash({ ready, onFinish, language, minMs = 1800 }: Prop
               {copy.tagline.toUpperCase()}
             </Text>
           </View>
+
+          {/* Sacred Inspiration */}
+          <Text
+            style={{
+              marginTop: 12,
+              fontSize: 12,
+              fontWeight: '700',
+              color: '#FDE68A',
+              letterSpacing: 0.4,
+              textAlign: 'center',
+            }}
+          >
+            {language === 'hi'
+              ? '।। ॐ अर्हम् • जय जिनेन्द्र ।। • प्रेरणा: पूज्य मुनि 108 श्री आदित्य सागर जी'
+              : 'Om Arham • Jai Jinendra • Inspired by Muni Aditya Sagar Ji'}
+          </Text>
         </Animated.View>
       </View>
 
