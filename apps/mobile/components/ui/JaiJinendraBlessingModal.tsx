@@ -1,6 +1,7 @@
 // apps/mobile/components/ui/JaiJinendraBlessingModal.tsx
 // Opening sacred blessing modal featuring Pujya Muni 108 Shri Aditya Sagar Ji Maharaj
-// Fully responsive across compact screens (<360px), standard phones, tablets, and web.
+// Engineered for flawless responsiveness across ultra-compact phones (<=360px),
+// standard smartphones (iPhone SE, 12, 13, 14, 15, 16, Galaxy, Pixel), tablets, and web.
 // Ultra-fast instant asset decode, zero sparkles, and prestigious spiritual healthcare design.
 
 import React from 'react';
@@ -56,12 +57,23 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
   const { language } = useLanguage() as any;
   const isHi = language === 'hi';
 
-  const isSmallDevice = width < 370;
+  // Responsive device heuristics (both width and height aware)
+  const isSmallWidth = width < 370;
+  const isShortHeight = height < 740;
+  const isVeryShortHeight = height < 670;
+  const isCompact = isSmallWidth || isShortHeight;
   const isTabletOrWeb = width >= 600;
 
-  // Responsive sizing
-  const modalWidth = isTabletOrWeb ? 430 : Math.min(width - 32, 400);
-  const imgSize = isSmallDevice ? 122 : 142;
+  // Responsive sizing calculations
+  const modalWidth = isTabletOrWeb ? 420 : Math.min(width - 24, 384);
+  const modalMaxHeight = isVeryShortHeight
+    ? height - 24
+    : isShortHeight
+    ? height - 36
+    : Math.min(height - 48, 620);
+
+  // Tuned harmonious portrait diameter (ensures zero vertical cutoffs on small screens)
+  const imgSize = isVeryShortHeight ? 80 : isCompact ? 90 : isTabletOrWeb ? 116 : 102;
 
   return (
     <Modal
@@ -79,21 +91,36 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
           onPress={onClose}
         />
 
-        {/* Modal Card */}
-        <View style={[styles.cardContainer, { width: modalWidth }]}>
+        {/* Modal Card Container */}
+        <View
+          style={[
+            styles.cardContainer,
+            {
+              width: modalWidth,
+              maxHeight: modalMaxHeight,
+            },
+          ]}
+        >
           {/* Top Sacred Golden Header Banner */}
           <LinearGradient
             colors={['#040816', '#0B1B44', '#061028']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.headerGradient}
+            style={[
+              styles.headerGradient,
+              {
+                paddingTop: isCompact ? 12 : 16,
+                paddingBottom: isCompact ? 10 : 14,
+                paddingHorizontal: 14,
+              },
+            ]}
           >
             {/* Ambient Gold Halo Glow */}
             <View
               pointerEvents="none"
               style={[
                 styles.ambientGlow,
-                { left: modalWidth / 2 - 90, top: -30 },
+                { left: modalWidth / 2 - 80, top: -35 },
               ]}
             />
 
@@ -101,16 +128,42 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={styles.closeBtn}
+              style={[
+                styles.closeBtn,
+                {
+                  top: isCompact ? 10 : 12,
+                  right: isCompact ? 10 : 12,
+                  width: isCompact ? 28 : 32,
+                  height: isCompact ? 28 : 32,
+                  borderRadius: isCompact ? 14 : 16,
+                },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
-              <X size={17} color="#F1F5F9" strokeWidth={2.4} />
+              <X size={isCompact ? 15 : 17} color="#F1F5F9" strokeWidth={2.4} />
             </TouchableOpacity>
 
             {/* Sacred Mantra Capsule Badge (Clean, dignified, zero sparkles) */}
-            <View style={styles.mantraBadge}>
-              <Text style={styles.mantraText}>
+            <View
+              style={[
+                styles.mantraBadge,
+                {
+                  paddingHorizontal: isCompact ? 12 : 14,
+                  paddingVertical: isCompact ? 3 : 4,
+                  marginBottom: isCompact ? 7 : 10,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.mantraText,
+                  {
+                    fontSize: isCompact ? 11 : 12,
+                    letterSpacing: isCompact ? 0.9 : 1.1,
+                  },
+                ]}
+              >
                 {isHi ? '।। ॐ अर्हम् • जय जिनेन्द्र ।।' : 'OM ARHAM • JAI JINENDRA'}
               </Text>
             </View>
@@ -120,8 +173,8 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
               style={[
                 styles.outerHaloFrame,
                 {
-                  borderRadius: (imgSize + 14) / 2,
-                  padding: 3.5,
+                  borderRadius: (imgSize + 12) / 2,
+                  padding: 3,
                 },
               ]}
             >
@@ -145,31 +198,89 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
             </View>
 
             {/* Title & Honorific */}
-            <Text style={[styles.muniTitle, { fontSize: isSmallDevice ? 15.5 : 17.5 }]}>
+            <Text
+              style={[
+                styles.muniTitle,
+                {
+                  fontSize: isCompact ? 14 : 16,
+                  lineHeight: isCompact ? 18 : 21,
+                  marginTop: isCompact ? 6 : 8,
+                },
+              ]}
+            >
               {isHi
                 ? 'परम पूज्य मुनि 108 श्री आदित्य सागर जी महाराज'
                 : 'Pujya Muni 108 Shri Aditya Sagar Ji Maharaj'}
             </Text>
-            <Text style={styles.muniSub}>
+            <Text
+              style={[
+                styles.muniSub,
+                {
+                  fontSize: isCompact ? 10.5 : 11.5,
+                  marginTop: 2,
+                },
+              ]}
+            >
               {isHi ? 'पावन प्रेरणा एवं मंगल आशीर्वाद' : 'Divine Inspiration & Sacred Blessings'}
             </Text>
           </LinearGradient>
 
-          {/* Body Content */}
+          {/* Body Content - Scrollable flex area */}
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.bodyContent}
-            style={{ maxHeight: height * 0.46 }}
+            bounces={false}
+            contentContainerStyle={[
+              styles.bodyContent,
+              {
+                paddingHorizontal: isCompact ? 12 : 16,
+                paddingTop: isCompact ? 10 : 12,
+                paddingBottom: isCompact ? 12 : 14,
+                gap: isCompact ? 8 : 10,
+              },
+            ]}
+            style={{ flexGrow: 0, flexShrink: 1 }}
           >
             {/* Origin & Initiative Card */}
-            <View style={styles.initiativeCard}>
-              <View style={styles.anukampaBadge}>
-                <Text style={styles.anukampaBadgeText}>
+            <View
+              style={[
+                styles.initiativeCard,
+                {
+                  padding: isCompact ? 9 : 12,
+                  borderRadius: isCompact ? 14 : 16,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.anukampaBadge,
+                  {
+                    paddingHorizontal: isCompact ? 10 : 12,
+                    paddingVertical: isCompact ? 2.5 : 3.5,
+                    marginBottom: isCompact ? 5 : 7,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.anukampaBadgeText,
+                    {
+                      fontSize: isCompact ? 10 : 11,
+                    },
+                  ]}
+                >
                   {isHi ? 'आदित्यम् अनुकम्पा' : 'AADITYAM ANUKAMPA'}
                 </Text>
               </View>
 
-              <Text style={[styles.bodyText, { fontSize: isSmallDevice ? 12.5 : 13.5 }]}>
+              <Text
+                style={[
+                  styles.bodyText,
+                  {
+                    fontSize: isCompact ? 11.5 : 12.5,
+                    lineHeight: isCompact ? 16 : 18,
+                  },
+                ]}
+              >
                 {isHi
                   ? 'यह स्वास्थ्य सेवा पहल पूज्य मुनिश्री के पावन आशीर्वाद व प्रेरणा से तथा श्री अभिषेक जैन के विज़न द्वारा समाज एवं संपूर्ण जनमानस के स्वास्थ्य, सेवा एवं करुणा (अनुकम्पा) हेतु समर्पित है।'
                   : 'Inspired by the divine blessings of Pujya Muni 108 Shri Aditya Sagar Ji Maharaj & shaped by the vision of Abhishek Jain — dedicated to compassionate, dignified and accessible healthcare for all.'}
@@ -177,47 +288,120 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
             </View>
 
             {/* 3 Sacred Pillars */}
-            <View style={styles.pillarsContainer}>
-              <View style={styles.pillarItem}>
-                <View style={[styles.pillarIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                  <HeartHandshake size={16} color="#D97706" />
+            <View style={[styles.pillarsContainer, { gap: isCompact ? 6 : 8 }]}>
+              <View
+                style={[
+                  styles.pillarItem,
+                  {
+                    paddingVertical: isCompact ? 6 : 8,
+                    borderRadius: isCompact ? 12 : 14,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.pillarIconCircle,
+                    {
+                      backgroundColor: '#FEF3C7',
+                      width: isCompact ? 26 : 30,
+                      height: isCompact ? 26 : 30,
+                      borderRadius: isCompact ? 13 : 15,
+                      marginBottom: isCompact ? 3 : 4,
+                    },
+                  ]}
+                >
+                  <HeartHandshake size={isCompact ? 13 : 15} color="#D97706" />
                 </View>
-                <Text style={styles.pillarLabel}>
+                <Text style={[styles.pillarLabel, { fontSize: isCompact ? 10.5 : 11.5 }]}>
                   {isHi ? 'अनुकम्पा' : 'Compassion'}
                 </Text>
-                <Text style={styles.pillarSub}>
+                <Text style={[styles.pillarSub, { fontSize: isCompact ? 9 : 9.5 }]}>
                   {isHi ? 'करुणा भाव' : 'Selfless Care'}
                 </Text>
               </View>
 
-              <View style={styles.pillarItem}>
-                <View style={[styles.pillarIconCircle, { backgroundColor: '#EFF6FF' }]}>
-                  <Stethoscope size={16} color="#2563EB" />
+              <View
+                style={[
+                  styles.pillarItem,
+                  {
+                    paddingVertical: isCompact ? 6 : 8,
+                    borderRadius: isCompact ? 12 : 14,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.pillarIconCircle,
+                    {
+                      backgroundColor: '#EFF6FF',
+                      width: isCompact ? 26 : 30,
+                      height: isCompact ? 26 : 30,
+                      borderRadius: isCompact ? 13 : 15,
+                      marginBottom: isCompact ? 3 : 4,
+                    },
+                  ]}
+                >
+                  <Stethoscope size={isCompact ? 13 : 15} color="#2563EB" />
                 </View>
-                <Text style={styles.pillarLabel}>
+                <Text style={[styles.pillarLabel, { fontSize: isCompact ? 10.5 : 11.5 }]}>
                   {isHi ? 'निःस्वार्थ सेवा' : 'Service'}
                 </Text>
-                <Text style={styles.pillarSub}>
+                <Text style={[styles.pillarSub, { fontSize: isCompact ? 9 : 9.5 }]}>
                   {isHi ? 'सुलभ चिकित्सा' : 'Dedicated'}
                 </Text>
               </View>
 
-              <View style={styles.pillarItem}>
-                <View style={[styles.pillarIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                  <ShieldCheck size={16} color="#059669" />
+              <View
+                style={[
+                  styles.pillarItem,
+                  {
+                    paddingVertical: isCompact ? 6 : 8,
+                    borderRadius: isCompact ? 12 : 14,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.pillarIconCircle,
+                    {
+                      backgroundColor: '#ECFDF5',
+                      width: isCompact ? 26 : 30,
+                      height: isCompact ? 26 : 30,
+                      borderRadius: isCompact ? 13 : 15,
+                      marginBottom: isCompact ? 3 : 4,
+                    },
+                  ]}
+                >
+                  <ShieldCheck size={isCompact ? 13 : 15} color="#059669" />
                 </View>
-                <Text style={styles.pillarLabel}>
+                <Text style={[styles.pillarLabel, { fontSize: isCompact ? 10.5 : 11.5 }]}>
                   {isHi ? 'मर्यादा' : 'Dignity'}
                 </Text>
-                <Text style={styles.pillarSub}>
+                <Text style={[styles.pillarSub, { fontSize: isCompact ? 9 : 9.5 }]}>
                   {isHi ? 'विश्वसनीयता' : 'Fair Care'}
                 </Text>
               </View>
             </View>
 
             {/* Blessing Quote */}
-            <View style={styles.quoteBox}>
-              <Text style={styles.quoteText}>
+            <View
+              style={[
+                styles.quoteBox,
+                {
+                  paddingVertical: isCompact ? 6 : 8,
+                  paddingHorizontal: 10,
+                  borderRadius: isCompact ? 10 : 12,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.quoteText,
+                  {
+                    fontSize: isCompact ? 10.5 : 11.5,
+                  },
+                ]}
+              >
                 {isHi
                   ? '“सर्वे भवन्तु सुखिनः सर्वे सन्तु निरामयाः”'
                   : '“Healthcare with Compassion, Dignity & Fearless Healing”'}
@@ -226,19 +410,46 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
           </ScrollView>
 
           {/* Action Button (No sparkles, ultra-clean premium CTA) */}
-          <View style={styles.footerContainer}>
+          <View
+            style={[
+              styles.footerContainer,
+              {
+                paddingHorizontal: isCompact ? 12 : 16,
+                paddingTop: isCompact ? 6 : 8,
+                paddingBottom: isCompact ? 10 : 14,
+              },
+            ]}
+          >
             <TouchableOpacity
               onPress={onClose}
               activeOpacity={0.88}
-              style={styles.ctaButton}
+              style={[
+                styles.ctaButton,
+                {
+                  borderRadius: isCompact ? 13 : 15,
+                },
+              ]}
             >
               <LinearGradient
                 colors={['#1E3A8A', '#1D4ED8', '#2563EB']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.ctaGradient}
+                style={[
+                  styles.ctaGradient,
+                  {
+                    paddingVertical: isCompact ? 11 : 13,
+                    paddingHorizontal: 16,
+                  },
+                ]}
               >
-                <Text style={[styles.ctaText, { fontSize: isSmallDevice ? 13.5 : 14.5 }]}>
+                <Text
+                  style={[
+                    styles.ctaText,
+                    {
+                      fontSize: isCompact ? 13 : 14,
+                    },
+                  ]}
+                >
                   {isHi ? 'मंगल आशीर्वाद ग्रहण करें' : 'Accept Sacred Blessings & Continue'}
                 </Text>
               </LinearGradient>
@@ -256,7 +467,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 11, 26, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
     ...Platform.select({
       web: {
         backdropFilter: 'blur(10px)',
@@ -265,7 +477,7 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 26,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 16 },
@@ -274,29 +486,24 @@ const styles = StyleSheet.create({
     elevation: 16,
     borderWidth: 1.2,
     borderColor: 'rgba(245, 158, 11, 0.38)',
+    display: 'flex',
+    flexDirection: 'column',
   },
   headerGradient: {
-    paddingTop: 18,
-    paddingBottom: 18,
-    paddingHorizontal: 16,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   ambientGlow: {
     position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     backgroundColor: 'rgba(245, 158, 11, 0.14)',
   },
   closeBtn: {
     position: 'absolute',
-    top: 14,
-    right: 14,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -308,16 +515,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245, 158, 11, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.38)',
-    paddingHorizontal: 16,
-    paddingVertical: 5,
     borderRadius: 999,
-    marginBottom: 12,
   },
   mantraText: {
     color: '#FDE68A',
     fontWeight: '800',
-    fontSize: 12,
-    letterSpacing: 1.1,
   },
   outerHaloFrame: {
     borderWidth: 1.5,
@@ -325,7 +527,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245, 158, 11, 0.08)',
   },
   imgFrame: {
-    borderWidth: 2.2,
+    borderWidth: 2,
     borderColor: '#F59E0B',
     overflow: 'hidden',
     backgroundColor: '#071028',
@@ -339,67 +541,50 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 12,
     letterSpacing: -0.2,
-    lineHeight: 22,
     paddingHorizontal: 6,
   },
   muniSub: {
-    fontSize: 12,
     fontWeight: '600',
     color: '#FBBF24',
     textAlign: 'center',
-    marginTop: 3,
     letterSpacing: 0.5,
   },
   bodyContent: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-    gap: 12,
+    flexGrow: 0,
   },
   initiativeCard: {
     backgroundColor: '#FAF8F5',
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#F3E8D2',
-    padding: 12,
     alignItems: 'center',
   },
   anukampaBadge: {
     backgroundColor: '#1E3A8A',
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.35)',
-    paddingHorizontal: 14,
-    paddingVertical: 4,
     borderRadius: 999,
-    marginBottom: 8,
   },
   anukampaBadgeText: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 11,
     letterSpacing: 0.9,
   },
   bodyText: {
     fontWeight: '500',
     color: '#334155',
     textAlign: 'center',
-    lineHeight: 19.5,
   },
   pillarsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
   },
   pillarItem: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     alignItems: 'center',
     shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 2 },
@@ -408,21 +593,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   pillarIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 5,
   },
   pillarLabel: {
-    fontSize: 12,
     fontWeight: '800',
     color: '#0F172A',
     textAlign: 'center',
   },
   pillarSub: {
-    fontSize: 10,
     fontWeight: '600',
     color: '#64748B',
     textAlign: 'center',
@@ -430,38 +609,29 @@ const styles = StyleSheet.create({
   },
   quoteBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     alignItems: 'center',
   },
   quoteText: {
-    fontSize: 12,
-    fontWeight: '700',
     color: '#1E293B',
+    fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
   },
   footerContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
     backgroundColor: '#FFFFFF',
+    flexShrink: 0,
   },
   ctaButton: {
-    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#1D4ED8',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.35,
-    shadowRadius: 14,
+    shadowRadius: 12,
     elevation: 6,
   },
   ctaGradient: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
