@@ -30,7 +30,6 @@ import {
   CheckCircle2,
   Building2,
   Clock,
-  Sparkles,
   User,
   FileText,
   Pill,
@@ -594,35 +593,12 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Right Action: Blessings Pill + Profile Avatar with Active Indicator */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
-                onPress={() => setBlessingModalVisible(true)}
-                activeOpacity={0.75}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                  backgroundColor: '#FEF3C7',
-                  paddingHorizontal: 9,
-                  paddingVertical: 5,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: '#F59E0B',
-                  marginRight: 8,
-                }}
-              >
-                <Sparkles size={11} color="#B45309" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E' }}>
-                  {isHi ? 'मंगलाशीर्वाद' : 'Blessings'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setProfileModalVisible(true)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Open profile"
+            {/* Right Action: Profile Avatar with Active Indicator */}
+            <TouchableOpacity
+              onPress={() => setProfileModalVisible(true)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
                 style={{
                   width: 42,
                   height: 42,
@@ -650,7 +626,6 @@ export default function HomeScreen() {
                   }}
                 />
               </TouchableOpacity>
-            </View>
           </View>
 
           {/* Hero Tagline / Greeting: Simple, clear, and welcoming */}

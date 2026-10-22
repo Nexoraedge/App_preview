@@ -1,6 +1,7 @@
 // apps/mobile/components/ui/JaiJinendraBlessingModal.tsx
 // Opening sacred blessing modal featuring Pujya Muni 108 Shri Aditya Sagar Ji Maharaj
 // Fully responsive across compact screens (<360px), standard phones, tablets, and web.
+// Ultra-fast instant asset decode, zero sparkles, and prestigious spiritual healthcare design.
 
 import React from 'react';
 import {
@@ -15,10 +16,35 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Sparkles, HeartHandshake, ShieldCheck, Stethoscope } from 'lucide-react-native';
+import { X, HeartHandshake, ShieldCheck, Stethoscope } from 'lucide-react-native';
 import { useLanguage } from '../../src/context/LanguageContext';
 
 const muniBlessingImg = require('../../assets/muni_aditya_blessing_aura.jpg');
+
+// Preload and cache immediately upon module evaluation for zero-lag instant rendering
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  try {
+    const asset = Image.resolveAssetSource(muniBlessingImg);
+    if (asset?.uri) {
+      const preloadImg = new (window as any).Image();
+      preloadImg.src = asset.uri;
+      if (typeof document !== 'undefined') {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = asset.uri;
+        document.head.appendChild(link);
+      }
+    }
+  } catch {}
+} else {
+  try {
+    const asset = Image.resolveAssetSource(muniBlessingImg);
+    if (asset?.uri) {
+      Image.prefetch(asset.uri).catch(() => {});
+    }
+  } catch {}
+}
 
 interface Props {
   visible: boolean;
@@ -34,8 +60,8 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
   const isTabletOrWeb = width >= 600;
 
   // Responsive sizing
-  const modalWidth = isTabletOrWeb ? 440 : Math.min(width - 32, 420);
-  const imgSize = isSmallDevice ? 130 : 154;
+  const modalWidth = isTabletOrWeb ? 430 : Math.min(width - 32, 400);
+  const imgSize = isSmallDevice ? 122 : 142;
 
   return (
     <Modal
@@ -57,7 +83,7 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
         <View style={[styles.cardContainer, { width: modalWidth }]}>
           {/* Top Sacred Golden Header Banner */}
           <LinearGradient
-            colors={['#0F172A', '#1E293B', '#0F172A']}
+            colors={['#040816', '#0B1B44', '#061028']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
@@ -67,7 +93,7 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
               pointerEvents="none"
               style={[
                 styles.ambientGlow,
-                { left: modalWidth / 2 - 75, top: -20 },
+                { left: modalWidth / 2 - 90, top: -30 },
               ]}
             />
 
@@ -79,29 +105,47 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
-              <X size={18} color="#E2E8F0" strokeWidth={2.4} />
+              <X size={17} color="#F1F5F9" strokeWidth={2.4} />
             </TouchableOpacity>
 
-            {/* Sacred Mantra Header */}
-            <View style={styles.mantraRow}>
-              <Sparkles size={14} color="#FBBF24" />
+            {/* Sacred Mantra Capsule Badge (Clean, dignified, zero sparkles) */}
+            <View style={styles.mantraBadge}>
               <Text style={styles.mantraText}>
-                {isHi ? '।। ॐ अर्हम् • जय जिनेन्द्र ।।' : 'Om Arham • Jai Jinendra'}
+                {isHi ? '।। ॐ अर्हम् • जय जिनेन्द्र ।।' : 'OM ARHAM • JAI JINENDRA'}
               </Text>
-              <Sparkles size={14} color="#FBBF24" />
             </View>
 
-            {/* Divine Image Container with Golden Radial Frame */}
-            <View style={[styles.imgFrame, { width: imgSize, height: imgSize, borderRadius: imgSize / 2 }]}>
-              <Image
-                source={muniBlessingImg}
-                style={{ width: '100%', height: '100%', borderRadius: imgSize / 2 }}
-                resizeMode="cover"
-              />
+            {/* Divine Image Container with Concentric Golden Radiance Frames */}
+            <View
+              style={[
+                styles.outerHaloFrame,
+                {
+                  borderRadius: (imgSize + 14) / 2,
+                  padding: 3.5,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.imgFrame,
+                  {
+                    width: imgSize,
+                    height: imgSize,
+                    borderRadius: imgSize / 2,
+                  },
+                ]}
+              >
+                <Image
+                  source={muniBlessingImg}
+                  style={{ width: '100%', height: '100%', borderRadius: imgSize / 2 }}
+                  resizeMode="cover"
+                  fadeDuration={0}
+                />
+              </View>
             </View>
 
             {/* Title & Honorific */}
-            <Text style={[styles.muniTitle, { fontSize: isSmallDevice ? 16 : 18 }]}>
+            <Text style={[styles.muniTitle, { fontSize: isSmallDevice ? 15.5 : 17.5 }]}>
               {isHi
                 ? 'परम पूज्य मुनि 108 श्री आदित्य सागर जी महाराज'
                 : 'Pujya Muni 108 Shri Aditya Sagar Ji Maharaj'}
@@ -115,7 +159,7 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.bodyContent}
-            style={{ maxHeight: height * 0.45 }}
+            style={{ maxHeight: height * 0.46 }}
           >
             {/* Origin & Initiative Card */}
             <View style={styles.initiativeCard}>
@@ -128,7 +172,7 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
               <Text style={[styles.bodyText, { fontSize: isSmallDevice ? 12.5 : 13.5 }]}>
                 {isHi
                   ? 'यह स्वास्थ्य सेवा पहल पूज्य मुनिश्री के पावन आशीर्वाद व प्रेरणा से तथा श्री अभिषेक जैन के विज़न द्वारा समाज एवं संपूर्ण जनमानस के स्वास्थ्य, सेवा एवं करुणा (अनुकम्पा) हेतु समर्पित है।'
-                  : 'Inspired by the divine blessings of Pujya Muni 108 Shri Aditya Sagar Ji Maharaj & shaped by the vision of Abhishek Jain — dedicated to compassionate, dignified and affordable healthcare for all.'}
+                  : 'Inspired by the divine blessings of Pujya Muni 108 Shri Aditya Sagar Ji Maharaj & shaped by the vision of Abhishek Jain — dedicated to compassionate, dignified and accessible healthcare for all.'}
               </Text>
             </View>
 
@@ -142,7 +186,7 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
                   {isHi ? 'अनुकम्पा' : 'Compassion'}
                 </Text>
                 <Text style={styles.pillarSub}>
-                  {isHi ? 'करुणा भाव' : 'Care'}
+                  {isHi ? 'करुणा भाव' : 'Selfless Care'}
                 </Text>
               </View>
 
@@ -181,23 +225,22 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
             </View>
           </ScrollView>
 
-          {/* Action Button */}
+          {/* Action Button (No sparkles, ultra-clean premium CTA) */}
           <View style={styles.footerContainer}>
             <TouchableOpacity
               onPress={onClose}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
               style={styles.ctaButton}
             >
               <LinearGradient
-                colors={['#1E40AF', '#1D4ED8', '#2563EB']}
+                colors={['#1E3A8A', '#1D4ED8', '#2563EB']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.ctaGradient}
               >
                 <Text style={[styles.ctaText, { fontSize: isSmallDevice ? 13.5 : 14.5 }]}>
-                  {isHi ? 'मंगल आशीर्वाद ग्रहण करें' : 'Accept Blessings & Continue'}
+                  {isHi ? 'मंगल आशीर्वाद ग्रहण करें' : 'Accept Sacred Blessings & Continue'}
                 </Text>
-                <Sparkles size={16} color="#FDE68A" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -210,27 +253,27 @@ export function JaiJinendraBlessingModal({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(11, 27, 77, 0.78)',
+    backgroundColor: 'rgba(5, 11, 26, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(10px)',
       },
     }),
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderRadius: 26,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 12,
-    borderWidth: 1.5,
-    borderColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.42,
+    shadowRadius: 28,
+    elevation: 16,
+    borderWidth: 1.2,
+    borderColor: 'rgba(245, 158, 11, 0.38)',
   },
   headerGradient: {
     paddingTop: 18,
@@ -242,10 +285,10 @@ const styles = StyleSheet.create({
   },
   ambientGlow: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(245, 158, 11, 0.14)',
   },
   closeBtn: {
     position: 'absolute',
@@ -254,42 +297,52 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
-  mantraRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  mantraBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.38)',
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 999,
     marginBottom: 12,
   },
   mantraText: {
     color: '#FDE68A',
     fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    letterSpacing: 1.1,
+  },
+  outerHaloFrame: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.42)',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
   },
   imgFrame: {
-    borderWidth: 3,
+    borderWidth: 2.2,
     borderColor: '#F59E0B',
     overflow: 'hidden',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#071028',
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
   muniTitle: {
     fontWeight: '900',
     color: '#FFFFFF',
     textAlign: 'center',
     marginTop: 12,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
     lineHeight: 22,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   muniSub: {
     fontSize: 12,
@@ -297,26 +350,28 @@ const styles = StyleSheet.create({
     color: '#FBBF24',
     textAlign: 'center',
     marginTop: 3,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   bodyContent: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 8,
     gap: 12,
   },
   initiativeCard: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#FAF8F5',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#F3E8D2',
     padding: 12,
     alignItems: 'center',
   },
   anukampaBadge: {
-    backgroundColor: '#D97706',
-    paddingHorizontal: 12,
-    paddingVertical: 3,
+    backgroundColor: '#1E3A8A',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
     borderRadius: 999,
     marginBottom: 8,
   },
@@ -324,13 +379,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 11,
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
   },
   bodyText: {
     fontWeight: '500',
-    color: '#78350F',
+    color: '#334155',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 19.5,
   },
   pillarsContainer: {
     flexDirection: 'row',
@@ -339,13 +394,18 @@ const styles = StyleSheet.create({
   },
   pillarItem: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     paddingVertical: 10,
     paddingHorizontal: 4,
     alignItems: 'center',
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pillarIconCircle: {
     width: 32,
@@ -369,8 +429,10 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   quoteBox: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingVertical: 8,
     paddingHorizontal: 12,
     alignItems: 'center',
@@ -378,12 +440,12 @@ const styles = StyleSheet.create({
   quoteText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
+    color: '#1E293B',
     fontStyle: 'italic',
     textAlign: 'center',
   },
   footerContainer: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingBottom: 16,
     paddingTop: 8,
     backgroundColor: '#FFFFFF',
@@ -391,23 +453,21 @@ const styles = StyleSheet.create({
   ctaButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
   },
   ctaGradient: {
-    paddingVertical: 13,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
   ctaText: {
     color: '#FFFFFF',
     fontWeight: '900',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });

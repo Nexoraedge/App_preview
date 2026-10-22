@@ -26,7 +26,7 @@ const card = {
 } as const;
 
 import { Image } from 'react-native';
-import { Sparkles, HeartHandshake, ShieldCheck } from 'lucide-react-native';
+import { HeartHandshake, ShieldCheck } from 'lucide-react-native';
 
 const muniBlessingImg = require('../assets/muni_aditya_blessing_aura.jpg');
 
@@ -34,12 +34,21 @@ function InspirationArt({ c, isHi }: { c: ReturnType<typeof pickCopy>; isHi: boo
   return (
     <View style={card}>
       {/* Top Sacred Tag */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 }}>
-        <Sparkles size={14} color="#D97706" />
-        <Text style={{ fontSize: 13, fontWeight: '800', color: '#D97706', letterSpacing: 0.5 }}>
+      <View
+        style={{
+          alignSelf: 'center',
+          backgroundColor: '#FEF3C7',
+          paddingHorizontal: 14,
+          paddingVertical: 5,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: '#FDE68A',
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#B45309', letterSpacing: 0.6 }}>
           {isHi ? '।। ॐ अर्हम् • जय जिनेन्द्र ।।' : 'Om Arham • Jai Jinendra'}
         </Text>
-        <Sparkles size={14} color="#D97706" />
       </View>
 
       {/* Divine Portrait with Golden Aura Frame */}
@@ -64,6 +73,7 @@ function InspirationArt({ c, isHi }: { c: ReturnType<typeof pickCopy>; isHi: boo
             source={muniBlessingImg}
             style={{ width: '100%', height: '100%', borderRadius: 70 }}
             resizeMode="cover"
+            fadeDuration={0}
           />
         </View>
 
