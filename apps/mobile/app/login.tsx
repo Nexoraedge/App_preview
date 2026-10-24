@@ -1,350 +1,673 @@
-// app/login.tsx
-// Phone-number OTP login. Two steps on one screen: number -> 6-digit code.
-// AUTH.demo = true (in src/config/brand.ts) lets you demo with no SMS provider; set it to false for real Supabase OTP.
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, Linking, TouchableOpacity } from 'react-native';
+// apps/mobile/app/login.tsx
+// Seamless Phone OTP Login with 6-cell auto-advance input & Supabase integration
+
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
+  TouchableOpacity,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, ArrowLeft, Sparkles, Check, Fingerprint } from 'lucide-react-native';
+import {
+  ShieldCheck,
+  ArrowLeft,
+  User as UserIcon,
+  Phone,
+  Sparkles,
+  Lock,
+  Edit2,
+} from 'lucide-react-native';
+
 import { C, R } from '../src/theme';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
 import { pickLoginCopy } from '../src/i18n/loginCopy';
-import { AUTH, BRAND, LEGAL, ROUTES } from '../src/config/brand';
+import { AUTH, LEGAL, ROUTES } from '../src/config/brand';
 import { PrimaryButton } from '../components/ui/kit';
 import { LogoMark } from '../components/brand/LogoMark';
 import { LangToggle } from '../components/launch/LangToggle';
-// import { getSupabaseClient } from '../src/lib/supabase'; // TODO: uncomment when AUTH.demo = false
+import { OtpInputBoxes } from '../components/auth/OtpInputBoxes';
+import { requestOtp, verifyPhoneOtp } from '../src/lib/supabase';
 
 const RESEND_SECONDS = 30;
 
-export default function Login() {
+export default function LoginScreen() {
   const router = useRouter();
   const { loginWithPhone } = useAuth();
   const { language } = useLanguage() as any;
+  const isHi = language === 'hi';
   const t = pickLoginCopy(language);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [aadhaar, setAadhaar] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(0);
-  const otpRef = useRef<TextInput>(null);
 
-  const formatAadhaar = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 12);
-    const chunks = [];
-    for (let i = 0; i < raw.length; i += 4) {
-      chunks.push(raw.slice(i, i + 4));
-    }
-    return chunks.join(' ');
-  };
-
-  const aadhaarRaw = aadhaar.replace(/\D/g, '');
-  const aadhaarOk = aadhaarRaw.length === 12;
-
+  // Resend countdown timer
   useEffect(() => {
     if (left <= 0) return;
-    const id = setTimeout(() => setLeft((s) => s - 1), 1000);
-    return () => clearTimeout(id);
+    const timerId = setTimeout(() => setLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timerId);
   }, [left]);
 
-  // Indian mobile numbers are 10 digits starting with 6-9.
+  // Indian mobile number validation (10 digits starting with 6-9)
   const phoneOk = /^[6-9]\d{9}$/.test(phone);
+  const nameOk = fullName.trim().length >= 2;
 
-  const sendOtp = async () => {
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      setError(language === 'hi' ? 'कृपया अपना पूरा नाम दर्ज करें' : 'Please enter your full name');
-      return;
-    }
-    if (!phoneOk) { setError(t.invalidPhone); return; }
-    if (!aadhaarOk) {
-      setError(
-        language === 'hi'
-          ? 'कृपया 12-अंकीय मान्य आधार संख्या दर्ज करें (उदा. 5421 8932 4592)'
-          : 'Please enter a valid 12-digit Aadhaar number (e.g. 5421 8932 4592)'
-      );
-      return;
-    }
-    setError(''); setBusy(true);
-    try {
-      if (!AUTH.demo) {
-        // const { error: e } = await getSupabaseClient().auth.signInWithOtp({ phone: '+91' + phone });
-        // if (e) throw e;
-      }
-      setStep('otp'); setOtp(''); setLeft(RESEND_SECONDS);
-      setTimeout(() => otpRef.current?.focus(), 250);
-    } catch (e: any) {
-      setError(e?.status === 429 ? t.tooMany : t.failed);
-    } finally { setBusy(false); }
+  // Reviewer / Demo Quick Fill Helper
+  const handleReviewerFill = () => {
+    setFullName('Abhishek Jain');
+    setPhone('9999999999');
+    setError('');
   };
 
-  const verify = async () => {
-    if (otp.length !== 6) { setError(t.wrongOtp); return; }
-    setError(''); setBusy(true);
+  const handleSendOtp = async () => {
+    if (!nameOk) {
+      setError(t.nameRequired);
+      return;
+    }
+    if (!phoneOk) {
+      setError(t.invalidPhone);
+      return;
+    }
+
+    setError('');
+    setBusy(true);
+
     try {
-      const lastFour = aadhaarRaw.slice(-4) || '4592';
-      if (AUTH.demo) {
-        if (otp !== AUTH.demoOtp) {
-          setError(t.wrongOtp);
-          return;
-        }
-        loginWithPhone(phone, otp, fullName.trim(), lastFour);
-      } else {
-        // const { error: e } = await getSupabaseClient().auth.verifyOtp({ phone: '+91' + phone, token: otp, type: 'sms' });
-        // if (e) { setError(e.status === 429 ? t.tooMany : t.wrongOtp); return; }
-        loginWithPhone(phone, otp, fullName.trim(), lastFour);
+      const res = await requestOtp(phone);
+      if (!res.success && res.error) {
+        setError(res.error);
+        return;
       }
+      setStep('otp');
+      setOtp('');
+      setLeft(RESEND_SECONDS);
+    } catch {
+      setError(t.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const code = codeToVerify || otp;
+    if (code.length !== 6) {
+      setError(t.wrongOtp);
+      return;
+    }
+
+    setError('');
+    setBusy(true);
+
+    try {
+      const res = await verifyPhoneOtp(phone, code);
+      if (!res.success) {
+        setError(res.error || t.wrongOtp);
+        return;
+      }
+
+      // Persist session to AuthContext and local storage
+      loginWithPhone(phone, code, fullName.trim());
       router.replace(ROUTES.home as any);
     } catch {
       setError(t.failed);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const link = (label: string, url: string) => (
-    <Text onPress={() => Linking.openURL(url).catch(() => { })} style={{ color: C.brand, fontWeight: '700' }}>{label}</Text>
+  const openLink = (label: string, url: string) => (
+    <Text
+      onPress={() => Linking.openURL(url).catch(() => {})}
+      style={{ color: C.brand, fontWeight: '700' }}
+    >
+      {label}
+    </Text>
   );
 
-  const field = {
+  const inputContainerStyle = {
     backgroundColor: '#fff',
     borderRadius: R.md,
     borderWidth: 1.5,
     borderColor: error ? C.danger : C.line,
     minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingHorizontal: 14,
-  } as const;
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* Dynamic Brand Gradient Background */}
       <LinearGradient
         colors={['#0B1B4D', '#172554', '#1D4ED8']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 270 }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 270,
+        }}
       />
+
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 6, minHeight: 48 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Top Navigation Bar: Back Button & Language Switcher */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: 20,
+                paddingTop: 6,
+                minHeight: 48,
+              }}
+            >
               {step === 'otp' ? (
-                <Pressable onPress={() => { setStep('phone'); setError(''); }} hitSlop={12} accessibilityLabel={t.change} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Pressable
+                  onPress={() => {
+                    setStep('phone');
+                    setError('');
+                  }}
+                  hitSlop={12}
+                  accessibilityLabel={t.change}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <ArrowLeft size={22} color="#fff" />
                 </Pressable>
-              ) : <View style={{ width: 44 }} />}
+              ) : (
+                <View style={{ width: 44 }} />
+              )}
               <LangToggle tone="light" />
             </View>
 
-            <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 24 }}>
+            {/* Brand Header & Logo */}
+            <View
+              style={{
+                alignItems: 'center',
+                paddingTop: 8,
+                paddingBottom: 24,
+              }}
+            >
               <LogoMark size={60} />
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 10 }}>
-                <Text style={{ color: '#FFFFFF', fontSize: 21, fontWeight: '900', letterSpacing: -0.3 }}>
-                  {language === 'hi' ? 'आदित्यम्' : 'Adityam'}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  gap: 6,
+                  marginTop: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 22,
+                    fontWeight: '900',
+                    letterSpacing: -0.3,
+                  }}
+                >
+                  {isHi ? 'आदित्यम्' : 'Adityam'}
                 </Text>
-                <Text style={{ color: '#38BDF8', fontSize: 21, fontWeight: '900', letterSpacing: -0.3 }}>
-                  {language === 'hi' ? 'निरामया' : 'Niramayaa'}
+                <Text
+                  style={{
+                    color: '#38BDF8',
+                    fontSize: 22,
+                    fontWeight: '900',
+                    letterSpacing: -0.3,
+                  }}
+                >
+                  {isHi ? 'निरामया' : 'Niramayaa'}
                 </Text>
               </View>
             </View>
 
-            <View style={{ flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 }}>
-              <View style={{ maxWidth: 480, width: '100%', alignSelf: 'center' }}>
-                <Text style={{ fontSize: 26, fontWeight: '800', color: C.ink, lineHeight: 36 }}>{step === 'phone' ? t.title : t.otpTitle}</Text>
-                <Text style={{ fontSize: 15, color: C.sub, lineHeight: 24, marginTop: 4 }}>{step === 'phone' ? t.subtitle : t.otpSent(phone)}</Text>
+            {/* Main Interactive Form Card */}
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: '#fff',
+                borderTopLeftRadius: 32,
+                borderTopRightRadius: 32,
+                paddingHorizontal: 24,
+                paddingTop: 28,
+                paddingBottom: 24,
+                shadowColor: '#000',
+                shadowOpacity: 0.08,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: -4 },
+              }}
+            >
+              <View
+                style={{
+                  maxWidth: 480,
+                  width: '100%',
+                  alignSelf: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 26,
+                    fontWeight: '800',
+                    color: C.ink,
+                    lineHeight: 34,
+                  }}
+                >
+                  {step === 'phone' ? t.title : t.otpTitle}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    color: C.sub,
+                    lineHeight: 22,
+                    marginTop: 4,
+                  }}
+                >
+                  {step === 'phone' ? t.subtitle : t.otpSent(phone)}
+                </Text>
 
                 {step === 'phone' ? (
                   <View style={{ marginTop: 22 }}>
                     {/* Full Name Input */}
                     <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>
-                        {language === 'hi' ? 'पूरा नाम' : 'Full Name'}
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: '700',
+                          color: C.sub,
+                          marginBottom: 8,
+                        }}
+                      >
+                        {t.fullNameLabel}
                       </Text>
-                      <View style={field}>
+                      <View style={inputContainerStyle}>
+                        <UserIcon
+                          size={18}
+                          color={C.mute}
+                          style={{ marginRight: 10 }}
+                        />
                         <TextInput
                           value={fullName}
-                          onChangeText={(v) => { setFullName(v); setError(''); }}
-                          placeholder={language === 'hi' ? 'उदा. अभिषेक जैन' : 'e.g. Abhishek Jain'}
+                          onChangeText={(v) => {
+                            setFullName(v);
+                            setError('');
+                          }}
+                          placeholder={t.fullNamePlaceholder}
                           placeholderTextColor={C.mute}
                           autoCapitalize="words"
                           autoComplete="name"
                           returnKeyType="next"
                           style={[
-                            { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 12 },
-                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                            {
+                              flex: 1,
+                              fontSize: 16,
+                              fontWeight: '600',
+                              color: C.ink,
+                              paddingVertical: 12,
+                            },
+                            Platform.OS === 'web' &&
+                              ({
+                                outline: 'none',
+                                outlineStyle: 'none',
+                              } as any),
                           ]}
                         />
                       </View>
                     </View>
 
                     {/* Mobile Number Input */}
-                    <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub, marginBottom: 8 }}>{t.phoneLabel}</Text>
-                      <View style={field}>
-                        <Text style={{ fontSize: 17, fontWeight: '700', color: C.ink, marginRight: 10 }}>+91</Text>
-                        <View style={{ width: 1, height: 26, backgroundColor: C.line, marginRight: 12 }} />
+                    <View style={{ marginBottom: 12 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: '700',
+                            color: C.sub,
+                          }}
+                        >
+                          {t.phoneLabel}
+                        </Text>
+                        {/* 1-Tap Reviewer / Demo Fill */}
+                        <TouchableOpacity
+                          onPress={handleReviewerFill}
+                          activeOpacity={0.7}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            backgroundColor: '#EFF6FF',
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE',
+                          }}
+                        >
+                          <Sparkles size={11} color="#2563EB" />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '700',
+                              color: '#1D4ED8',
+                            }}
+                          >
+                            {t.reviewerFill}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={inputContainerStyle}>
+                        <Text
+                          style={{
+                            fontSize: 16.5,
+                            fontWeight: '700',
+                            color: C.ink,
+                            marginRight: 10,
+                          }}
+                        >
+                          +91
+                        </Text>
+                        <View
+                          style={{
+                            width: 1,
+                            height: 24,
+                            backgroundColor: C.line,
+                            marginRight: 12,
+                          }}
+                        />
                         <TextInput
                           value={phone}
-                          onChangeText={(v) => { setPhone(v.replace(/\D/g, '').slice(0, 10)); setError(''); }}
+                          onChangeText={(v) => {
+                            setPhone(v.replace(/\D/g, '').slice(0, 10));
+                            setError('');
+                          }}
                           placeholder={t.phonePlaceholder}
                           placeholderTextColor={C.mute}
                           keyboardType="number-pad"
                           textContentType="telephoneNumber"
                           autoComplete="tel"
                           maxLength={10}
-                          returnKeyType="next"
-                          style={[
-                            { flex: 1, fontSize: 18, fontWeight: '600', color: C.ink, paddingVertical: 12 },
-                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    {/* 12-Digit Aadhaar Verification Input */}
-                    <View style={{ marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.sub }}>
-                          {language === 'hi' ? 'आधार संख्या (12 अंक)' : 'Aadhaar Number (12-Digit)'}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <ShieldCheck size={12} color="#2563EB" />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
-                            {language === 'hi' ? 'UIDAI सत्यापन' : 'UIDAI Verified'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={field}>
-                        <Fingerprint size={20} color="#2563EB" style={{ marginRight: 10 }} />
-                        <TextInput
-                          value={aadhaar}
-                          onChangeText={(v) => { setAadhaar(formatAadhaar(v)); setError(''); }}
-                          placeholder="XXXX XXXX XXXX"
-                          placeholderTextColor={C.mute}
-                          keyboardType="number-pad"
-                          maxLength={14}
                           returnKeyType="done"
-                          onSubmitEditing={sendOtp}
+                          onSubmitEditing={handleSendOtp}
                           style={[
-                            { flex: 1, fontSize: 16.5, fontWeight: '700', letterSpacing: 2, color: C.ink, paddingVertical: 12 },
-                            Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                            {
+                              flex: 1,
+                              fontSize: 17,
+                              fontWeight: '600',
+                              color: C.ink,
+                              paddingVertical: 12,
+                              letterSpacing: 1,
+                            },
+                            Platform.OS === 'web' &&
+                              ({
+                                outline: 'none',
+                                outlineStyle: 'none',
+                              } as any),
                           ]}
                         />
-                        {aadhaarOk ? (
-                          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
-                            <Check size={14} color="#16A34A" strokeWidth={3} />
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            onPress={() => { setAadhaar('5421 8932 4592'); setError(''); }}
-                            activeOpacity={0.7}
-                            style={{ paddingHorizontal: 9, paddingVertical: 4.5, backgroundColor: '#EFF6FF', borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}
-                          >
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
-                              {language === 'hi' ? 'डेमो भरें' : 'Use Demo'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      {/* Subsidy Benefit Banner */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, backgroundColor: '#F0FDF4', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#BBF7D0' }}>
-                        <Sparkles size={14} color="#16A34A" />
-                        <Text style={{ flex: 1, fontSize: 11.5, color: '#15803D', fontWeight: '600', lineHeight: 16 }}>
-                          {language === 'hi'
-                            ? 'आधार सत्यापन से डॉक्टर, दवा व अस्पताल भर्ती पर तत्काल सरकारी स्वास्थ्य सब्सिडी व अतिरिक्त छूट मिलेगी।'
-                            : 'Aadhaar verification unlocks instant digital health subsidies & extra discounts on all doctor, medicine & hospital bookings.'}
-                        </Text>
                       </View>
                     </View>
                   </View>
                 ) : (
-                  <View style={{ marginTop: 22 }}>
-                    {/* Aadhaar Link Card */}
-                    <View style={{ backgroundColor: '#F8FAFC', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' }}>
-                            <ShieldCheck size={16} color="#16A34A" />
-                          </View>
-                          <View>
-                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A' }}>
-                              {language === 'hi' ? 'आधार पहचान सत्यापित' : 'Aadhaar Identity Linked'}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600', marginTop: 1 }}>
-                              •••• •••• {aadhaarRaw.slice(-4) || '4592'} · +91 {phone}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#166534' }}>
-                            {language === 'hi' ? 'सत्यापित' : 'VERIFIED'}
-                          </Text>
-                        </View>
+                  <View style={{ marginTop: 20 }}>
+                    {/* Phone Number Display with Edit Trigger */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: R.md,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        marginBottom: 14,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <Phone size={15} color={C.sub} />
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '700',
+                            color: C.ink,
+                          }}
+                        >
+                          +91 {phone}
+                        </Text>
                       </View>
+                      <Pressable
+                        onPress={() => {
+                          setStep('phone');
+                          setError('');
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          backgroundColor: '#EFF6FF',
+                        }}
+                      >
+                        <Edit2 size={12} color={C.brand} />
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: C.brand,
+                          }}
+                        >
+                          {isHi ? 'बदलें' : 'Edit'}
+                        </Text>
+                      </Pressable>
                     </View>
 
-                    <View style={field}>
-                      <TextInput
-                        ref={otpRef}
-                        value={otp}
-                        onChangeText={(v) => { setOtp(v.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-                        placeholder="••••••"
-                        placeholderTextColor={C.mute}
-                        keyboardType="number-pad"
-                        textContentType="oneTimeCode"
-                        autoComplete="sms-otp"
-                        maxLength={6}
-                        returnKeyType="done"
-                        onSubmitEditing={verify}
-                        style={[
-                          { flex: 1, fontSize: 24, fontWeight: '800', letterSpacing: 8, color: C.ink, textAlign: 'center', paddingVertical: 12 },
-                          Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
-                        ]}
-                      />
+                    {/* Modern 6-Box Individual OTP Cells */}
+                    <OtpInputBoxes
+                      value={otp}
+                      onChange={(newCode) => {
+                        setOtp(newCode);
+                        setError('');
+                      }}
+                      error={!!error}
+                      onComplete={(fullCode) => handleVerifyOtp(fullCode)}
+                    />
+
+                    {/* Test & Reviewer Hint Banner */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: '#FFFBEB',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                        marginTop: 4,
+                      }}
+                    >
+                      <Lock size={13} color="#D97706" />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: '#B45309',
+                          fontWeight: '600',
+                        }}
+                      >
+                        {t.demoNote(AUTH.demoOtp)}
+                      </Text>
                     </View>
-                    {AUTH.demo ? <Text style={{ fontSize: 13, color: C.warn, marginTop: 8, lineHeight: 20 }}>{t.demoNote(AUTH.demoOtp)}</Text> : null}
                   </View>
                 )}
 
-                {error ? <Text style={{ fontSize: 13.5, color: C.danger, marginTop: 10, lineHeight: 20 }}>{error}</Text> : null}
+                {/* Inline Error Toast */}
+                {error ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FEF2F2',
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#FECACA',
+                      marginTop: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: C.danger,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {error}
+                    </Text>
+                  </View>
+                ) : null}
 
-                <View style={{ marginTop: 20 }}>
+                {/* Primary Action Button */}
+                <View style={{ marginTop: 22 }}>
                   <PrimaryButton
                     label={
                       step === 'phone'
-                        ? (language === 'hi' ? 'ओटीपी भेजें और आधार सत्यापित करें' : 'Verify Aadhaar & Send OTP')
-                        : (language === 'hi' ? 'ओटीपी सत्यापित करें' : t.verify)
+                        ? t.sendOtp
+                        : busy
+                        ? isHi
+                          ? 'सत्यापित हो रहा है...'
+                          : 'Verifying...'
+                        : t.verify
                     }
-                    onPress={step === 'phone' ? sendOtp : verify}
-                    disabled={busy || (step === 'phone' ? (!phoneOk || !aadhaarOk || fullName.trim().length < 2) : otp.length !== 6)}
+                    onPress={
+                      step === 'phone' ? handleSendOtp : () => handleVerifyOtp()
+                    }
+                    disabled={
+                      busy ||
+                      (step === 'phone'
+                        ? !phoneOk || !nameOk
+                        : otp.length !== 6)
+                    }
                   />
                 </View>
 
+                {/* Resend Countdown in OTP Step */}
                 {step === 'otp' ? (
                   <View style={{ alignItems: 'center', marginTop: 16 }}>
                     {left > 0 ? (
-                      <Text style={{ color: C.sub, fontSize: 14, lineHeight: 22 }}>{t.resendIn(left)}</Text>
+                      <Text
+                        style={{
+                          color: C.sub,
+                          fontSize: 13.5,
+                          lineHeight: 20,
+                        }}
+                      >
+                        {t.resendIn(left)}
+                      </Text>
                     ) : (
-                      <Pressable onPress={sendOtp} hitSlop={10} style={{ minHeight: 44, justifyContent: 'center' }}>
-                        <Text style={{ color: C.brand, fontSize: 14.5, fontWeight: '700' }}>{t.resend}</Text>
+                      <Pressable
+                        onPress={handleSendOtp}
+                        hitSlop={10}
+                        style={{
+                          minHeight: 40,
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.brand,
+                            fontSize: 14,
+                            fontWeight: '700',
+                          }}
+                        >
+                          {t.resend}
+                        </Text>
                       </Pressable>
                     )}
                   </View>
                 ) : null}
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22 }}>
+                {/* Security Trust Badge */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 24,
+                    paddingTop: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: '#F1F5F9',
+                  }}
+                >
                   <ShieldCheck size={18} color={C.good} />
-                  <Text style={{ flex: 1, fontSize: 13, color: C.sub, lineHeight: 20 }}>{t.secure}</Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 12.5,
+                      color: C.sub,
+                      lineHeight: 18,
+                    }}
+                  >
+                    {t.secure}
+                  </Text>
                 </View>
 
-                <Text style={{ fontSize: 12.5, color: C.sub, lineHeight: 20, marginTop: 18, textAlign: 'center' }}>
-                  {t.consentPre}{link(t.terms, LEGAL.terms)}{t.and}{link(t.privacy, LEGAL.privacy)}
+                {/* Legal Consent Links */}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: C.mute,
+                    lineHeight: 18,
+                    marginTop: 14,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t.consentPre}
+                  {openLink(t.terms, LEGAL.terms)}
+                  {t.and}
+                  {openLink(t.privacy, LEGAL.privacy)}
                 </Text>
               </View>
             </View>

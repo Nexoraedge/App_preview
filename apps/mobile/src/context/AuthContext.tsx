@@ -150,8 +150,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updated_at: new Date().toISOString(),
     };
     saveUserSession(newUser);
+
+    // Optional background sync with Supabase users table
+    try {
+      import('../lib/supabase').then(({ getSupabaseClient }) => {
+        Promise.resolve(
+          getSupabaseClient().from('users').upsert({
+            phone: newUser.phone,
+            full_name: newUser.full_name,
+            city: newUser.city,
+            wallet_balance: newUser.wallet_balance,
+            is_verified: true,
+          })
+        ).catch(() => {});
+      }).catch(() => {});
+    } catch {}
+
     return true;
   };
+
 
   const logout = () => {
     saveUserSession(null);
