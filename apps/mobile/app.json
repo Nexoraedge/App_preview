@@ -14,7 +14,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.adityam.niramayaa"
+      "bundleIdentifier": "com.adityam.niramayaa",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Adityam Niramayaa uses your camera to scan medicine bills, doctor prescriptions, and pharmacy QR codes.",
+        "NSPhotoLibraryUsageDescription": "Adityam Niramayaa requires access to your photo library to let you upload doctor prescriptions and lab reports.",
+        "NSLocationWhenInUseUsageDescription": "Adityam Niramayaa uses your location to show nearby empanelled hospitals, diagnostic centers, and clinics."
+      }
     },
     "androidStatusBar": {
       "barStyle": "light-content",
@@ -31,7 +37,14 @@
         "foregroundImage": "./assets/logo-an.png",
         "backgroundColor": "#172554"
       },
-      "package": "com.adityam.niramayaa"
+      "package": "com.adityam.niramayaa",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro"
@@ -41,7 +54,19 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Adityam Niramayaa to access your camera to scan pharmacy QR codes and capture bill receipts."
+          "cameraPermission": "Allow Adityam Niramayaa to access your camera to scan medicine bills, doctor slips, and pharmacy QR codes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Adityam Niramayaa to access your photos to upload doctor prescriptions and health reports."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Adityam Niramayaa to access your location to find nearby hospitals and diagnostic centers."
         }
       ],
       "expo-font",
