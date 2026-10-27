@@ -31,32 +31,39 @@ export function getSupabaseClient(): SupabaseClient {
 }
 
 /**
- * Request phone OTP via Supabase Auth with graceful fallback
+ * Request phone OTP via Supabase Auth or WhatsApp Cloud with graceful fallback
  */
-export async function requestOtp(phoneNumber: string): Promise<{ success: boolean; isDemo: boolean; error?: string }> {
+export async function requestOtp(
+  phoneNumber: string,
+  channel: 'whatsapp' | 'sms' = 'whatsapp'
+): Promise<{ success: boolean; isDemo: boolean; channel: 'whatsapp' | 'sms'; error?: string }> {
   const cleanPhone = phoneNumber.startsWith('+91') ? phoneNumber : `+91${phoneNumber.replace(/\D/g, '')}`;
 
   // Store reviewer bypass
   if (cleanPhone.includes('9999999999')) {
-    return { success: true, isDemo: true };
+    return { success: true, isDemo: true, channel };
   }
 
   try {
     const client = getSupabaseClient();
     const { error } = await client.auth.signInWithOtp({
       phone: cleanPhone,
+      options: {
+        channel: channel === 'whatsapp' ? 'whatsapp' : 'sms',
+      },
     });
 
     if (error) {
-      // If phone provider is not yet configured with DLT/Twilio on Supabase, fallback to demo code
-      return { success: true, isDemo: true };
+      // If phone provider is not yet configured on Supabase, fallback smoothly
+      return { success: true, isDemo: true, channel };
     }
 
-    return { success: true, isDemo: false };
+    return { success: true, isDemo: false, channel };
   } catch (err: any) {
-    return { success: true, isDemo: true };
+    return { success: true, isDemo: true, channel };
   }
 }
+
 
 /**
  * Verify phone OTP with Supabase Auth or Reviewer code

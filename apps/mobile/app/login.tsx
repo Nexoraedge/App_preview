@@ -24,6 +24,7 @@ import {
   Sparkles,
   Lock,
   Edit2,
+  MessageCircle,
 } from 'lucide-react-native';
 
 import { C, R } from '../src/theme';
@@ -47,6 +48,7 @@ export default function LoginScreen() {
   const t = pickLoginCopy(language);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [channel, setChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -72,7 +74,7 @@ export default function LoginScreen() {
     setError('');
   };
 
-  const handleSendOtp = async () => {
+  const handleSendOtp = async (targetChannel: 'whatsapp' | 'sms' = channel) => {
     if (!nameOk) {
       setError(t.nameRequired);
       return;
@@ -84,9 +86,10 @@ export default function LoginScreen() {
 
     setError('');
     setBusy(true);
+    setChannel(targetChannel);
 
     try {
-      const res = await requestOtp(phone);
+      const res = await requestOtp(phone, targetChannel);
       if (!res.success && res.error) {
         setError(res.error);
         return;
@@ -289,7 +292,7 @@ export default function LoginScreen() {
                     marginTop: 4,
                   }}
                 >
-                  {step === 'phone' ? t.subtitle : t.otpSent(phone)}
+                  {step === 'phone' ? t.subtitle : t.otpSent(phone, channel)}
                 </Text>
 
                 {step === 'phone' ? (
@@ -421,7 +424,7 @@ export default function LoginScreen() {
                           autoComplete="tel"
                           maxLength={10}
                           returnKeyType="done"
-                          onSubmitEditing={handleSendOtp}
+                          onSubmitEditing={() => handleSendOtp()}
                           style={[
                             {
                               flex: 1,
@@ -569,69 +572,134 @@ export default function LoginScreen() {
                   </View>
                 ) : null}
 
-                {/* Primary Action Button */}
-                <View style={{ marginTop: 22 }}>
-                  <PrimaryButton
-                    label={
-                      step === 'phone'
-                        ? t.sendOtp
-                        : busy
-                        ? isHi
-                          ? 'सत्यापित हो रहा है...'
-                          : 'Verifying...'
-                        : t.verify
-                    }
-                    onPress={
-                      step === 'phone' ? handleSendOtp : () => handleVerifyOtp()
-                    }
-                    disabled={
-                      busy ||
-                      (step === 'phone'
-                        ? !phoneOk || !nameOk
-                        : otp.length !== 6)
-                    }
-                  />
-
-                  {/* 1-Tap Instant Reviewer & Team Sign-In */}
-                  {step === 'phone' && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        loginWithPhone('9999999999', '123456', 'Abhishek Jain');
-                        router.replace(ROUTES.home as any);
-                      }}
-                      activeOpacity={0.8}
-                      style={{
-                        marginTop: 12,
-                        height: 48,
-                        borderRadius: R.pill,
-                        backgroundColor: '#EFF6FF',
-                        borderWidth: 1.5,
-                        borderColor: '#BFDBFE',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexDirection: 'row',
-                        gap: 6,
-                      }}
-                    >
-                      <Sparkles size={16} color="#1D4ED8" />
-                      <Text
+                {/* Action Buttons */}
+                <View style={{ marginTop: 22, gap: 10 }}>
+                  {step === 'phone' ? (
+                    <>
+                      {/* 1. Primary: WhatsApp OTP Button (Meta Cloud API, instant <2s, lowest cost) */}
+                      <TouchableOpacity
+                        onPress={() => handleSendOtp('whatsapp')}
+                        disabled={busy || !phoneOk || !nameOk}
+                        activeOpacity={0.8}
                         style={{
-                          fontSize: 14,
-                          fontWeight: '700',
-                          color: '#1D4ED8',
+                          height: 52,
+                          borderRadius: R.md,
+                          backgroundColor:
+                            busy || !phoneOk || !nameOk ? '#CBD5E1' : '#16A34A',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'row',
+                          gap: 8,
+                          shadowColor: '#16A34A',
+                          shadowOpacity: busy || !phoneOk || !nameOk ? 0 : 0.25,
+                          shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 4 },
                         }}
                       >
-                        {isHi
-                          ? '1-क्लिक रिव्यूअर / डेमो प्रवेश'
-                          : '1-Tap Reviewer / Demo Access'}
-                      </Text>
-                    </TouchableOpacity>
+                        <MessageCircle size={20} color="#fff" />
+                        <Text
+                          style={{
+                            color: '#fff',
+                            fontSize: 15.5,
+                            fontWeight: '700',
+                          }}
+                        >
+                          {busy && channel === 'whatsapp'
+                            ? isHi
+                              ? 'व्हाट्सएप पर भेजा जा रहा है...'
+                              : 'Sending on WhatsApp...'
+                            : t.sendViaWhatsApp}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 2. Secondary: SMS Gateway Fallback */}
+                      <TouchableOpacity
+                        onPress={() => handleSendOtp('sms')}
+                        disabled={busy || !phoneOk || !nameOk}
+                        activeOpacity={0.7}
+                        style={{
+                          height: 48,
+                          borderRadius: R.md,
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1.5,
+                          borderColor: C.line,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'row',
+                          gap: 8,
+                        }}
+                      >
+                        <Phone size={16} color={C.sub} />
+                        <Text
+                          style={{
+                            color: C.ink,
+                            fontSize: 14.5,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {busy && channel === 'sms'
+                            ? isHi
+                              ? 'SMS भेजा जा रहा है...'
+                              : 'Sending SMS...'
+                            : t.sendViaSms}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 3. Reviewer & Test Team Bypass */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          loginWithPhone('9999999999', '123456', 'Abhishek Jain');
+                          router.replace(ROUTES.home as any);
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                          marginTop: 4,
+                          height: 44,
+                          borderRadius: R.pill,
+                          backgroundColor: '#EFF6FF',
+                          borderWidth: 1.5,
+                          borderColor: '#BFDBFE',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'row',
+                          gap: 6,
+                        }}
+                      >
+                        <Sparkles size={15} color="#1D4ED8" />
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: '700',
+                            color: '#1D4ED8',
+                          }}
+                        >
+                          {isHi
+                            ? '1-क्लिक रिव्यूअर / डेमो प्रवेश'
+                            : '1-Tap Reviewer / Demo Access'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      {/* OTP Verification Button */}
+                      <PrimaryButton
+                        label={
+                          busy
+                            ? isHi
+                              ? 'सत्यापित हो रहा है...'
+                              : 'Verifying...'
+                            : t.verify
+                        }
+                        onPress={() => handleVerifyOtp()}
+                        disabled={busy || otp.length !== 6}
+                      />
+                    </>
                   )}
                 </View>
 
-                {/* Resend Countdown in OTP Step */}
+                {/* Resend Controls in OTP Step */}
                 {step === 'otp' ? (
-                  <View style={{ alignItems: 'center', marginTop: 16 }}>
+                  <View style={{ alignItems: 'center', marginTop: 16, gap: 10 }}>
                     {left > 0 ? (
                       <Text
                         style={{
@@ -643,24 +711,51 @@ export default function LoginScreen() {
                         {t.resendIn(left)}
                       </Text>
                     ) : (
-                      <Pressable
-                        onPress={handleSendOtp}
-                        hitSlop={10}
-                        style={{
-                          minHeight: 40,
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text
+                      <View style={{ alignItems: 'center', gap: 8 }}>
+                        <Pressable
+                          onPress={() => handleSendOtp(channel)}
+                          hitSlop={10}
                           style={{
-                            color: C.brand,
-                            fontSize: 14,
-                            fontWeight: '700',
+                            minHeight: 36,
+                            justifyContent: 'center',
                           }}
                         >
-                          {t.resend}
-                        </Text>
-                      </Pressable>
+                          <Text
+                            style={{
+                              color: C.brand,
+                              fontSize: 14,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {t.resend}
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            handleSendOtp(channel === 'whatsapp' ? 'sms' : 'whatsapp')
+                          }
+                          hitSlop={10}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 6,
+                            backgroundColor: '#F1F5F9',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: C.sub,
+                              fontSize: 13,
+                              fontWeight: '600',
+                            }}
+                          >
+                            {channel === 'whatsapp'
+                              ? t.resendViaSms
+                              : t.resendViaWhatsApp}
+                          </Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
                 ) : null}
