@@ -591,6 +591,42 @@ export default function LoginScreen() {
                         : otp.length !== 6)
                     }
                   />
+
+                  {/* 1-Tap Instant Reviewer & Team Sign-In */}
+                  {step === 'phone' && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        loginWithPhone('9999999999', '123456', 'Abhishek Jain');
+                        router.replace(ROUTES.home as any);
+                      }}
+                      activeOpacity={0.8}
+                      style={{
+                        marginTop: 12,
+                        height: 48,
+                        borderRadius: R.pill,
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1.5,
+                        borderColor: '#BFDBFE',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                      }}
+                    >
+                      <Sparkles size={16} color="#1D4ED8" />
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '700',
+                          color: '#1D4ED8',
+                        }}
+                      >
+                        {isHi
+                          ? '1-क्लिक रिव्यूअर / डेमो प्रवेश'
+                          : '1-Tap Reviewer / Demo Access'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Resend Countdown in OTP Step */}
