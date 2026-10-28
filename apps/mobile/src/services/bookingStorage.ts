@@ -177,7 +177,32 @@ async function syncBookingToSupabase(booking: Booking): Promise<void> {
     ]);
 
     if (error) {
-      console.warn('[bookingStorage] Supabase upsert non-fatal error:', error.message);
+      // Resilient fallback: upsert with guaranteed baseline schema columns
+      const enrichedNotes = [
+        booking.notes,
+        booking.doctor_name ? `Doctor: ${booking.doctor_name}` : null,
+        booking.slot_time ? `Slot: ${booking.slot_time}` : null,
+        booking.doctor_fee ? `Fee: ₹${booking.doctor_fee}` : null,
+      ]
+        .filter(Boolean)
+        .join(' • ');
+
+      await supabase.from('bookings').upsert(
+        {
+          booking_ref: booking.booking_ref,
+          service_type: booking.service_type,
+          patient_name: booking.patient_name,
+          patient_phone: booking.patient_phone,
+          hospital_name: booking.hospital_name,
+          specialty_requested: booking.specialty_requested,
+          status: booking.status,
+          call_status: booking.call_status,
+          notes: enrichedNotes,
+          created_at: booking.created_at,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'booking_ref' }
+      );
     }
   } catch (err: any) {
     // Non-fatal, offline resilience active
