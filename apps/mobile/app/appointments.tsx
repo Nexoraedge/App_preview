@@ -51,6 +51,11 @@ import {
 } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking, ServiceType, BookingStatus } from '@adityam/types';
+import {
+  fetchAllBookings,
+  updateBookingStatus,
+  subscribeBookings,
+} from '../src/services/bookingStorage';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
 import { PressableCard } from '../components/PressableCard';
@@ -242,16 +247,11 @@ export default function AppointmentsScreen() {
   const [ticketModalVisible, setTicketModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch real bookings from Supabase if available
+  // Fetch real bookings from local storage & Supabase
   const loadBookings = useCallback(async () => {
     try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
+      const data = await fetchAllBookings(user?.phone);
+      if (Array.isArray(data) && data.length > 0) {
         // Merge with seeds
         const realMapped: EnrichedAppointment[] = data.map((b: Booking, idx: number) => {
           const isUpc = b.status === 'NEW' || b.status === 'CONFIRMED' || b.status === 'CALLING';
@@ -269,8 +269,8 @@ export default function AppointmentsScreen() {
             hospitalNameHi: b.hospital_name || 'जैन ईएनटी अस्पताल',
             hospitalAddress: b.branch_name || 'Hospital Campus Desk',
             hospitalAddressHi: b.branch_name || 'अस्पताल परिसर डेस्क',
-            patientName: b.patient_name || user?.full_name || 'Rahul Jain',
-            patientPhone: b.patient_phone || user?.phone || '+91 98112 44550',
+            patientName: b.patient_name || user?.full_name || 'Abhishek Jain',
+            patientPhone: b.patient_phone || user?.phone || '+91 99999 99999',
             slotDate: b.slot_time ? b.slot_time.split(',')[0] || 'Scheduled Date' : 'Scheduled Date',
             slotDateHi: b.slot_time ? b.slot_time.split(',')[0] || 'नियत तिथि' : 'नियत तिथि',
             slotTime: b.slot_time && b.slot_time.includes(',') ? b.slot_time.split(',')[1].trim() : '11:00 AM',
@@ -298,6 +298,10 @@ export default function AppointmentsScreen() {
 
   useEffect(() => {
     loadBookings();
+    const unsubscribe = subscribeBookings(() => {
+      loadBookings();
+    });
+    return unsubscribe;
   }, [loadBookings]);
 
   // Handle Manual Refresh
@@ -336,7 +340,7 @@ export default function AppointmentsScreen() {
   const upcomingCount = useMemo(() => appointments.filter((a) => a.isUpcoming).length, [appointments]);
   const pastCount = useMemo(() => appointments.filter((a) => !a.isUpcoming).length, [appointments]);
 
-  // Cancel Appointment Handler
+  // Cancel Appointment Handler with permanent storage persistence
   const handleCancelAppointment = (apt: EnrichedAppointment) => {
     Alert.alert(
       isHi ? 'अपॉइंटमेंट रद्द करें' : 'Cancel Appointment',
@@ -348,7 +352,8 @@ export default function AppointmentsScreen() {
         {
           text: isHi ? 'हाँ, रद्द करें' : 'Yes, Cancel',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await updateBookingStatus(apt.bookingRef, 'CANCELLED', 'User requested cancellation');
             setAppointments((prev) =>
               prev.map((item) =>
                 item.id === apt.id

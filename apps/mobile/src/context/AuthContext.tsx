@@ -4,7 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User, Dependent } from '@adityam/types';
 
 const AUTH_USER_STORAGE_KEY = '@adityam_auth_user_v1';
+const DEPENDENTS_STORAGE_KEY = '@adityam_dependents_v2';
 const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
+
+export type DependentRelation = 'Father' | 'Mother' | 'Spouse' | 'Son' | 'Daughter' | 'Other';
 
 interface AuthContextType {
   user: User | null;
@@ -14,6 +17,7 @@ interface AuthContextType {
   loginWithPhone: (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => boolean;
   logout: () => void;
   addDependent: (dependent: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => void;
+  removeDependent: (id: string) => void;
   deductWallet: (amount: number) => void;
   updateUser: (updates: Partial<User>) => void;
   deleteAccount: () => Promise<void>;
@@ -80,13 +84,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(getStoredInitialUser);
   const [dependents, setDependents] = useState<Dependent[]>(INITIAL_DEPENDENTS);
 
-  // Restore session from AsyncStorage asynchronously on all platforms
+  // Restore session & dependents from AsyncStorage asynchronously on all platforms
   useEffect(() => {
     AsyncStorage.getItem(AUTH_USER_STORAGE_KEY)
       .then((data) => {
         if (data) {
           try {
             setUser(JSON.parse(data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    AsyncStorage.getItem(DEPENDENTS_STORAGE_KEY)
+      .then((data) => {
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setDependents(parsed);
+            }
           } catch {}
         }
       })
@@ -181,7 +198,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user_id: user?.id || 'guest',
       created_at: new Date().toISOString(),
     };
-    setDependents((prev) => [newDep, ...prev]);
+    setDependents((prev) => {
+      const updated = [newDep, ...prev];
+      AsyncStorage.setItem(DEPENDENTS_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    // Background push to Supabase dependents table
+    try {
+      import('../lib/supabase').then(({ getSupabaseClient }) => {
+        Promise.resolve(
+          getSupabaseClient().from('dependents').insert({
+            id: newDep.id,
+            user_id: user?.id || null,
+            full_name: newDep.full_name,
+            relation: newDep.relation,
+            age: newDep.age,
+            gender: newDep.gender,
+            aadhaar_last_four: newDep.aadhaar_last_four,
+            kyc_status: newDep.kyc_status,
+            consent_given: newDep.consent_given,
+          })
+        ).catch(() => {});
+      }).catch(() => {});
+    } catch {}
+  };
+
+  const removeDependent = (id: string) => {
+    setDependents((prev) => {
+      const updated = prev.filter((d) => d.id !== id);
+      AsyncStorage.setItem(DEPENDENTS_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    try {
+      import('../lib/supabase').then(({ getSupabaseClient }) => {
+        Promise.resolve(
+          getSupabaseClient().from('dependents').delete().eq('id', id)
+        ).catch(() => {});
+      }).catch(() => {});
+    } catch {}
   };
 
   const deductWallet = (amount: number) => {
@@ -207,8 +263,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AsyncStorage.multiRemove([
         AUTH_USER_STORAGE_KEY,
+        DEPENDENTS_STORAGE_KEY,
         ONBOARDING_SEEN_KEY,
         '@adityam_appointments_v1',
+        '@adityam_local_bookings_v2',
         '@adityam_lab_cart_v1',
         '@adityam_family_v1',
         '@adityam_settings_v1',
@@ -217,9 +275,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       try {
         window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        window.localStorage.removeItem(DEPENDENTS_STORAGE_KEY);
         window.localStorage.removeItem(ONBOARDING_SEEN_KEY);
-        window.localStorage.removeItem('@adityam_lab_cart_v1');
-        window.localStorage.removeItem('@adityam_appointments_v1');
+        window.localStorage.removeItem('@adityam_local_bookings_v2');
       } catch {}
     }
     setUser(null);
@@ -236,6 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithPhone,
         logout,
         addDependent,
+        removeDependent,
         deductWallet,
         updateUser,
         deleteAccount,

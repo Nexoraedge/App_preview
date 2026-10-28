@@ -14,8 +14,9 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, UserCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchNearbyHospitals, getSupabaseClient } from '@adityam/supabase';
+import { fetchNearbyHospitals } from '@adityam/supabase';
 import type { Hospital, Doctor, Booking } from '@adityam/types';
+import { saveNewBooking } from '../../src/services/bookingStorage';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage } from '../../src/context/LanguageContext';
 import { opdCopy } from '../../src/i18n/opdCopy';
@@ -287,7 +288,10 @@ export default function OpdConciergeScreen() {
     setBookingModalVisible(true);
   };
 
-  const handleConfirmBooking = async () => {
+  const handleConfirmBooking = async (
+    patientName?: string,
+    patientPhone?: string
+  ) => {
     if (!bookingTargetDoctor) return;
     setIsSubmitting(true);
 
@@ -298,30 +302,25 @@ export default function OpdConciergeScreen() {
       booking_ref: bookingRef,
       service_type: 'OPD_CONCIERGE',
       user_id: user?.id,
-      patient_name: user?.full_name || 'Rahul Jain',
-      patient_phone: user?.phone || '+91 99999 99999',
+      patient_name: patientName || user?.full_name || 'Abhishek Jain',
+      patient_phone: patientPhone || user?.phone || '+91 99999 99999',
       hospital_name: bookingTargetDoctor.hospitalName,
       doctor_name: bookingTargetDoctor.doctor.name,
       doctor_fee: bookingTargetDoctor.doctor.discounted_fee,
       slot_time: effectiveSlot,
       specialty_requested: bookingTargetDoctor.doctor.specialty,
-      status: 'NEW',
-      call_status: 'pending',
-      notes: `OPD slot reserved for ${bookingTargetDoctor.doctor.name} at ${bookingTargetDoctor.hospitalName}. Masked Exotel dispatch initiated.`,
+      status: 'CONFIRMED',
+      call_status: 'connected',
+      notes: `OPD slot reserved for ${bookingTargetDoctor.doctor.name} at ${bookingTargetDoctor.hospitalName}. Token issued.`,
       created_at: new Date().toISOString(),
     };
 
-    try {
-      const supabase = getSupabaseClient();
-      await supabase.from('bookings').insert(newBooking);
-    } catch {
-      // Offline fallback handling
-    }
+    await saveNewBooking(newBooking);
 
     setTimeout(() => {
       setIsSubmitting(false);
       setConfirmedBooking(newBooking);
-    }, 700);
+    }, 450);
   };
 
   return (
@@ -651,6 +650,7 @@ export default function OpdConciergeScreen() {
         userPhone={user?.phone}
         userName={user?.full_name}
         language={language}
+        onViewAppointments={() => router.push('/appointments')}
       />
 
       {/* Profile & Language Modal */}
