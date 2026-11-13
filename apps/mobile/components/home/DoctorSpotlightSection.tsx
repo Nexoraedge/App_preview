@@ -30,7 +30,8 @@ export function DoctorSpotlightSection({
 }: DoctorSpotlightSectionProps) {
   const router = useRouter();
   const { width } = Dimensions.get('window');
-  const cardWidth = Math.min(width - 48, 330);
+  const containerWidth = Math.min(width, 640);
+  const cardWidth = Math.min(containerWidth - 48, 310);
   const c = isHi ? homeCopy.hi : homeCopy.en;
 
   if (!doctors || doctors.length === 0) return null;

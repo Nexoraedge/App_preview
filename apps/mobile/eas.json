@@ -1,11 +1,15 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
     },
     "preview": {
       "distribution": "internal",
@@ -23,10 +27,23 @@
       },
       "ios": {
         "enterprise": false
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bgzkpbeeypydmmufuoho.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_vLYf5GH34-aBwZ-cEsBIQA_rzuwRYej"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "",
+        "ascAppId": "",
+        "appleTeamId": ""
+      }
+    }
   }
 }

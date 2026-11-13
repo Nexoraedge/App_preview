@@ -2,14 +2,23 @@
 // Labs & Scans: Pick tests first, then pick the diagnostic centre offering all selections.
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { Search } from 'lucide-react-native';
+import type { Booking } from '@adityam/types';
+import { useAuth } from '../../src/context/AuthContext';
+import { useLocation } from '../../src/context/LocationContext';
+import { saveNewBooking, subscribeCloudBookings } from '../../src/services/bookingStorage';
+import { triggerBrowserNotification } from '../../src/services/notificationService';
+import { uploadPrescriptionSlip } from '../../src/lib/supabase';
 
 import { C, R, inr } from '../../src/theme';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { QuickAssistBar } from '../../components/ui/QuickAssistBar';
 import { LabCardSkeleton } from '../../components/ui/SkeletonBox';
 import { useLanguage } from '../../src/context/LanguageContext';
 import {
@@ -21,7 +30,9 @@ import {
   homeAvailable,
   type Item,
   type Segment,
+  type Centre,
 } from '../../src/data/labsSample';
+import { useLabItems, useLabCentres } from '../../src/hooks/useSupabaseData';
 import { TabSegment } from '../../src/data/labsData';
 import { labsCopy } from '../../src/i18n/labsCopy';
 
@@ -36,6 +47,8 @@ import {
   LabCartStickyBar,
   TestDetailModal,
   CentreSelectionSheet,
+  LabBookingModal,
+  LabPrescriptionUploadModal,
 } from '../../components/labs';
 
 const wrap = {
@@ -47,6 +60,8 @@ const wrap = {
 
 export default function LabsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuth();
   const { language } = useLanguage();
   const isHi = language === 'hi';
   const t = isHi ? labsCopy.hi : labsCopy.en;
@@ -66,11 +81,57 @@ export default function LabsScreen() {
   const [pick, setPick] = useState<string | null>(null);
   const [profileVisible, setProfileVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [labBookingModalVisible, setLabBookingModalVisible] = useState(false);
+  const [prescriptionModalVisible, setPrescriptionModalVisible] = useState(false);
+  const [confirmedLabBooking, setConfirmedLabBooking] = useState<Booking | null>(null);
+  const [isSubmittingLab, setIsSubmittingLab] = useState(false);
+  const [pendingBookingData, setPendingBookingData] = useState<{
+    totalAmount: number;
+    centre: Centre;
+    items?: Item[];
+  } | null>(null);
+
+  const { data: dbItems } = useLabItems();
+  const { data: dbCentres } = useLabCentres();
+
+  const liveItems: Item[] = useMemo(() => {
+    if (dbItems && dbItems.length > 0) {
+      return dbItems.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        nameHi: d.name_hi ?? d.name,
+        segment: d.segment as Segment,
+        category: d.category,
+        reportHrs: d.report_hrs,
+        fastingHrs: d.fasting_hrs ?? null,
+        about: d.about ?? '',
+        aboutHi: d.about_hi ?? d.about ?? '',
+        prep: d.prep ?? '',
+        prepHi: d.prep_hi ?? d.prep ?? '',
+        testsCount: d.tests_count ?? undefined,
+      }));
+    }
+    return ITEMS;
+  }, [dbItems]);
+
+  const itemMap = useMemo(() => {
+    const map: Record<string, Item> = { ...ITEM_BY_ID };
+    for (const item of liveItems) {
+      map[item.id] = item;
+    }
+    return map;
+  }, [liveItems]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 350);
     return () => clearTimeout(timer);
   }, []);
+
+  // Realtime subscription for Supabase cloud bookings
+  useEffect(() => {
+    const unsub = subscribeCloudBookings(user?.id);
+    return () => unsub();
+  }, [user?.id]);
 
   const allCartIds = useMemo(
     () => Array.from(new Set([...carts.lab, ...carts.scan, ...carts.package])),
@@ -95,9 +156,31 @@ export default function LabsScreen() {
       };
     });
 
+  const { coords: ctxCoords, activeAddress, currentLocationName } = useLocation();
+
+  const userCoords = useMemo(() => {
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    const isJp = locText.includes('jaipur') || String(activeAddress?.pincode || '').startsWith('302');
+    if (isJp) {
+      const lat = Number(activeAddress?.latitude);
+      const lng = Number(activeAddress?.longitude);
+      if (lat >= 26.0 && lat <= 28.0 && lng >= 75.0 && lng <= 77.0) return { lat, lng };
+      return { lat: 26.9205, lng: 75.8450 };
+    }
+    if (activeAddress?.latitude && activeAddress?.longitude) {
+      return { lat: Number(activeAddress.latitude), lng: Number(activeAddress.longitude) };
+    }
+    if (ctxCoords?.latitude && ctxCoords?.longitude) {
+      return { lat: ctxCoords.latitude, lng: ctxCoords.longitude };
+    }
+    return { lat: 26.9205, lng: 75.8450 };
+  }, [activeAddress, ctxCoords, currentLocationName, user?.city]);
+
+  const userCity = activeAddress?.city || currentLocationName || user?.city || 'Jaipur';
+
   const options = useMemo(
-    () => centresFor(cartIds.map((id) => ITEM_BY_ID[id])),
-    [cartIds]
+    () => centresFor(cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean), userCoords, userCity),
+    [cartIds, itemMap, userCoords, userCity]
   );
   const cheapestTotal = options.length
     ? Math.min(...options.map((o) => o.total))
@@ -109,10 +192,10 @@ export default function LabsScreen() {
   const totalEstimatedPrice = useMemo(() => {
     if (cheapestTotal !== null) return cheapestTotal;
     return cartIds.reduce((sum, id) => {
-      const it = ITEM_BY_ID[id];
+      const it = itemMap[id] || ITEM_BY_ID[id];
       return sum + (it ? fromPrice(it) : 0);
     }, 0);
-  }, [cheapestTotal, cartIds]);
+  }, [cheapestTotal, cartIds, itemMap]);
 
   const cartSummarySubtitle = useMemo(() => {
     const parts: string[] = [];
@@ -142,7 +225,8 @@ export default function LabsScreen() {
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return ITEMS.filter((i) => (segment === 'all' ? true : i.segment === segment))
+    return liveItems
+      .filter((i) => (segment === 'all' ? i.segment !== 'package' : i.segment === segment))
       .filter((i) => !category || i.category === category)
       .filter(
         (i) =>
@@ -153,9 +237,9 @@ export default function LabsScreen() {
       .filter((i) => !flt.home || homeAvailable(i))
       .filter((i) => !flt.sameDay || i.reportHrs <= 12)
       .filter((i) => !flt.noFast || i.fastingHrs === null);
-  }, [segment, category, query, flt]);
+  }, [segment, category, query, flt, liveItems]);
 
-  const packages = ITEMS.filter((i) => i.segment === 'package');
+  const packages = useMemo(() => liveItems.filter((i) => i.segment === 'package'), [liveItems]);
   const cats =
     segment === 'package'
       ? []
@@ -176,6 +260,86 @@ export default function LabsScreen() {
     setCentreSheet(true);
   };
 
+  const handleProceedToPayment = () => {
+    const selectedOption = options.find((o) => o.centre.id === pick) || options[0];
+    const selectedCentre = selectedOption?.centre;
+    const totalAmount = selectedOption?.total || cheapestTotal || 0;
+    if (!selectedCentre) return;
+
+    setPendingBookingData({
+      totalAmount,
+      centre: selectedCentre,
+      items: cartIds.map((id) => itemMap[id]).filter(Boolean),
+    });
+    setCentreSheet(false);
+    setLabBookingModalVisible(true);
+  };
+
+  const handleConfirmLabBooking = async (
+    patientName: string,
+    patientPhone: string,
+    collectionMode: 'HOME_COLLECTION' | 'CENTRE_VISIT',
+    collectionAddress: string,
+    slotString: string,
+    paymentMethod: string,
+    txnId: string
+  ) => {
+    if (!pendingBookingData) return;
+    setIsSubmittingLab(true);
+    const { totalAmount, centre } = pendingBookingData;
+    const bookingRef = `AN-LAB-${Math.floor(1000 + Math.random() * 9000)}`;
+    const testNames = cartIds.map((id) => itemMap[id]?.name || id).join(', ');
+
+    const newBooking: Booking = {
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
+      booking_ref: bookingRef,
+      service_type: 'INVESTIGATION',
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
+      patient_name: patientName,
+      patient_phone: patientPhone,
+      hospital_name: centre.name || 'Diagnostic Partner Lab',
+      branch_name: centre.area || currentLocationName || '',
+      doctor_name: `${cartIds.length || 1} Tests Panel: ${testNames.slice(0, 45)}`,
+      doctor_fee: totalAmount,
+      slot_time: slotString,
+      specialty_requested: segment === 'scan' ? 'Diagnostic Radiology' : 'Pathology Panel',
+      status: 'PAID',
+      call_status: 'connected',
+      notes: `Mode: ${
+        collectionMode === 'HOME_COLLECTION'
+          ? `Home Sample Collection at ${collectionAddress}`
+          : `Diagnostic Centre Walk-in at ${centre.name}`
+      }. Tests: ${testNames}. Paid online via ${paymentMethod} (${txnId}).`,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      await saveNewBooking(newBooking);
+      triggerBrowserNotification(
+        'Lab Appointment Confirmed',
+        `Booking #${bookingRef} confirmed for ${centre.name}. Slot: ${slotString}`
+      );
+      setConfirmedLabBooking(newBooking);
+      setCarts({ lab: [], scan: [], package: [] });
+    } catch (e) {
+      console.error('Failed to save lab booking:', e);
+      Alert.alert(
+        isHi ? 'त्रुटि' : 'Error',
+        isHi ? 'बुकिंग दर्ज करने में समस्या आई।' : 'Failed to register booking. Please try again.'
+      );
+    } finally {
+      setIsSubmittingLab(false);
+    }
+  };
+
+  const handleUploadPrescription = () => {
+    setPrescriptionModalVisible(true);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
@@ -183,7 +347,7 @@ export default function LabsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingBottom: (cartIds.length ? 175 : 96) + insets.bottom,
+          paddingBottom: (cartIds.length ? 190 : 160) + insets.bottom,
         }}
       >
         {/* 0. Header */}
@@ -210,6 +374,8 @@ export default function LabsScreen() {
             backgroundColor: C.bg,
             paddingTop: 14,
             paddingBottom: 10,
+            width: '100%',
+            alignItems: 'center',
           }}
         >
           <View style={wrap}>
@@ -219,19 +385,27 @@ export default function LabsScreen() {
               counts={counts}
               isHi={isHi}
             />
+            <LabFilterPillsRow
+              segment={segment}
+              filters={flt}
+              onToggleFilter={(key) =>
+                setFlt((prev) => ({ ...prev, [key]: !prev[key] }))
+              }
+              isHi={isHi}
+            />
           </View>
-          <LabFilterPillsRow
-            segment={segment}
-            filters={flt}
-            onToggleFilter={(key) =>
-              setFlt((prev) => ({ ...prev, [key]: !prev[key] }))
-            }
-            isHi={isHi}
-          />
         </View>
 
         {/* 2. Main Content Body */}
         <View style={[wrap, { paddingTop: 6 }]}>
+          {/* Quick Assistance 3-Pill Bar (Call, Quick Order, WhatsApp) */}
+          <QuickAssistBar
+            context="labs"
+            isHi={isHi}
+            onPressQuickOrder={handleUploadPrescription}
+            style={{ marginBottom: 12 }}
+          />
+
           {/* Category tiles */}
           {segment !== 'package' && (showBrowse || category) && (
             <CategoryTilesGrid
@@ -245,7 +419,7 @@ export default function LabsScreen() {
           {/* Prescription Upload Banner */}
           {segment !== 'package' && showBrowse && (
             <LabPrescriptionBanner
-              onPressUpload={() => {}}
+              onPressUpload={handleUploadPrescription}
               isHi={isHi}
             />
           )}
@@ -468,7 +642,7 @@ export default function LabsScreen() {
           setCarts({ lab: [], scan: [], package: [] });
           setCentreSheet(false);
         }}
-        onConfirm={() => setCentreSheet(false)}
+        onConfirm={handleProceedToPayment}
         onClose={() => setCentreSheet(false)}
         isHi={isHi}
         segment={segment}
@@ -479,6 +653,37 @@ export default function LabsScreen() {
       <ProfileModal
         visible={profileVisible}
         onClose={() => setProfileVisible(false)}
+      />
+
+      {/* Lab Booking Modal (Home/Centre mode, patient selector, morning fasting slots, online payment & pass) */}
+      <LabBookingModal
+        visible={labBookingModalVisible}
+        onClose={() => {
+          setLabBookingModalVisible(false);
+          setConfirmedLabBooking(null);
+          setPendingBookingData(null);
+        }}
+        selectedCentre={pendingBookingData?.centre || null}
+        selectedItems={pendingBookingData?.items || cartIds.map((id) => itemMap[id]).filter(Boolean)}
+        totalAmount={pendingBookingData?.totalAmount || 0}
+        onConfirmBooking={handleConfirmLabBooking}
+        isSubmitting={isSubmittingLab}
+        confirmedBooking={confirmedLabBooking}
+        language={language}
+        onViewAppointments={() => {
+          setLabBookingModalVisible(false);
+          setConfirmedLabBooking(null);
+          setPendingBookingData(null);
+          router.push('/appointments');
+        }}
+      />
+
+      {/* Cross-Platform Lab Prescription Upload Modal */}
+      <LabPrescriptionUploadModal
+        visible={prescriptionModalVisible}
+        onClose={() => setPrescriptionModalVisible(false)}
+        isHi={isHi}
+        onViewAppointments={() => router.push('/appointments')}
       />
     </View>
   );

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { MapPin, Star, Check, Truck, Store } from 'lucide-react-native';
+import { MapPin, Star, Check, Truck, Store, Clock, Zap } from 'lucide-react-native';
 import { Pharmacy, getPharmacyName, getPharmacyArea } from '../../src/data/pharmacySample';
 import { PressableCard } from '../ui/PressableCard';
 import { Chip } from '../ui/kit';
@@ -26,6 +26,14 @@ export function PharmacyShopCard({
 }: PharmacyShopCardProps) {
   const name = getPharmacyName(shop, isHi);
   const area = getPharmacyArea(shop, isHi);
+  const estTime = shop.km <= 1.5
+    ? (isHi ? '15–20 मिनट' : '15–20 mins')
+    : shop.km <= 3.5
+    ? (isHi ? '25–30 मिनट' : '25–30 mins')
+    : (isHi ? '35–45 मिनट' : '35–45 mins');
+  const deliveryBadge = shop.km <= 3.0
+    ? (isHi ? 'मुफ़्त डिलीवरी' : 'FREE Delivery')
+    : (isHi ? '₹15 डिलीवरी' : '₹15 Delivery');
 
   return (
     <PressableCard
@@ -51,27 +59,34 @@ export function PharmacyShopCard({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text
-              style={{ fontSize: 15.5, fontWeight: '700', color: C.ink }}
-            >
-              {name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text
+                style={{ fontSize: 15.5, fontWeight: '700', color: C.ink, flex: 1 }}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+            </View>
+
             <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
                 marginTop: 3,
+                flexWrap: 'wrap',
               }}
             >
               <MapPin size={12} color={C.sub} />
               <Text style={{ fontSize: 12, color: C.sub }}>
-                {area} · {shop.km} {isHi ? 'किमी' : 'km'}
+                {area} · <Text style={{ fontWeight: '700', color: C.brand }}>{shop.km} {isHi ? 'किमी' : 'km'}</Text>
               </Text>
-              <Star size={11} color="#D97706" fill="#D97706" />
-              <Text style={{ fontSize: 12, color: C.sub }}>
-                {shop.rating}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Star size={11} color="#D97706" fill="#D97706" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#D97706' }}>
+                  {shop.rating}
+                </Text>
+              </View>
             </View>
           </View>
           {isSelected && (
@@ -106,10 +121,14 @@ export function PharmacyShopCard({
             }
             tone="good"
           />
+          <Chip
+            label={estTime}
+            icon={<Clock size={11} color="#2563EB" />}
+          />
           {shop.delivery && (
             <Chip
-              label={isHi ? 'होम डिलीवरी' : 'Delivers'}
-              icon={<Truck size={11} color={C.sub} />}
+              label={deliveryBadge}
+              icon={<Truck size={11} color="#059669" />}
             />
           )}
           {shop.pickup && (

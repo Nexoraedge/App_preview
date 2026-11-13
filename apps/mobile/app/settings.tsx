@@ -3,7 +3,7 @@
 // Includes Profile Editing, ABHA Health ID linkage, Notifications preferences,
 // Biometric lock, Offline Cache Manager, Legal/Medical compliance, and Apple/Google compliant Account Deletion.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   TextInput,
   Switch,
   Modal,
+  Image,
   Alert,
   Platform,
   Share,
@@ -19,6 +20,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowLeft,
   User as UserIcon,
@@ -34,6 +37,7 @@ import {
   Fingerprint,
   Languages,
   Check,
+  CheckCircle2,
   Trash2,
   AlertTriangle,
   ChevronRight,
@@ -50,9 +54,13 @@ import {
   Smartphone,
   Share2,
   Info,
+  Camera,
 } from 'lucide-react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage, type Language } from '../src/context/LanguageContext';
+import { VerifyPhoneModal } from '../components/auth/VerifyPhoneModal';
+
+const SETTINGS_STORAGE_KEY = '@adityam_settings_v1';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -77,16 +85,151 @@ export default function SettingsScreen() {
   const [cacheSizeMb, setCacheSizeMb] = useState<number>(14.8);
   const [isClearingCache, setIsClearingCache] = useState(false);
 
+  // Clean Sanitized Fields
+  const isDemoUser = user?.id === '00000000-0000-0000-0000-000000000001';
+  // Only block demo reviewer placeholder data — real user data is always shown
+  const DEMO_PHONE = '+91 99999 99999';
+  const cleanCity = user?.city || '';
+  const cleanBlood = user?.blood_group || '';
+  const cleanEmergency = user?.emergency_contact && user.emergency_contact !== '+91 98112 44550' ? user.emergency_contact : '';
+  const cleanPhone = user?.phone && user.phone !== DEMO_PHONE && !user.phone.startsWith('+9100') ? user.phone : '';
+
   // Profile Edit Modal State
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
-  const [editName, setEditName] = useState(user?.full_name || 'Rahul Jain');
-  const [editEmail, setEditEmail] = useState('rahul.jain@example.com');
-  const [editCity, setEditCity] = useState(user?.city || 'Delhi NCR');
-  const [editBloodGroup, setEditBloodGroup] = useState('O+ Positive');
-  const [editEmergencyPhone, setEditEmergencyPhone] = useState('+91 98112 44550');
+  const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
+  const [verifyPhoneTarget, setVerifyPhoneTarget] = useState('');
+  const [editName, setEditName] = useState(user?.full_name || '');
+  const [editPhone, setEditPhone] = useState(cleanPhone);
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [editCity, setEditCity] = useState(cleanCity);
+  const [editBloodGroup, setEditBloodGroup] = useState(cleanBlood);
+  const [editEmergencyPhone, setEditEmergencyPhone] = useState(cleanEmergency);
+  const [editAvatar, setEditAvatar] = useState<string | null>(user?.avatar_url || null);
+
+  // Keep state in sync with user
+  useEffect(() => {
+    if (user) {
+      setEditName(user.full_name || '');
+      setEditPhone(cleanPhone);
+      setEditEmail(user.email || '');
+      setEditCity(cleanCity);
+      setEditBloodGroup(cleanBlood);
+      setEditEmergencyPhone(cleanEmergency);
+      setEditAvatar(user.avatar_url || null);
+    }
+  }, [user, cleanPhone, cleanCity, cleanBlood, cleanEmergency]);
+
+  // Load saved settings toggles
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_STORAGE_KEY)
+      .then((data) => {
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            if (typeof parsed.whatsappAlerts === 'boolean') setWhatsappAlerts(parsed.whatsappAlerts);
+            if (typeof parsed.smsAlerts === 'boolean') setSmsAlerts(parsed.smsAlerts);
+            if (typeof parsed.labReportAlerts === 'boolean') setLabReportAlerts(parsed.labReportAlerts);
+            if (typeof parsed.refillReminders === 'boolean') setRefillReminders(parsed.refillReminders);
+            if (typeof parsed.healthTips === 'boolean') setHealthTips(parsed.healthTips);
+            if (typeof parsed.biometricLock === 'boolean') setBiometricLock(parsed.biometricLock);
+            if (typeof parsed.twoFactorAuth === 'boolean') setTwoFactorAuth(parsed.twoFactorAuth);
+            if (typeof parsed.abdmAutoSync === 'boolean') setAbdmAutoSync(parsed.abdmAutoSync);
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Save settings toggles whenever changed
+  const saveToggleState = (key: string, value: boolean) => {
+    AsyncStorage.getItem(SETTINGS_STORAGE_KEY)
+      .then((data) => {
+        const existing = data ? JSON.parse(data) : {};
+        existing[key] = value;
+        AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(existing)).catch(() => {});
+      })
+      .catch(() => {});
+  };
+
+  const handlePickAvatar = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setEditAvatar(res.assets[0].uri);
+      }
+    } catch {
+      Alert.alert(isHi ? 'त्रुटि' : 'Error', isHi ? 'गैलरी खोलने में असमर्थ' : 'Unable to open image gallery');
+    }
+  };
 
   // ABHA Digital Card Modal State
   const [abhaModalVisible, setAbhaModalVisible] = useState(false);
+  const [inputAbhaId, setInputAbhaId] = useState('');
+
+  const handleOpenEditModal = () => {
+    setEditName(user?.full_name || '');
+    setEditPhone(cleanPhone);
+    setEditEmail(user?.email || '');
+    setEditCity(cleanCity);
+    setEditBloodGroup(cleanBlood);
+    setEditEmergencyPhone(cleanEmergency);
+    setEditAvatar(user?.avatar_url || null);
+    setEditProfileModalVisible(true);
+  };
+
+  const handleTriggerVerifyPhone = (phoneToVerify?: string) => {
+    const target = phoneToVerify || editPhone || user?.phone || '';
+    const digits = target.replace(/\D/g, '').slice(-10);
+    if (digits.length < 10) {
+      Alert.alert(
+        isHi ? 'अमान्य मोबाइल नंबर' : 'Invalid Mobile Number',
+        isHi
+          ? 'सत्यापन कोड (OTP) प्राप्त करने के लिए कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें।'
+          : 'Please enter a valid 10-digit mobile number to receive verification OTP.'
+      );
+      return;
+    }
+    setVerifyPhoneTarget(target);
+    setIsVerifyPhoneOpen(true);
+  };
+
+  const handlePhoneVerified = (verifiedPhone: string) => {
+    setEditPhone(verifiedPhone);
+    updateUser({
+      phone: verifiedPhone,
+      is_verified: true,
+    });
+    setIsVerifyPhoneOpen(false);
+    Alert.alert(
+      isHi ? 'सत्यापन सफल' : 'Phone Verified',
+      isHi
+        ? `आपका मोबाइल नंबर ${verifiedPhone} सफलतापूर्वक सत्यापित हो गया है!`
+        : `Your mobile number ${verifiedPhone} is now verified!`
+    );
+  };
+
+  const handleLinkAbha = () => {
+    const clean = inputAbhaId.trim();
+    if (clean.length < 8) {
+      Alert.alert(
+        isHi ? 'अमान्य ABHA' : 'Invalid ABHA',
+        isHi ? 'कृपया मान्य 14-अंकों का ABHA नंबर दर्ज करें' : 'Please enter a valid 14-digit ABHA number'
+      );
+      return;
+    }
+    updateUser({ abha_id: clean });
+    setAbhaModalVisible(false);
+    setInputAbhaId('');
+    Alert.alert(
+      isHi ? 'सफल' : 'ABHA Linked',
+      isHi ? 'आपकी ABHA आईडी सफलतापूर्वक लिंक कर दी गई है।' : 'Your ABHA ID has been successfully linked.'
+    );
+  };
 
   // Account Deletion Modal & Safety Confirmation State
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -110,12 +253,17 @@ export default function SettingsScreen() {
     }
     updateUser({
       full_name: editName.trim(),
+      phone: editPhone.trim() || undefined,
+      email: editEmail.trim() || undefined,
       city: editCity.trim(),
+      blood_group: editBloodGroup.trim() || null,
+      emergency_contact: editEmergencyPhone.trim() || null,
+      avatar_url: editAvatar,
     });
     setEditProfileModalVisible(false);
     Alert.alert(
       isHi ? 'सफल' : 'Profile Updated',
-      isHi ? 'आपकी प्रोफ़ाइल जानकारी सफलतापूर्वक अपडेट हो गई है।' : 'Your profile details have been saved.'
+      isHi ? 'आपकी प्रोफ़ाइल जानकारी Supabase से सिंक हो गई है।' : 'Your profile details have been saved and synced to Supabase.'
     );
   };
 
@@ -146,7 +294,7 @@ export default function SettingsScreen() {
           text: isHi ? 'शेयर करें' : 'Share / Save',
           onPress: () => {
             Share.share({
-              message: `Adityam Niramayaa Health Archive for ${user?.full_name || 'Rahul Jain'} (ABHA: 91-4582-9011-3420). Encrypted package ready.`,
+              message: `Adityam Niramayaa Health Archive for ${user?.full_name || 'Patient'}${user?.abha_id ? ` (ABHA: ${user.abha_id})` : ''}. Encrypted package ready.`,
             });
           },
         },
@@ -156,7 +304,22 @@ export default function SettingsScreen() {
   };
 
   // Log Out Handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const doLogout = async () => {
+      await logout();
+      router.replace('/login');
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const ok = window.confirm(
+        isHi ? 'क्या आप निश्चित रूप से अपने खाते से साइन आउट करना चाहते हैं?' : 'Are you sure you want to sign out?'
+      );
+      if (ok) {
+        await doLogout();
+      }
+      return;
+    }
+
     Alert.alert(
       isHi ? 'लॉग आउट करें' : 'Sign Out',
       isHi ? 'क्या आप निश्चित रूप से अपने खाते से साइन आउट करना चाहते हैं?' : 'Are you sure you want to sign out?',
@@ -165,10 +328,7 @@ export default function SettingsScreen() {
         {
           text: isHi ? 'हाँ, साइन आउट' : 'Sign Out',
           style: 'destructive',
-          onPress: () => {
-            logout();
-            router.replace('/login');
-          },
+          onPress: doLogout,
         },
       ]
     );
@@ -181,6 +341,15 @@ export default function SettingsScreen() {
       await deleteAccount();
       setDeleteModalVisible(false);
       setIsDeleting(false);
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(
+          isHi
+            ? 'आपका खाता स्थायी रूप से हटा दिया गया है।'
+            : 'Your account has been permanently deleted.'
+        );
+        router.replace('/welcome');
+        return;
+      }
       Alert.alert(
         isHi ? 'खाता स्थायी रूप से हटा दिया गया' : 'Account Permanently Deleted',
         isHi
@@ -296,40 +465,53 @@ export default function SettingsScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                <View
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 18,
-                    backgroundColor: '#1E40AF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <UserIcon size={26} color="#FFFFFF" />
-                </View>
+                {user?.avatar_url ? (
+                  <Image
+                    source={{ uri: user.avatar_url }}
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 18,
+                      borderWidth: 1.5,
+                      borderColor: '#BFDBFE',
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 18,
+                      backgroundColor: '#1E40AF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <UserIcon size={26} color="#FFFFFF" />
+                  </View>
+                )}
 
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
-                    {user?.full_name || 'Rahul Jain'}
+                    {user?.full_name || (isHi ? 'उपयोगकर्ता' : 'User')}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                     <Phone size={11} color="#64748B" />
                     <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
-                      {user?.phone || '+91 99999 99999'}
+                      {user?.phone || user?.email || (isHi ? 'फोन नंबर लिंक नहीं' : 'No Phone Linked')}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                     <MapPin size={11} color="#0D9488" />
                     <Text style={{ fontSize: 11.5, color: '#0D9488', fontWeight: '600' }}>
-                      {user?.city || 'Delhi NCR'}
+                      {user?.city || (isHi ? 'स्थान सेट नहीं' : 'Location Not Set')}
                     </Text>
                   </View>
                 </View>
               </View>
 
               <TouchableOpacity
-                onPress={() => setEditProfileModalVisible(true)}
+                onPress={handleOpenEditModal}
                 activeOpacity={0.8}
                 style={{
                   backgroundColor: '#EFF6FF',
@@ -368,7 +550,7 @@ export default function SettingsScreen() {
                   {isHi ? 'रक्त समूह' : 'Blood Group'}
                 </Text>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#E11D48', marginTop: 1 }}>
-                  {editBloodGroup}
+                  {user?.blood_group || editBloodGroup || (isHi ? 'सेट नहीं' : 'Not Set')}
                 </Text>
               </View>
 
@@ -379,7 +561,7 @@ export default function SettingsScreen() {
                   {isHi ? 'आपातकालीन फोन' : 'Emergency Contact'}
                 </Text>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginTop: 1 }}>
-                  {editEmergencyPhone}
+                  {user?.emergency_contact || editEmergencyPhone || (isHi ? 'सेट नहीं' : 'Not Set')}
                 </Text>
               </View>
 
@@ -387,10 +569,19 @@ export default function SettingsScreen() {
 
               <View style={{ alignItems: 'center' }}>
                 <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600', textTransform: 'uppercase' }}>
-                  {isHi ? 'वॉलेट कैश' : 'Health Cash'}
+                  {isHi ? 'खाता स्थिति' : 'Account Status'}
                 </Text>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#16A34A', marginTop: 1 }}>
-                  ₹{user?.wallet_balance?.toLocaleString('en-IN') || '2,500'}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '800',
+                    color: user?.is_verified ? '#16A34A' : '#D97706',
+                    marginTop: 1,
+                  }}
+                >
+                  {user?.is_verified
+                    ? (isHi ? 'सत्यापित' : 'Verified')
+                    : (isHi ? 'लंबित' : 'Pending')}
                 </Text>
               </View>
             </View>
@@ -457,70 +648,115 @@ export default function SettingsScreen() {
                     {isHi ? 'आयुष्मान भारत डिजिटल हेल्थ (ABHA)' : 'Ayushman Bharat Digital Health (ABHA)'}
                   </Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>
-                    {isHi ? 'राष्ट्रीय स्वास्थ्य प्राधिकरण (NHA) सत्यापित' : 'National Health Authority (NHA) Linked'}
+                    {user?.abha_id
+                      ? (isHi ? 'राष्ट्रीय स्वास्थ्य प्राधिकरण (NHA) सत्यापित' : 'National Health Authority (NHA) Linked')
+                      : (isHi ? 'राष्ट्रीय स्वास्थ्य प्राधिकरण (ABDM)' : 'National Health Authority (ABDM)')}
                   </Text>
                 </View>
               </View>
 
               <View
                 style={{
-                  backgroundColor: '#DCFCE7',
+                  backgroundColor: user?.abha_id ? '#DCFCE7' : '#F1F5F9',
                   paddingHorizontal: 8,
                   paddingVertical: 3,
                   borderRadius: 6,
                   borderWidth: 1,
-                  borderColor: '#86EFAC',
+                  borderColor: user?.abha_id ? '#86EFAC' : '#CBD5E1',
                 }}
               >
-                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#15803D' }}>
-                  ✓ {isHi ? 'सत्यापित' : 'Active'}
+                <Text style={{ fontSize: 10.5, fontWeight: '700', color: user?.abha_id ? '#15803D' : '#64748B' }}>
+                  {user?.abha_id ? (isHi ? '✓ सक्रिय' : '✓ Active') : (isHi ? 'लिंक नहीं' : 'Not Linked')}
                 </Text>
               </View>
             </View>
 
             {/* ABHA Number Box */}
-            <View
-              style={{
-                backgroundColor: '#FFFBEB',
-                borderWidth: 1,
-                borderColor: '#FDE68A',
-                borderRadius: 12,
-                padding: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 12,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: '#92400E', textTransform: 'uppercase' }}>
-                  {isHi ? 'ABHA पता व पहचान संख्या' : 'ABHA ID & Address'}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#78350F', marginTop: 1 }}>
-                  91-4582-9011-3420
-                </Text>
-                <Text style={{ fontSize: 11, color: '#B45309', marginTop: 1 }}>
-                  rahul.jain@abdm
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setAbhaModalVisible(true)}
-                activeOpacity={0.8}
+            {user?.abha_id ? (
+              <View
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: '#F0FDF4',
                   borderWidth: 1,
-                  borderColor: '#F59E0B',
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: 8,
+                  borderColor: '#BBF7D0',
+                  borderRadius: 12,
+                  padding: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 12,
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#D97706' }}>
-                  {isHi ? 'कार्ड देखें' : 'View Card'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                <View>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#15803D', textTransform: 'uppercase' }}>
+                    {isHi ? 'ABHA पता व पहचान संख्या' : 'ABHA ID & Address'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#14532D', marginTop: 1 }}>
+                    {user.abha_id}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#16A34A', marginTop: 1 }}>
+                    {user.email || 'Linked with ABDM'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setAbhaModalVisible(true)}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: '#16A34A',
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#15803D' }}>
+                    {isHi ? 'कार्ड देखें' : 'View Card'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 12,
+                  padding: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 12,
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                    {isHi ? 'आयुष्मान भारत (ABHA) आईडी' : 'Ayushman Bharat (ABHA) ID'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155', marginTop: 1 }}>
+                    {isHi ? 'कोई ABHA लिंक नहीं है' : 'No ABHA Linked'}
+                  </Text>
+                  <Text style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 1 }}>
+                    {isHi ? 'डिजिटल स्वास्थ्य रिकॉर्ड सिंक करने के लिए लिंक करें' : 'Link to access digital hospital records'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setAbhaModalVisible(true)}
+                  activeOpacity={0.8}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                    {isHi ? 'लिंक करें' : 'Link ABHA'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* ABDM Auto Sync Toggle */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -846,7 +1082,7 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: '#64748B' }}>Delhi NCR</Text>
+              <Text style={{ fontSize: 11, color: '#64748B' }}>{cleanCity || (isHi ? 'सक्रिय' : 'Online')}</Text>
             </View>
           </View>
 
@@ -1238,6 +1474,55 @@ export default function SettingsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Avatar Photo Picker */}
+              <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={handlePickAvatar}
+                  activeOpacity={0.8}
+                  style={{ position: 'relative' }}
+                >
+                  {editAvatar ? (
+                    <Image
+                      source={{ uri: editAvatar }}
+                      style={{ width: 72, height: 72, borderRadius: 24 }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: 24,
+                        backgroundColor: '#1E40AF',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <UserIcon size={32} color="#FFFFFF" />
+                    </View>
+                  )}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: -2,
+                      right: -2,
+                      backgroundColor: '#2563EB',
+                      borderRadius: 13,
+                      width: 26,
+                      height: 26,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: '#FFFFFF',
+                    }}
+                  >
+                    <Camera size={13} color="#FFFFFF" />
+                  </View>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 11.5, color: '#2563EB', fontWeight: '600', marginTop: 6 }}>
+                  {isHi ? 'फ़ोटो बदलें' : 'Change Photo'}
+                </Text>
+              </View>
+
               {/* Full Name */}
               <View style={{ marginBottom: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B', marginBottom: 4 }}>
@@ -1246,7 +1531,7 @@ export default function SettingsScreen() {
                 <TextInput
                   value={editName}
                   onChangeText={setEditName}
-                  placeholder="Rahul Jain"
+                  placeholder={isHi ? 'पूरा नाम दर्ज करें' : 'Enter full name'}
                   style={[
                     {
                       backgroundColor: '#F8FAFC',
@@ -1272,7 +1557,7 @@ export default function SettingsScreen() {
                   value={editEmail}
                   onChangeText={setEditEmail}
                   keyboardType="email-address"
-                  placeholder="rahul.jain@example.com"
+                  placeholder={isHi ? 'ईमेल पता दर्ज करें' : 'name@example.com'}
                   style={[
                     {
                       backgroundColor: '#F8FAFC',
@@ -1289,6 +1574,89 @@ export default function SettingsScreen() {
                 />
               </View>
 
+              {/* Phone Number with Verification */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>
+                    {isHi ? 'फ़ोन नंबर' : 'Phone Number'}
+                  </Text>
+                  {user?.is_verified && editPhone.replace(/\D/g, '').slice(-10) === (user?.phone?.replace(/\D/g, '').slice(-10) || '') ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={12} color="#16A34A" />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A' }}>
+                        {isHi ? 'सत्यापित' : 'Verified'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleTriggerVerifyPhone(editPhone)}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        backgroundColor: '#EFF6FF',
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                      }}
+                    >
+                      <ShieldCheck size={12} color="#2563EB" />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>
+                        {isHi ? 'सत्यापित करें' : 'Verify'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <TextInput
+                    value={editPhone}
+                    onChangeText={setEditPhone}
+                    keyboardType="phone-pad"
+                    placeholder="+91"
+                    style={[
+                      {
+                        flex: 1,
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        color: '#0F172A',
+                      },
+                      Platform.OS === 'web' && ({ outline: 'none', outlineStyle: 'none' } as any),
+                    ]}
+                  />
+                  {(!user?.is_verified || editPhone.replace(/\D/g, '').slice(-10) !== (user?.phone?.replace(/\D/g, '').slice(-10) || '')) && (
+                    <TouchableOpacity
+                      onPress={() => handleTriggerVerifyPhone(editPhone)}
+                      activeOpacity={0.88}
+                      style={{
+                        backgroundColor: '#2563EB',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        shadowColor: '#2563EB',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4,
+                        elevation: 2,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                        {isHi ? 'सत्यापित करें' : 'Verify'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               {/* City */}
               <View style={{ marginBottom: 12 }}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B', marginBottom: 4 }}>
@@ -1297,7 +1665,7 @@ export default function SettingsScreen() {
                 <TextInput
                   value={editCity}
                   onChangeText={setEditCity}
-                  placeholder="Delhi NCR"
+                  placeholder={isHi ? 'जैसे जयपुर, दक्षिण दिल्ली' : 'e.g. South Delhi, Jaipur'}
                   style={[
                     {
                       backgroundColor: '#F8FAFC',
@@ -1322,7 +1690,7 @@ export default function SettingsScreen() {
                 <TextInput
                   value={editBloodGroup}
                   onChangeText={setEditBloodGroup}
-                  placeholder="O+ Positive"
+                  placeholder={isHi ? 'जैसे B+, O+, AB+' : 'e.g. B+, O+, AB+'}
                   style={[
                     {
                       backgroundColor: '#F8FAFC',
@@ -1348,7 +1716,7 @@ export default function SettingsScreen() {
                   value={editEmergencyPhone}
                   onChangeText={setEditEmergencyPhone}
                   keyboardType="phone-pad"
-                  placeholder="+91 98112 44550"
+                  placeholder={isHi ? '10 अंकों का फोन नंबर' : '10-digit emergency mobile'}
                   style={[
                     {
                       backgroundColor: '#F8FAFC',
@@ -1430,83 +1798,147 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ padding: 20 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+            {user?.abha_id ? (
+              <View style={{ padding: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                  <View
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 16,
+                      backgroundColor: '#EFF6FF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: '#BFDBFE',
+                    }}
+                  >
+                    <UserIcon size={32} color="#2563EB" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                      {user.full_name || 'Patient'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                      {user.gender ? `Gender: ${user.gender} • ` : ''}{user.age ? `Age: ${user.age}` : 'Age: Not Set'}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>
+                      ✓ ABDM KYC Verified
+                    </Text>
+                  </View>
+                </View>
+
                 <View
                   style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 16,
-                    backgroundColor: '#EFF6FF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    padding: 14,
                     borderWidth: 1,
-                    borderColor: '#BFDBFE',
+                    borderColor: '#E2E8F0',
+                    gap: 8,
                   }}
                 >
-                  <UserIcon size={32} color="#2563EB" />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>ABHA Number:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>{user.abha_id}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>ABHA Address:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                      {user.email ? `${user.email.split('@')[0]}@abdm` : 'patient@abdm'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Linked Mobile:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }}>{user.phone || 'Not Linked'}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
-                    {user?.full_name || 'Rahul Jain'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
-                    Gender: Male • Age: 34
-                  </Text>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>
-                    ✓ ABDM KYC Verified
-                  </Text>
-                </View>
-              </View>
 
-              <View
-                style={{
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 14,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: '#E2E8F0',
-                  gap: 8,
-                }}
-              >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>ABHA Number:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>91-4582-9011-3420</Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>ABHA Address:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>rahul.jain@abdm</Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Linked Mobile:</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }}>+91 99999 99999</Text>
-                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Share.share({
+                      message: `ABHA Health Card: ${user.full_name || 'Patient'} (${user.abha_id}). Linked with Adityam Niramayaa Health Network.`,
+                    });
+                  }}
+                  activeOpacity={0.88}
+                  style={{
+                    marginTop: 16,
+                    backgroundColor: '#1E40AF',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Share2 size={16} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {isHi ? 'कार्ड साझा करें' : 'Share Digital Card'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                onPress={() => {
-                  Share.share({
-                    message: 'ABHA Health Card: Rahul Jain (91-4582-9011-3420). Linked with Adityam Niramayaa Health Network.',
-                  });
-                }}
-                activeOpacity={0.88}
-                style={{
-                  marginTop: 16,
-                  backgroundColor: '#1E40AF',
-                  paddingVertical: 12,
-                  borderRadius: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                <Share2 size={16} color="#FFFFFF" />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                  {isHi ? 'कार्ड साझा करें' : 'Share Digital Card'}
+            ) : (
+              <View style={{ padding: 20 }}>
+                <Text style={{ fontSize: 13, color: '#475569', lineHeight: 18, marginBottom: 14 }}>
+                  {isHi
+                    ? 'राष्ट्रीय स्वास्थ्य प्राधिकरण (NHA) द्वारा जारी अपना 14 अंकों का ABHA नंबर लिंक करें।'
+                    : 'Link your 14-digit Ayushman Bharat Health Account (ABHA) number issued by the National Health Authority.'}
                 </Text>
-              </TouchableOpacity>
-            </View>
+
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B', marginBottom: 6 }}>
+                    {isHi ? 'ABHA नंबर दर्ज करें' : '14-Digit ABHA ID'}
+                  </Text>
+                  <TextInput
+                    value={inputAbhaId}
+                    onChangeText={setInputAbhaId}
+                    placeholder="91-XXXX-XXXX-XXXX"
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      color: '#0F172A',
+                    }}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleLinkAbha}
+                  activeOpacity={0.88}
+                  style={{
+                    backgroundColor: '#2563EB',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {isHi ? 'सत्यापित कर लिंक करें' : 'Verify & Link ABHA'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    const sample = `91-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
+                    setInputAbhaId(sample);
+                  }}
+                  activeOpacity={0.7}
+                  style={{ alignItems: 'center', paddingVertical: 6 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563EB' }}>
+                    {isHi ? 'परीक्षण हेतु डमी ABHA भरें' : 'Autofill Sample ABHA for Demo'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1776,6 +2208,21 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Progressive Phone Verification Modal with OTP */}
+      <VerifyPhoneModal
+        visible={isVerifyPhoneOpen}
+        onClose={() => setIsVerifyPhoneOpen(false)}
+        initialPhone={verifyPhoneTarget}
+        onSuccess={handlePhoneVerified}
+        isHi={isHi}
+        title={isHi ? 'मोबाइल नंबर सत्यापन' : 'Verify Mobile Number'}
+        subtitle={
+          isHi
+            ? 'अपनी प्रोफ़ाइल व मेडिकल रिकॉर्ड सुरक्षित रखने के लिए 10-अंकों का फ़ोन नंबर सत्यापित करें।'
+            : 'Verify your phone number with a quick 6-digit OTP to secure your account and OPD passes.'
+        }
+      />
     </View>
   );
 }

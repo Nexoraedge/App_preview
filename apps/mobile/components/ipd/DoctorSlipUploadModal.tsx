@@ -1,7 +1,7 @@
 // apps/mobile/components/ipd/DoctorSlipUploadModal.tsx
 // Doctor admission advice slip upload bottom sheet modal
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -11,8 +11,11 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Image,
+  Alert,
 } from 'react-native';
-import { X, CheckCircle2, Upload } from 'lucide-react-native';
+import { X, CheckCircle2, Upload, Camera, Image as ImageIcon, Trash2 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DoctorSlipUploadModalProps {
@@ -26,8 +29,9 @@ interface DoctorSlipUploadModalProps {
   adviceNote: string;
   onAdviceNoteChange: (text: string) => void;
   isSubmitting: boolean;
-  onSubmit: () => void;
+  onSubmit: (slipUri?: string | null, slipBase64?: string) => void;
   successRef: string | null;
+  onViewAppointments?: () => void;
 }
 
 export function DoctorSlipUploadModal({
@@ -43,8 +47,38 @@ export function DoctorSlipUploadModal({
   isSubmitting,
   onSubmit,
   successRef,
+  onViewAppointments,
 }: DoctorSlipUploadModalProps) {
   const insets = useSafeAreaInsets();
+  const [slipUri, setSlipUri] = useState<string | null>(null);
+  const [slipBase64, setSlipBase64] = useState<string | undefined>(undefined);
+
+  const handlePickGallery = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.uri) {
+        setSlipUri(res.assets[0].uri);
+        setSlipBase64(res.assets[0].base64 || undefined);
+      }
+    } catch {}
+  };
+
+  const handlePickCamera = async () => {
+    try {
+      const res = await ImagePicker.launchCameraAsync({
+        quality: 0.7,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.uri) {
+        setSlipUri(res.assets[0].uri);
+        setSlipBase64(res.assets[0].base64 || undefined);
+      }
+    } catch {}
+  };
 
   return (
     <Modal
@@ -195,28 +229,55 @@ export function DoctorSlipUploadModal({
                   : `An Adityam Niramayaa care advisor is reviewing your prescription. We will contact you at ${patientPhone} with comparative package estimates.`}
               </Text>
 
-              <TouchableOpacity
-                onPress={onClose}
-                style={{
-                  backgroundColor: '#2563EB',
-                  borderRadius: 12,
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                  marginTop: 20,
-                  width: '100%',
-                  alignItems: 'center',
-                }}
-              >
-                <Text
+              <View style={{ width: '100%', marginTop: 20, gap: 10 }}>
+                {onViewAppointments && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      onViewAppointments();
+                    }}
+                    style={{
+                      backgroundColor: '#2563EB',
+                      borderRadius: 12,
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      width: '100%',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 13,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {isHi ? 'मेरी अपॉइंटमेंट्स देखें →' : 'View My Bookings →'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={onClose}
                   style={{
-                    color: '#FFFFFF',
-                    fontSize: 13,
-                    fontWeight: '700',
+                    backgroundColor: onViewAppointments ? '#F1F5F9' : '#2563EB',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    width: '100%',
+                    alignItems: 'center',
                   }}
                 >
-                  {isHi ? 'पूर्ण' : 'Done'}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={{
+                      color: onViewAppointments ? '#475569' : '#FFFFFF',
+                      fontSize: 13,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {isHi ? 'पूर्ण' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <ScrollView
@@ -224,38 +285,109 @@ export function DoctorSlipUploadModal({
               style={{ marginTop: 10 }}
             >
               {/* Upload box */}
-              <View
-                style={{
-                  backgroundColor: '#F8FAFC',
-                  borderWidth: 2,
-                  borderStyle: 'dashed',
-                  borderColor: '#93C5FD',
-                  borderRadius: 16,
-                  padding: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 14,
-                }}
-              >
-                <Upload size={24} color="#2563EB" />
-                <Text
+              {slipUri ? (
+                <View
                   style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: '#0F172A',
-                    marginTop: 8,
+                    backgroundColor: '#F0FDF4',
+                    borderWidth: 1.5,
+                    borderColor: '#86EFAC',
+                    borderRadius: 16,
+                    padding: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 14,
                   }}
                 >
-                  {isHi
-                    ? 'डॉक्टर का पर्चा संलग्न करें'
-                    : "Doctor's prescription attached"}
-                </Text>
-                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                  {isHi
-                    ? 'पीडीएफ या फोटो (अधिकतम 10 एमबी)'
-                    : 'PDF or Image (Max 10 MB)'}
-                </Text>
-              </View>
+                  <Image
+                    source={{ uri: slipUri }}
+                    style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: '#E2E8F0' }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={14} color="#16A34A" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#15803D' }}>
+                        {isHi ? 'पर्चा संलग्न है' : 'Prescription Attached'}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      {isHi ? 'तस्वीर सफलतापूर्वक चुनी गई' : 'File selected successfully'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSlipUri(null);
+                      setSlipBase64(undefined);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{ padding: 6, backgroundColor: '#FEE2E2', borderRadius: 8 }}
+                  >
+                    <Trash2 size={15} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                  <TouchableOpacity
+                    onPress={handlePickGallery}
+                    activeOpacity={0.8}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 2,
+                      borderStyle: 'dashed',
+                      borderColor: '#93C5FD',
+                      borderRadius: 16,
+                      padding: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Upload size={22} color="#2563EB" />
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '700',
+                        color: '#0F172A',
+                        marginTop: 6,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {isHi ? 'गैलरी / फ़ाइल चुनें' : 'Choose File / Gallery'}
+                    </Text>
+                  </TouchableOpacity>
+                  {Platform.OS !== 'web' && (
+                    <TouchableOpacity
+                      onPress={handlePickCamera}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
+                        borderColor: '#CBD5E1',
+                        borderRadius: 16,
+                        padding: 18,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Camera size={22} color="#334155" />
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '700',
+                          color: '#0F172A',
+                          marginTop: 6,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {isHi ? 'फोटो लें' : 'Take Photo'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               {/* Patient Name */}
               <TextInput
@@ -342,7 +474,7 @@ export function DoctorSlipUploadModal({
 
               {/* Submit Button */}
               <TouchableOpacity
-                onPress={onSubmit}
+                onPress={() => onSubmit(slipUri, slipBase64)}
                 disabled={isSubmitting}
                 activeOpacity={0.88}
                 style={{

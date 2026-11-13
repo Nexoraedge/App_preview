@@ -1,5 +1,8 @@
 // apps/mobile/components/home/HeroCarousel.tsx
-// 158px Auto-Scrolling Hero Banner Carousel with 1:1 3D PNG Illustrations and Pagination Dots
+// Exact 1:1 Modular Hero Banners with User-Specified Graphics & Brand Gradients:
+// 1. Royal Blue: Consult Top Specialists (Doctor with Stethoscope)
+// 2. Emerald Green: NABL Certified Labs & Diagnostics (Microscope + Report)
+// 3. Royal Purple-Violet: Planned Hospital Care & Surgery (Hospital Building)
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
@@ -8,17 +11,32 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Dimensions,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ImageSourcePropType,
+  ImageStyle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SkeletonBox } from '../ui/SkeletonBox';
 
-const docHeroImg = require('../../assets/doc.png');
-const labHeroImg = require('../../assets/lab.png');
-const hospHeroImg = require('../../assets/hosp.png');
+// User-specified banner assets
+const doctorImage = require('../../assets/banner_doctor.png');
+const labImage = require('../../assets/banner_lab.png');
+const hospitalImage = require('../../assets/banner_hospital.png');
+
+interface BannerItem {
+  id: string;
+  route: '/opd' | '/labs' | '/ipd' | '/pharmacy';
+  badge: string;
+  title: string;
+  sub: string;
+  cta: string;
+  colors: readonly [string, string];
+  image: ImageSourcePropType;
+  imageStyle?: ImageStyle;
+}
 
 interface HeroCarouselProps {
   isHi: boolean;
@@ -27,46 +45,91 @@ interface HeroCarouselProps {
 
 export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
   const router = useRouter();
-  const { width } = Dimensions.get('window');
-  const bannerWidth = width - 32;
+  const { width } = useWindowDimensions();
+  const containerWidth = Math.min(width, 640);
+  const bannerWidth = containerWidth - 32;
   const bannerScrollRef = useRef<ScrollView>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
-  const heroBanners = useMemo(
+  const heroBanners: BannerItem[] = useMemo(
     () => [
+      // 1. ROYAL BLUE: Consult Top Specialists (Doctor)
       {
         id: 'b-opd',
-        route: '/opd' as const,
-        badge: isHi ? 'पार्टनर अस्पताल' : 'Partner Hospitals',
-        title: isHi ? 'विशेषज्ञ डॉक्टर परामर्श' : 'Consult Top Specialists',
-        sub: isHi ? 'समय पर इन-क्लिनिक अपॉइंटमेंट' : 'Priority in-clinic consultations',
+        route: '/opd',
+        badge: isHi ? 'शीर्ष क्लिनिक' : 'Top Clinics',
+        title: isHi
+          ? 'विशेषज्ञ डॉक्टर परामर्श'
+          : 'Consult Top Specialists',
+        sub: isHi
+          ? 'समय पर इन-क्लिनिक अपॉइंटमेंट'
+          : 'Priority in-clinic consultations',
         cta: isHi ? 'अपॉइंटमेंट लें ›' : 'Book Consult ›',
-        colors: ['#1E3A8A', '#2563EB'] as const,
-        image: docHeroImg,
+        colors: ['#0F2B5C', '#1E4DB7'] as const,
+        image: doctorImage,
+        imageStyle: {
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          width: 140,
+          height: 154,
+        },
       },
+      // 2. EMERALD GREEN: Labs & Diagnostics (Microscope + NABL Report)
       {
         id: 'b-labs',
-        route: '/labs' as const,
-        badge: isHi ? 'NABL प्रमाणित लैब्स' : '100% NABL Labs',
-        title: isHi ? 'सटीक व डिजिटल टेस्ट्स' : 'Accurate Diagnostic Tests',
-        sub: isHi ? 'घर से मुफ़्त सैंपल व त्वरित रिपोर्ट' : 'Home sample pickup & fast reports',
-        cta: isHi ? 'टेस्ट्स देखें ›' : 'Explore Tests ›',
-        colors: ['#065F46', '#059669'] as const,
-        image: labHeroImg,
+        route: '/labs',
+        badge: isHi ? 'NABL प्रमाणित' : 'NABL Certified',
+        title: isHi
+          ? 'NABL प्रमाणित लैब टेस्ट्स'
+          : 'Lab Tests at NABL-Certified Centres',
+        sub: isHi
+          ? 'घर से मुफ़्त सैंपल संग्रह उपलब्ध'
+          : 'Home sample pickup available',
+        cta: isHi ? 'बुक करें ›' : 'Book Now ›',
+        colors: ['#064E3B', '#059669'] as const,
+        image: labImage,
+        imageStyle: {
+          position: 'absolute',
+          right: 4,
+          bottom: 6,
+          width: 140,
+          height: 138,
+        },
       },
+      // 3. ROYAL PURPLE-VIOLET: Hospital Care & Surgery (Hospital Building)
       {
         id: 'b-ipd',
-        route: '/ipd' as const,
-        badge: isHi ? 'अस्पताल देखभाल' : 'Hospital Care',
-        title: isHi ? 'नियोजित अस्पताल भर्ती' : 'Planned Hospital Admissions',
-        sub: isHi ? 'अनुभवी डॉक्टरों व केंद्रों का नेटवर्क' : 'Dedicated support across partner network',
-        cta: isHi ? 'अस्पताल खोजें ›' : 'Find Hospitals ›',
-        colors: ['#312E81', '#4F46E5'] as const,
-        image: hospHeroImg,
+        route: '/ipd',
+        badge: isHi ? 'शीर्ष अस्पताल' : 'Top Hospitals',
+        title: isHi
+          ? 'नियोजित अस्पताल भर्ती व सर्जरी'
+          : 'Planned Hospital Care & Surgery',
+        sub: isHi
+          ? 'समर्पित सहायता व कैशलेस एडमिशन'
+          : 'Cashless admission & priority care',
+        cta: isHi ? 'अस्पताल देखें ›' : 'Explore Care ›',
+        colors: ['#4C1D95', '#7C3AED'] as const,
+        image: hospitalImage,
+        imageStyle: {
+          position: 'absolute',
+          right: 4,
+          bottom: 6,
+          width: 138,
+          height: 138,
+        },
       },
     ],
     [isHi]
   );
+
+  // Keep scroll aligned on window resize
+  useEffect(() => {
+    bannerScrollRef.current?.scrollTo({
+      x: activeBannerIndex * bannerWidth,
+      animated: false,
+    });
+  }, [bannerWidth]);
 
   // Auto-scroll every 5.5s
   useEffect(() => {
@@ -113,24 +176,32 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
           shadowOpacity: 0.12,
           shadowRadius: 10,
           elevation: 4,
+          backgroundColor: '#0F2B5C',
         }}
       >
         <ScrollView
           ref={bannerScrollRef}
           horizontal
           pagingEnabled
+          snapToInterval={bannerWidth}
+          snapToAlignment="center"
+          decelerationRate="fast"
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={handleBannerScroll}
           scrollEventThrottle={16}
-          decelerationRate="fast"
           style={{ width: bannerWidth, height: 158 }}
+          contentContainerStyle={{ width: bannerWidth * heroBanners.length }}
         >
           {heroBanners.map((banner) => (
             <TouchableOpacity
               key={banner.id}
               activeOpacity={0.92}
               onPress={() => router.push(banner.route)}
-              style={{ width: bannerWidth, height: 158 }}
+              style={{
+                width: bannerWidth,
+                height: 158,
+                overflow: 'hidden',
+              }}
             >
               <LinearGradient
                 colors={banner.colors}
@@ -139,37 +210,41 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                 style={{
                   width: '100%',
                   height: '100%',
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
+                  paddingHorizontal: 18,
+                  paddingVertical: 14,
                   position: 'relative',
                   overflow: 'hidden',
+                  justifyContent: 'space-between',
                 }}
               >
-                {/* Soft Ambient Radial Shine */}
+                {/* Circular Halo Backdrop behind Graphic */}
                 <View
                   pointerEvents="none"
                   style={{
                     position: 'absolute',
-                    right: -10,
+                    right: 6,
                     bottom: -15,
-                    width: 150,
-                    height: 150,
-                    borderRadius: 75,
+                    width: 140,
+                    height: 140,
+                    borderRadius: 70,
                     backgroundColor: 'rgba(255, 255, 255, 0.16)',
                   }}
                 />
 
-                {/* 1:1 Transparent 3D Illustration */}
+                {/* Banner Illustration */}
                 <Image
                   source={banner.image}
-                  style={{
-                    position: 'absolute',
-                    right: -6,
-                    bottom: 0,
-                    width: 132,
-                    height: 132,
-                    zIndex: 1,
-                  }}
+                  style={[
+                    {
+                      position: 'absolute',
+                      right: 2,
+                      bottom: 0,
+                      width: 135,
+                      height: 145,
+                      zIndex: 1,
+                    },
+                    banner.imageStyle,
+                  ]}
                   resizeMode="contain"
                 />
 
@@ -177,7 +252,7 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                 <View
                   style={{
                     flex: 1,
-                    paddingRight: 104,
+                    paddingRight: 122,
                     justifyContent: 'space-between',
                     zIndex: 2,
                   }}
@@ -186,7 +261,7 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                   <View style={{ alignSelf: 'flex-start' }}>
                     <View
                       style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.24)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.22)',
                         paddingHorizontal: 9,
                         paddingVertical: 3,
                         borderRadius: 999,
@@ -199,7 +274,7 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                   </View>
 
                   {/* Title & Subtitle */}
-                  <View style={{ marginVertical: 4 }}>
+                  <View style={{ marginVertical: 2 }}>
                     <Text
                       numberOfLines={2}
                       style={{
@@ -212,18 +287,20 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                     >
                       {banner.title}
                     </Text>
-                    <Text
-                      numberOfLines={2}
-                      style={{
-                        color: 'rgba(255, 255, 255, 0.88)',
-                        fontSize: 11,
-                        fontWeight: '500',
-                        marginTop: 2,
-                        lineHeight: 14,
-                      }}
-                    >
-                      {banner.sub}
-                    </Text>
+                    {!!banner.sub && (
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: 'rgba(255, 255, 255, 0.88)',
+                          fontSize: 11,
+                          fontWeight: '500',
+                          marginTop: 2,
+                          lineHeight: 14,
+                        }}
+                      >
+                        {banner.sub}
+                      </Text>
+                    )}
                   </View>
 
                   {/* CTA Pill */}
@@ -232,8 +309,13 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
                       style={{
                         backgroundColor: '#FFFFFF',
                         paddingHorizontal: 12,
-                        paddingVertical: 5,
+                        paddingVertical: 4.5,
                         borderRadius: 999,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 3,
+                        elevation: 2,
                       }}
                     >
                       <Text style={{ color: banner.colors[0], fontSize: 11, fontWeight: '900' }}>
@@ -249,7 +331,15 @@ export function HeroCarousel({ isHi, isLoading }: HeroCarouselProps) {
       </View>
 
       {/* Pagination Dots */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, marginTop: 8 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 8,
+        }}
+      >
         {heroBanners.map((_, idx) => (
           <TouchableOpacity
             key={idx}

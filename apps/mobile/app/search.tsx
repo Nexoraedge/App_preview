@@ -62,8 +62,8 @@ const SEARCH_DATABASE: SearchItem[] = [
     badgeHi: '5.0 ★ सर्वश्रेष्ठ',
     route: '/branch-doctors?specialty=ENT',
     rating: 5.0,
-    location: 'Jain ENT Hospital, Saket',
-    locationHi: 'जैन ईएनटी अस्पताल, साकेत',
+    location: 'Jain ENT Hospital, Jaipur',
+    locationHi: 'जैन ईएनटी अस्पताल, जयपुर',
   },
   {
     id: 'd1',
@@ -76,22 +76,22 @@ const SEARCH_DATABASE: SearchItem[] = [
     badgeHi: 'तुरंत परामर्श',
     route: '/branch-doctors?specialty=General+Physician',
     rating: 4.1,
-    location: 'Saket, South Delhi',
-    locationHi: 'साकेत, दक्षिण दिल्ली',
+    location: 'Surajpole Gate, Jaipur',
+    locationHi: 'सूरजपोल गेट, जयपुर',
   },
   {
     id: 'd2',
     title: 'Dr. Ananya Iyer',
     titleHi: 'डॉ. अनन्या अय्यर',
-    subtitle: 'Interventional Cardiologist • Apollo Hospitals • 15 yrs exp',
-    subtitleHi: 'हृदय रोग विशेषज्ञ • अपोलो हॉस्पिटल्स • 15 वर्ष अनुभव',
+    subtitle: 'Interventional Cardiologist • SDMH Jaipur • 15 yrs exp',
+    subtitleHi: 'हृदय रोग विशेषज्ञ • एसडीएमएच जयपुर • 15 वर्ष अनुभव',
     type: 'doctor',
     badge: 'Heart Care',
     badgeHi: 'हार्ट स्पेशलिस्ट',
     route: '/branch-doctors?specialty=Heart+Specialist',
-    rating: 3.95,
-    location: 'Sarita Vihar, New Delhi',
-    locationHi: 'सरिता विहार, नई दिल्ली',
+    rating: 4.95,
+    location: 'Bhawani Singh Road, Jaipur',
+    locationHi: 'भवानी सिंह रोड, जयपुर',
   },
   {
     id: 'd3',
@@ -103,9 +103,9 @@ const SEARCH_DATABASE: SearchItem[] = [
     badge: 'Joint Specialist',
     badgeHi: 'हड्डी विशेषज्ञ',
     route: '/branch-doctors?specialty=Bone+%26+Joints',
-    rating: 3.88,
-    location: 'Saket, New Delhi',
-    locationHi: 'साकेत, नई दिल्ली',
+    rating: 4.88,
+    location: 'SMS Hospital Road, Jaipur',
+    locationHi: 'एसएमएस अस्पताल रोड, जयपुर',
   },
   {
     id: 'd4',
@@ -117,9 +117,9 @@ const SEARCH_DATABASE: SearchItem[] = [
     badge: 'Child Care',
     badgeHi: 'बाल रोग',
     route: '/branch-doctors?specialty=Child+Care',
-    rating: 4.20,
-    location: 'Malviya Nagar, New Delhi',
-    locationHi: 'मालवीय नगर, नई दिल्ली',
+    rating: 4.80,
+    location: 'Malviya Nagar, Jaipur',
+    locationHi: 'मालवीय नगर, जयपुर',
   },
   {
     id: 'd5',
@@ -131,9 +131,9 @@ const SEARCH_DATABASE: SearchItem[] = [
     badge: 'Women Health',
     badgeHi: 'महिला स्वास्थ्य',
     route: '/branch-doctors',
-    rating: 4.19,
-    location: 'Hauz Khas, New Delhi',
-    locationHi: 'हौज खास, नई दिल्ली',
+    rating: 4.89,
+    location: 'C-Scheme, Jaipur',
+    locationHi: 'सी-स्कीम, जयपुर',
   },
 
   // --- Hospitals ---
@@ -141,22 +141,22 @@ const SEARCH_DATABASE: SearchItem[] = [
     id: 'h1',
     title: 'Jain ENT Hospital',
     titleHi: 'जैन ईएनटी अस्पताल',
-    subtitle: 'Saket, New Delhi • Best Hospital • 5.0 ★ NABH Accredited',
-    subtitleHi: 'साकेत, नई दिल्ली • सर्वश्रेष्ठ अस्पताल • 5.0 ★ NABH प्रमाणित',
+    subtitle: 'JLN Marg, Jaipur • Best Hospital • 5.0 ★ NABH Accredited',
+    subtitleHi: 'जेएलएन मार्ग, जयपुर • सर्वश्रेष्ठ अस्पताल • 5.0 ★ NABH प्रमाणित',
     type: 'hospital',
     badge: '5.0 ★ Best Hospital',
     badgeHi: '5.0 ★ सर्वश्रेष्ठ',
     route: '/(tabs)/ipd',
     rating: 5.0,
-    location: 'Saket, New Delhi',
-    locationHi: 'साकेत, नई दिल्ली',
+    location: 'JLN Marg, Jaipur',
+    locationHi: 'जेएलएन मार्ग, जयपुर',
   },
   {
     id: 'h-csk',
-    title: 'CSK Hospital',
-    titleHi: 'सीएसके अस्पताल',
-    subtitle: 'South Extension • Best Hospital • 5.0 ★ Multispeciality Excellence',
-    subtitleHi: 'साउथ एक्सटेंशन • सर्वश्रेष्ठ अस्पताल • 5.0 ★ मल्टीस्पेशलिटी',
+    title: 'SDMH Memorial Hospital',
+    titleHi: 'एसडीएमएच मेमोरियल अस्पताल',
+    subtitle: 'Bhawani Singh Road • Best Hospital • 5.0 ★ Multispeciality Excellence',
+    subtitleHi: 'भवानी सिंह रोड • सर्वश्रेष्ठ अस्पताल • 5.0 ★ मल्टीस्पेशलिटी',
     type: 'hospital',
     badge: '5.0 ★ Best Hospital',
     badgeHi: '5.0 ★ सर्वश्रेष्ठ',
@@ -273,8 +273,8 @@ const SEARCH_DATABASE: SearchItem[] = [
     id: 'l6',
     title: 'Ultrasound Whole Abdomen (USG)',
     titleHi: 'अल्ट्रासाउंड होल एब्डोमेन (USG)',
-    subtitle: 'Same-day imaging • Saket Imaging Centre & CityCare',
-    subtitleHi: 'उसी दिन रिपोर्ट • साकेत इमेजिंग व सिटीकेयर',
+    subtitle: 'Same-day imaging • SMS Imaging Centre & Metropolis Jaipur',
+    subtitleHi: 'उसी दिन रिपोर्ट • एसएमएस इमेजिंग व मेट्रोपोलिस जयपुर',
     type: 'lab',
     badge: 'Imaging Scan',
     badgeHi: 'इमेजिंग स्कैन',
@@ -398,7 +398,7 @@ const SEARCH_DATABASE: SearchItem[] = [
 const RECENT_SEARCHES = [
   'Dr. Rohan Mehta',
   'Complete Health Checkup',
-  'Max Hospital Saket',
+  'SDMH Hospital Jaipur',
   'Cataract Surgery',
   'Dolo 650',
 ];
@@ -406,12 +406,12 @@ const RECENT_SEARCHES = [
 const TRENDING_TAGS = [
   'Cardiology',
   'Full Body Checkup',
-  'Apollo Saket',
+  'Fortis Jaipur',
   'Knee Replacement',
   'Ultrasound Abdomen',
   'Diabetes Test',
   'Dolo 650',
-  'Fortis Escorts',
+  'SMS Hospital',
 ];
 
 export default function SearchScreen() {
@@ -517,10 +517,17 @@ export default function SearchScreen() {
           elevation: 6,
         }}
       >
+        <View style={{ width: '100%', maxWidth: 600, alignSelf: 'center' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {/* Back button */}
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)');
+              }
+            }}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -639,6 +646,7 @@ export default function SearchScreen() {
             );
           })}
         </ScrollView>
+        </View>
       </LinearGradient>
 
       {/* Main Content Area */}
@@ -650,6 +658,7 @@ export default function SearchScreen() {
           paddingBottom: 40 + insets.bottom,
         }}
       >
+        <View style={{ width: '100%', maxWidth: 600, alignSelf: 'center' }}>
         {query.length === 0 ? (
           <>
             {/* Quick Browse Service Tiles */}
@@ -962,6 +971,7 @@ export default function SearchScreen() {
             )}
           </View>
         )}
+        </View>
       </ScrollView>
     </View>
   );

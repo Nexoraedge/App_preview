@@ -2,18 +2,22 @@
 // Ultra-lean, smooth, and premium Patient Profile screen for Adityam Niramayaa.
 // Focuses on personal identity, health hub shortcuts, medical vitals, and clean navigation.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
+  Modal,
+  Image,
   Alert,
   Platform,
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
   User as UserIcon,
@@ -31,30 +35,192 @@ import {
   HelpCircle,
   FileText,
   HeartPulse,
-  Crown,
   Languages,
   Check,
+  CheckCircle2,
   RotateCcw,
   Sparkles,
+  Edit3,
+  Camera,
+  X,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage, type Language } from '../../src/context/LanguageContext';
+import { useFamily } from '../../src/context/FamilyContext';
+import { getLocalBookings, subscribeBookings, subscribeCloudBookings, isBookingUpcoming } from '../../src/services/bookingStorage';
+import { VerifyPhoneModal } from '../../components/auth/VerifyPhoneModal';
+
+function formatDisplayPhone(phone?: string | null, email?: string | null, isHi: boolean = false): string {
+  if (phone) {
+    const clean = phone.replace(/[^\d+]/g, '');
+    if (clean.startsWith('+91')) {
+      const digits = clean.slice(3);
+      if (digits.length === 10) {
+        return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+      }
+    } else if (clean.length === 10) {
+      return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`;
+    }
+    return phone;
+  }
+  if (email) {
+    return email;
+  }
+  return isHi ? '+91 (नंबर जोड़ें)' : '+91 (Add Phone)';
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, dependents, logout, loginAsTestUser } = useAuth();
+  const { user, dependents, logout, loginAsTestUser, updateUser } = useAuth();
   const { language, setLanguage } = useLanguage();
+  const { members } = useFamily();
   const isHi = language === 'hi';
 
+  const isDemo = user?.id === '00000000-0000-0000-0000-000000000001';
+  const DEMO_PHONE = '+91 99999 99999';
+  const cleanCity = user?.city || '';
+  const cleanBlood = user?.blood_group || '';
+  const cleanPhone = user?.phone && user.phone !== DEMO_PHONE && !user.phone.startsWith('+9100') ? user.phone : '';
+
   const [showReviewerDrawer, setShowReviewerDrawer] = useState(false);
+
+  // Edit Profile Modal State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
+  const [verifyPhoneTarget, setVerifyPhoneTarget] = useState('');
+  const [editName, setEditName] = useState(user?.full_name || '');
+  const [editPhone, setEditPhone] = useState(cleanPhone);
+  const [editCity, setEditCity] = useState(cleanCity);
+  const [editAge, setEditAge] = useState(user?.age ? String(user.age) : '');
+  const [editGender, setEditGender] = useState(user?.gender || 'Male');
+  const [editBloodGroup, setEditBloodGroup] = useState(cleanBlood);
+  const [editAvatar, setEditAvatar] = useState<string | null>(user?.avatar_url || null);
+  const [scheduledCount, setScheduledCount] = useState<number>(0);
+
+  useEffect(() => {
+    const loadCount = async () => {
+      try {
+        const bookings = await getLocalBookings();
+        const isDemo = user?.id === '00000000-0000-0000-0000-000000000001';
+        const userBookings = bookings.filter((b) => isDemo || (user?.id && b.user_id === user.id));
+        const active = userBookings.filter((b) => isBookingUpcoming(b)).length;
+        setScheduledCount(active);
+      } catch {
+        setScheduledCount(0);
+      }
+    };
+    loadCount();
+    const unsub = subscribeBookings(loadCount);
+    const unsubCloud = subscribeCloudBookings(user?.id, loadCount);
+    return () => {
+      unsub();
+      unsubCloud();
+    };
+  }, [user?.id]);
+
+  // Keep edit state in sync with user changes
+  useEffect(() => {
+    if (user) {
+      setEditName(user.full_name || '');
+      setEditPhone(cleanPhone);
+      setEditCity(cleanCity);
+      setEditAge(user.age ? String(user.age) : '');
+      setEditGender(user.gender || 'Male');
+      setEditBloodGroup(cleanBlood);
+      setEditAvatar(user.avatar_url || null);
+    }
+  }, [user, cleanPhone, cleanCity, cleanBlood]);
+
+  const handlePickAvatar = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setEditAvatar(res.assets[0].uri);
+      }
+    } catch {
+      Alert.alert(isHi ? 'त्रुटि' : 'Error', isHi ? 'गैलरी खोलने में असमर्थ' : 'Unable to open image gallery');
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (!editName.trim()) {
+      Alert.alert(isHi ? 'त्रुटि' : 'Error', isHi ? 'कृपया अपना नाम दर्ज करें' : 'Please enter your name');
+      return;
+    }
+    updateUser({
+      full_name: editName.trim(),
+      phone: editPhone.trim() || undefined,
+      city: editCity.trim(),
+      age: parseInt(editAge, 10) || null,
+      gender: editGender,
+      blood_group: editBloodGroup || null,
+      avatar_url: editAvatar,
+    });
+    setEditModalVisible(false);
+    Alert.alert(
+      isHi ? 'सफल' : 'Profile Updated',
+      isHi ? 'आपकी जानकारी सहेज ली गई है और Supabase से सिंक हो गई है।' : 'Your profile details have been saved and synced to Supabase.'
+    );
+  };
+
+  const handleTriggerVerifyPhone = (phoneToVerify?: string) => {
+    const target = phoneToVerify || editPhone || user?.phone || '';
+    const digits = target.replace(/\D/g, '').slice(-10);
+    if (digits.length < 10) {
+      Alert.alert(
+        isHi ? 'अमान्य मोबाइल नंबर' : 'Invalid Mobile Number',
+        isHi
+          ? 'सत्यापन कोड (OTP) प्राप्त करने के लिए कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें।'
+          : 'Please enter a valid 10-digit mobile number to receive verification OTP.'
+      );
+      return;
+    }
+    setVerifyPhoneTarget(target);
+    setIsVerifyPhoneOpen(true);
+  };
+
+  const handlePhoneVerified = (verifiedPhone: string) => {
+    setEditPhone(verifiedPhone);
+    updateUser({
+      phone: verifiedPhone,
+      is_verified: true,
+    });
+    setIsVerifyPhoneOpen(false);
+    Alert.alert(
+      isHi ? 'सत्यापन सफल' : 'Phone Verified',
+      isHi
+        ? `आपका मोबाइल नंबर ${verifiedPhone} सफलतापूर्वक सत्यापित हो गया है!`
+        : `Your mobile number ${verifiedPhone} is now verified!`
+    );
+  };
 
   const handleLanguageChange = (newLang: Language) => {
     if (newLang === language) return;
     setLanguage(newLang);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const doLogout = async () => {
+      await logout();
+      router.replace('/login');
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const ok = window.confirm(
+        isHi ? 'क्या आप निश्चित रूप से अपने खाते से साइन आउट करना चाहते हैं?' : 'Are you sure you want to sign out?'
+      );
+      if (ok) {
+        await doLogout();
+      }
+      return;
+    }
+
     Alert.alert(
       isHi ? 'साइन आउट करें' : 'Sign Out',
       isHi ? 'क्या आप निश्चित रूप से अपने खाते से साइन आउट करना चाहते हैं?' : 'Are you sure you want to sign out?',
@@ -63,10 +229,7 @@ export default function ProfileScreen() {
         {
           text: isHi ? 'हाँ, साइन आउट' : 'Sign Out',
           style: 'destructive',
-          onPress: () => {
-            logout();
-            router.replace('/login');
-          },
+          onPress: doLogout,
         },
       ]
     );
@@ -82,9 +245,10 @@ export default function ProfileScreen() {
     );
   };
 
-  const userName = user?.full_name || (isHi ? 'अभिषेक जैन' : 'Abhishek Jain');
-  const userPhone = user?.phone || '+91 99999 99999';
-  const userCity = user?.city || (isHi ? 'दिल्ली एनसीआर' : 'Delhi NCR');
+  const userName = user?.full_name || (isHi ? 'उपयोगकर्ता' : 'User');
+  const userPhone = formatDisplayPhone(cleanPhone, user?.email, isHi);
+  const userCity = cleanCity || (isHi ? 'स्थान निर्धारित नहीं' : 'Location Not Set');
+  const linkedMembersCount = Math.max(0, members.length - 1);
   const initial = userName.charAt(0).toUpperCase();
 
   return (
@@ -184,24 +348,37 @@ export default function ProfileScreen() {
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              {/* Initials Avatar Tile */}
-              <View
-                style={{
-                  width: 58,
-                  height: 58,
-                  borderRadius: 20,
-                  backgroundColor: '#1E40AF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  shadowColor: '#1E40AF',
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 6,
-                  elevation: 3,
-                }}
-              >
-                <Text style={{ fontSize: 22, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
-              </View>
+              {/* Avatar Tile: Real photo or Royal Initials */}
+              {user?.avatar_url ? (
+                <Image
+                  source={{ uri: user.avatar_url }}
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 20,
+                    borderWidth: 1.5,
+                    borderColor: '#BFDBFE',
+                  }}
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 20,
+                    backgroundColor: '#1E40AF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    shadowColor: '#1E40AF',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 6,
+                    elevation: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
+                </View>
+              )}
 
               {/* Name & Details */}
               <View style={{ flex: 1 }}>
@@ -209,18 +386,6 @@ export default function ProfileScreen() {
                   <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>
                     {userName}
                   </Text>
-                  <View
-                    style={{
-                      backgroundColor: '#FEF3C7',
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: '#FDE68A',
-                    }}
-                  >
-                    <Crown size={11} color="#D97706" strokeWidth={2.5} />
-                  </View>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
@@ -233,9 +398,32 @@ export default function ProfileScreen() {
                   <Text style={{ fontSize: 12, fontWeight: '600', color: '#0D9488' }}>{userCity}</Text>
                 </View>
               </View>
+
+              {/* Quick Edit Profile CTA */}
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(true)}
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: '#EFF6FF',
+                  paddingHorizontal: 11,
+                  paddingVertical: 6,
+                  borderRadius: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  borderWidth: 1,
+                  borderColor: '#BFDBFE',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <Edit3 size={12} color="#2563EB" />
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                  {isHi ? 'बदलें' : 'Edit'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Seamless ABHA & Wallet Strip */}
+            {/* Seamless ABHA & Digital Health Strip */}
             <View
               style={{
                 marginTop: 14,
@@ -255,39 +443,62 @@ export default function ProfileScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
-                  backgroundColor: '#F0FDF4',
+                  backgroundColor: user?.abha_id ? '#F0FDF4' : '#F1F5F9',
                   paddingHorizontal: 10,
                   paddingVertical: 5,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: '#BBF7D0',
+                  borderColor: user?.abha_id ? '#BBF7D0' : '#E2E8F0',
                 }}
               >
-                <ShieldCheck size={14} color="#16A34A" />
-                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#15803D' }}>
-                  {isHi ? 'ABHA: 91-4582-9011' : 'ABHA: 91-4582-9011'}
+                <ShieldCheck size={14} color={user?.abha_id ? '#16A34A' : '#64748B'} />
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: user?.abha_id ? '#15803D' : '#475569' }}>
+                  {user?.abha_id ? `ABHA: ${user.abha_id}` : (isHi ? 'ABHA आईडी लिंक करें' : 'Link ABHA ID')}
                 </Text>
               </TouchableOpacity>
 
-              {/* Wallet Pill */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  backgroundColor: '#EFF6FF',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: '#BFDBFE',
-                }}
-              >
-                <Wallet size={14} color="#2563EB" />
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#1E40AF' }}>
-                  ₹{user?.wallet_balance?.toLocaleString('en-IN') || '2,500'}
-                </Text>
-              </View>
+              {/* Phone Verification / Digital ID Pill */}
+              {user?.is_verified ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: '#F0FDF4',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#BBF7D0',
+                  }}
+                >
+                  <CheckCircle2 size={13} color="#16A34A" />
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#15803D' }}>
+                    {isHi ? 'मोबाइल सत्यापित' : 'Phone Verified'}
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => handleTriggerVerifyPhone(cleanPhone)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: '#EFF6FF',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                  }}
+                >
+                  <ShieldCheck size={13} color="#2563EB" />
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                    {isHi ? 'नंबर सत्यापित करें' : 'Verify Phone'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -334,7 +545,7 @@ export default function ProfileScreen() {
                   {isHi ? 'अपॉइंटमेंट्स' : 'Appointments'}
                 </Text>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: '#2563EB', marginTop: 2 }}>
-                  {isHi ? '2 सक्रिय विज़िट' : '2 Scheduled'}
+                  {scheduledCount > 0 ? (isHi ? `${scheduledCount} सक्रिय विज़िट` : `${scheduledCount} Scheduled`) : (isHi ? 'कोई विज़िट नहीं' : '0 Scheduled')}
                 </Text>
               </TouchableOpacity>
 
@@ -374,7 +585,9 @@ export default function ProfileScreen() {
                   {isHi ? 'परिवार वॉल्ट' : 'Family Vault'}
                 </Text>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: '#16A34A', marginTop: 2 }}>
-                  {dependents?.length || 2} {isHi ? 'सदस्य जुड़े हैं' : 'Members Linked'}
+                  {linkedMembersCount > 0
+                    ? `${linkedMembersCount} ${isHi ? 'सदस्य जुड़े हैं' : 'Members Linked'}`
+                    : (isHi ? 'केवल आप (0 सदस्य)' : 'Self Only (0 Added)')}
                 </Text>
               </TouchableOpacity>
 
@@ -481,17 +694,23 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'रक्त समूह' : 'Blood Group'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>O+ Positive</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>
+                  {user?.blood_group || (isHi ? 'निर्धारित नहीं' : 'Not Set')}
+                </Text>
               </View>
               <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'एलर्जी' : 'Allergies'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#059669', marginTop: 2 }}>{isHi ? 'कोई ज्ञात नहीं' : 'None Known'}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: user?.allergies ? '#E11D48' : '#059669', marginTop: 2 }}>
+                  {user?.allergies || (isHi ? 'कोई ज्ञात नहीं' : 'None Known')}
+                </Text>
               </View>
               <View style={{ width: 1, height: 22, backgroundColor: '#E2E8F0' }} />
               <View>
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{isHi ? 'प्राथमिक डॉक्टर' : 'Primary Doctor'}</Text>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>Dr. Satish ji</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 2 }}>
+                  {user?.primary_doctor || (isHi ? 'असाइन नहीं' : 'None Assigned')}
+                </Text>
               </View>
             </View>
           </View>
@@ -785,6 +1004,357 @@ export default function ProfileScreen() {
           </Text>
         </ScrollView>
       </View>
+
+      {/* EDIT PROFILE MODAL */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: Math.max(insets.bottom, 20) + 16,
+              maxWidth: 600,
+              width: '100%',
+              alignSelf: 'center',
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A' }}>
+                {isHi ? 'प्रोफ़ाइल संपादित करें' : 'Edit Profile'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Avatar Picker */}
+            <View style={{ alignItems: 'center', marginBottom: 18 }}>
+              <TouchableOpacity
+                onPress={handlePickAvatar}
+                activeOpacity={0.8}
+                style={{ position: 'relative' }}
+              >
+                {editAvatar ? (
+                  <Image
+                    source={{ uri: editAvatar }}
+                    style={{ width: 80, height: 80, borderRadius: 28 }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 28,
+                      backgroundColor: '#1E40AF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
+                  </View>
+                )}
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: -2,
+                    right: -2,
+                    backgroundColor: '#2563EB',
+                    borderRadius: 14,
+                    width: 28,
+                    height: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#FFFFFF',
+                  }}
+                >
+                  <Camera size={14} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 12, color: '#2563EB', fontWeight: '600', marginTop: 8 }}>
+                {isHi ? 'फ़ोटो बदलें' : 'Change Photo'}
+              </Text>
+            </View>
+
+            {/* Full Name */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>
+                {isHi ? 'पूरा नाम' : 'Full Name'}
+              </Text>
+              <TextInput
+                value={editName}
+                onChangeText={setEditName}
+                placeholder={isHi ? 'अपना नाम दर्ज करें' : 'Enter full name'}
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 14,
+                  color: '#0F172A',
+                }}
+              />
+            </View>
+
+            {/* Phone Number with Verification Action */}
+            <View style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                  {isHi ? 'फ़ोन नंबर' : 'Phone Number'}
+                </Text>
+                {user?.is_verified && editPhone.replace(/\D/g, '').slice(-10) === (user?.phone?.replace(/\D/g, '').slice(-10) || '') ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <CheckCircle2 size={12} color="#16A34A" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#16A34A' }}>
+                      {isHi ? 'सत्यापित' : 'Verified'}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => handleTriggerVerifyPhone(editPhone)}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#EFF6FF',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: '#BFDBFE',
+                    }}
+                  >
+                    <ShieldCheck size={12} color="#2563EB" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>
+                      {isHi ? 'सत्यापित करें' : 'Verify'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TextInput
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  keyboardType="phone-pad"
+                  placeholder="+91"
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: '#0F172A',
+                  }}
+                />
+                {(!user?.is_verified || editPhone.replace(/\D/g, '').slice(-10) !== (user?.phone?.replace(/\D/g, '').slice(-10) || '')) && (
+                  <TouchableOpacity
+                    onPress={() => handleTriggerVerifyPhone(editPhone)}
+                    activeOpacity={0.88}
+                    style={{
+                      backgroundColor: '#2563EB',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      shadowColor: '#2563EB',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 4,
+                      elevation: 2,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                      {isHi ? 'सत्यापित करें' : 'Verify'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* City */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>
+                {isHi ? 'शहर / क्षेत्र' : 'City / Region'}
+              </Text>
+              <TextInput
+                value={editCity}
+                onChangeText={setEditCity}
+                placeholder={isHi ? 'जैसे जयपुर, दक्षिण दिल्ली' : 'e.g. South Delhi, Jaipur'}
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 14,
+                  color: '#0F172A',
+                }}
+              />
+            </View>
+
+            {/* Age & Gender Row */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 18 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>
+                  {isHi ? 'आयु' : 'Age'}
+                </Text>
+                <TextInput
+                  value={editAge}
+                  onChangeText={setEditAge}
+                  keyboardType="numeric"
+                  placeholder={isHi ? 'जैसे 28' : 'e.g. 28'}
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: '#0F172A',
+                  }}
+                />
+              </View>
+
+              <View style={{ flex: 1.5 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>
+                  {isHi ? 'लिंग' : 'Gender'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {['Male', 'Female', 'Other'].map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      onPress={() => setEditGender(g)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: editGender === g ? '#EFF6FF' : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: editGender === g ? '#2563EB' : '#E2E8F0',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: editGender === g ? '800' : '500',
+                          color: editGender === g ? '#1E40AF' : '#64748B',
+                        }}
+                      >
+                        {g === 'Male' ? (isHi ? 'पुरुष' : 'Male') : g === 'Female' ? (isHi ? 'महिला' : 'Female') : (isHi ? 'अन्य' : 'Other')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* Blood Group */}
+            <View style={{ marginBottom: 18 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
+                {isHi ? 'रक्त समूह' : 'Blood Group'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bg) => (
+                  <TouchableOpacity
+                    key={bg}
+                    onPress={() => setEditBloodGroup(editBloodGroup === bg ? '' : bg)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 8,
+                      backgroundColor: editBloodGroup === bg ? '#EFF6FF' : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: editBloodGroup === bg ? '#2563EB' : '#E2E8F0',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: editBloodGroup === bg ? '800' : '600',
+                        color: editBloodGroup === bg ? '#1E40AF' : '#475569',
+                      }}
+                    >
+                      {bg}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              onPress={handleSaveProfile}
+              activeOpacity={0.88}
+              style={{
+                backgroundColor: '#2563EB',
+                paddingVertical: 14,
+                borderRadius: 14,
+                alignItems: 'center',
+                shadowColor: '#2563EB',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.25,
+                shadowRadius: 6,
+                elevation: 3,
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
+                {isHi ? 'जानकारी सहेजें' : 'Save Changes'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Progressive Phone Verification Modal with OTP */}
+      <VerifyPhoneModal
+        visible={isVerifyPhoneOpen}
+        onClose={() => setIsVerifyPhoneOpen(false)}
+        initialPhone={verifyPhoneTarget}
+        onSuccess={handlePhoneVerified}
+        isHi={isHi}
+        title={isHi ? 'मोबाइल नंबर सत्यापन' : 'Verify Mobile Number'}
+        subtitle={
+          isHi
+            ? 'अपनी प्रोफ़ाइल व मेडिकल रिकॉर्ड सुरक्षित रखने के लिए 10-अंकों का फ़ोन नंबर सत्यापित करें।'
+            : 'Verify your phone number with a quick 6-digit OTP to secure your account and OPD passes.'
+        }
+      />
     </View>
   );
 }

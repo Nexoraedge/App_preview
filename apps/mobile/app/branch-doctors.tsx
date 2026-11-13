@@ -39,6 +39,9 @@ import { fetchNearbyHospitals, getSupabaseClient, SEED_HOSPITALS } from '@aditya
 import type { Hospital, HospitalBranch, Doctor, Booking } from '@adityam/types';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
+import { BookingSlotModal } from '../components/opd/BookingSlotModal';
+import { saveNewBooking } from '../src/services/bookingStorage';
+import { triggerBrowserNotification } from '../src/services/notificationService';
 import {
   OpdStethoscopeIcon,
   HeartPulseIcon,
@@ -76,6 +79,7 @@ export default function BranchDoctorsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { t, language } = useLanguage();
+  const isHi = language === 'hi';
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const cardGap = 16;
@@ -104,6 +108,11 @@ export default function BranchDoctorsScreen() {
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
   const [branchDropdownVisible, setBranchDropdownVisible] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [bookingTargetDoctor, setBookingTargetDoctor] = useState<{
+    doctor: Doctor;
+    slot: string;
+    hospitalName: string;
+  } | null>(null);
   const [selectedSlotDoctor, setSelectedSlotDoctor] = useState<{ doctor: Doctor; slot: string } | null>(null);
   const [selectedModalSlot, setSelectedModalSlot] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -291,55 +300,75 @@ export default function BranchDoctorsScreen() {
   const handleInitiateDoctorBooking = (doctor: Doctor, chosenSlot?: string) => {
     setSelectedDoctor(doctor);
     const slots = getDoctorSlots(doctor, language === 'hi');
-    const initialSlot = chosenSlot || slots[0];
+    const initialSlot = chosenSlot || doctor.next_available_slot || slots[0] || 'Today, 6:30 PM';
     setSelectedModalSlot(initialSlot);
     if (chosenSlot) {
       setSelectedSlotDoctor({ doctor, slot: chosenSlot });
     }
+    setBookingTargetDoctor({
+      doctor,
+      slot: initialSlot,
+      hospitalName: hospital ? `${hospital.name} (${activeBranch?.name || ''})` : 'Hospital Network',
+    });
     setConfirmedBooking(null);
     setBookingModalVisible(true);
   };
 
-  const handleConfirmExotelBooking = async () => {
-    if (!selectedDoctor || !hospital) return;
+  const handleConfirmBooking = async (
+    patientName?: string,
+    patientPhone?: string,
+    paymentMethod?: string,
+    txnId?: string,
+    reason?: string,
+    slot?: string
+  ) => {
+    if (!bookingTargetDoctor || !hospital) return;
     setIsSubmitting(true);
 
     const bookingRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const effectiveSlot = selectedModalSlot || selectedDoctor.next_available_slot;
+    const now = new Date();
+    const fmtDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const rawSlot = slot || selectedModalSlot || bookingTargetDoctor.slot;
+    const effectiveSlot = (rawSlot?.includes('·') || rawSlot?.includes(','))
+      ? rawSlot
+      : `Today, ${fmtDate} · ${rawSlot}`;
 
     const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
       booking_ref: bookingRef,
       service_type: 'OPD_CONCIERGE',
-      user_id: user?.id,
-      patient_name: user?.full_name || 'Rahul Jain',
-      patient_phone: user?.phone || '+91 99999 99999',
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
+      patient_name: patientName || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
+      patient_phone: patientPhone || (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999' ? user.phone : ''),
       hospital_id: hospital.id,
       hospital_name: hospital.name,
       branch_id: activeBranch?.id,
       branch_name: activeBranch?.name,
-      doctor_id: selectedDoctor.id,
-      doctor_name: selectedDoctor.name,
-      doctor_fee: selectedDoctor.discounted_fee,
+      doctor_id: bookingTargetDoctor.doctor.id,
+      doctor_name: bookingTargetDoctor.doctor.name,
+      doctor_fee: bookingTargetDoctor.doctor.discounted_fee,
       slot_time: effectiveSlot,
-      specialty_requested: selectedDoctor.specialty,
-      status: 'NEW',
-      call_status: 'pending',
-      notes: `Direct OPD consult booked for ${selectedDoctor.name} (${selectedDoctor.specialty}) at ${hospital.name} - ${activeBranch?.name}. Masked calling via Exotel initiated.`,
+      specialty_requested: bookingTargetDoctor.doctor.specialty,
+      status: 'PAID',
+      call_status: 'connected',
+      notes: `${reason ? `Reason / Symptoms: ${reason}. ` : ''}Paid online via ${paymentMethod || 'UPI'} (${txnId || 'RZP-SUCCESS'}). Direct OPD consult booked for ${bookingTargetDoctor.doctor.name} (${bookingTargetDoctor.doctor.specialty}) at ${hospital.name} - ${activeBranch?.name}. Priority QR pass issued.`,
       created_at: new Date().toISOString(),
     };
 
-    try {
-      const supabase = getSupabaseClient();
-      await supabase.from('bookings').insert(newBooking);
-    } catch {
-      // Offline fallback handling
-    }
+    await saveNewBooking(newBooking);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setConfirmedBooking(newBooking);
-    }, 700);
+    // Trigger Notification
+    triggerBrowserNotification(
+      'OPD Appointment Confirmed',
+      `Token #14 issued for ${bookingTargetDoctor.doctor.name} at ${hospital.name}. Slot: ${effectiveSlot}`
+    );
+
+    setIsSubmitting(false);
+    setConfirmedBooking(newBooking);
   };
 
   return (
@@ -367,7 +396,13 @@ export default function BranchDoctorsScreen() {
           {/* Navigation & Title Row */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/opd');
+                }
+              }}
               activeOpacity={0.7}
               style={{
                 width: 40,
@@ -1126,231 +1161,24 @@ export default function BranchDoctorsScreen() {
           </View>
         )}
 
-        {/* Exotel Masked Call Booking Modal */}
-        <Modal
+        {/* Modular Booking Slot Modal with Online Payment Gateway & Digital Pass */}
+        <BookingSlotModal
           visible={bookingModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setBookingModalVisible(false)}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' }}>
-            <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
-                  {confirmedBooking
-                    ? (language === 'hi' ? 'परामर्श की पुष्टि हुई!' : 'Consultation Confirmed!')
-                    : (language === 'hi' ? 'प्राथमिकता ओपीडी डॉक्टर बुकिंग' : 'Priority OPD Doctor Booking')}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setBookingModalVisible(false)}
-                  style={{ padding: 4 }}
-                >
-                  <X size={20} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {confirmedBooking ? (
-                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                    <CheckCircle2 size={32} color="#3B82F6" />
-                  </View>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: '#182F3B' }}>
-                    {language === 'hi' ? 'कंसीयर्ज कॉल शुरू हुई' : 'Concierge Dispatched'}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#3B82F6', marginTop: 4 }}>
-                    {language === 'hi' ? 'संदर्भ आईडी: ' : 'Reference: '}{confirmedBooking.booking_ref}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#475569', textAlign: 'center', marginTop: 12, paddingHorizontal: 16, lineHeight: 18 }}>
-                    {language === 'hi' ? (
-                      <>
-                        <Text style={{ fontWeight: '700', color: '#182F3B' }}>
-                          {translateDoctorName(confirmedBooking.doctor_name || '', true)}
-                        </Text>{' '}
-                        के लिए आपका प्राथमिकता स्लॉट {translateHospitalName(confirmedBooking.hospital_name || '', true)} ({translateBranchName(confirmedBooking.branch_name || '', true)}) में दर्ज कर दिया गया है। हमारे समन्वयक आपसे संपर्क कर रहे हैं!
-                      </>
-                    ) : (
-                      <>
-                        Your priority slot for{' '}
-                        <Text style={{ fontWeight: '700', color: '#182F3B' }}>
-                          {confirmedBooking.doctor_name}
-                        </Text>{' '}
-                        at {confirmedBooking.hospital_name} ({confirmedBooking.branch_name}) has been submitted to the real-time CRM. Our desk coordinator is connecting you now!
-                      </>
-                    )}
-                  </Text>
-
-                  <View style={{ width: '100%', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 20 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#182F3B', textTransform: 'uppercase' }}>
-                      {language === 'hi' ? 'एक्सोटेल वर्चुअल टेलीफोनी' : 'Exotel Virtual Telephony Route'}
-                    </Text>
-                    <Text style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700', color: '#1E293B', marginTop: 2 }}>
-                      +91 11 4000 8800 ➔ {user?.phone || '+91 99999 99999'}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: '#3B82F6', fontWeight: '600', marginTop: 4 }}>
-                      {language === 'hi'
-                        ? '✓ आपका नंबर और व्यक्तिगत पहचान 100% गोपनीय रहती है।'
-                        : '✓ Masked calling protects your identity and number.'}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => setBookingModalVisible(false)}
-                    style={{ width: '100%', backgroundColor: '#3B82F6', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 }}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>{language === 'hi' ? 'पूर्ण' : 'Done'}</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={{ paddingVertical: 16 }}>
-                  {/* Doctor Summary */}
-                  {selectedDoctor && (
-                    <View style={{ marginBottom: 12 }}>
-                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}>
-                        {translateDoctorName(selectedDoctor.name, language === 'hi')}
-                      </Text>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563EB', marginTop: 2 }}>
-                        {translateSpecialty(selectedDoctor.specialty, language === 'hi')} • {translateHospitalName(hospital?.name || '', language === 'hi')} ({translateBranchName(activeBranch?.name || '', language === 'hi')})
-                      </Text>
-                      {selectedDoctor.qualification && (
-                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
-                          {translateQualification(selectedDoctor.qualification, language === 'hi')}
-                        </Text>
-                      )}
-
-                      {/* Doctor's OPD Consultation Timings / Schedule */}
-                      {selectedDoctor.opd_timing && (
-                        <View style={{ backgroundColor: 'rgba(239, 246, 255, 0.8)', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(191, 219, 254, 0.7)', marginTop: 12, marginBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
-                          <View style={{ width: 32, height: 32, borderRadius: 12, backgroundColor: 'rgba(37, 99, 235, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                            <Clock size={16} color="#2563EB" strokeWidth={2.2} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                              {language === 'hi' ? 'डॉक्टर का ओपीडी समय (शेड्यूल):' : 'Doctor OPD Schedule:'}
-                            </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', marginTop: 2 }}>
-                              {translateTiming(selectedDoctor.opd_timing, language === 'hi')}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-
-                      {/* Booking Timing: Selectable Time Slots */}
-                      <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginVertical: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
-                            {language === 'hi' ? 'बुकिंग का समय (स्लॉट) चुनें:' : 'Select Booking Slot:'}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(219, 234, 254, 0.7)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                            <Clock size={11} color="#1D4ED8" />
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>
-                              {selectedModalSlot || selectedDoctor.next_available_slot}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Interactive slot chips */}
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                          {getDoctorSlots(selectedDoctor, language === 'hi').map((slot) => {
-                            const isSelected = (selectedModalSlot || selectedDoctor.next_available_slot) === slot;
-                            return (
-                              <TouchableOpacity
-                                key={slot}
-                                onPress={() => setSelectedModalSlot(slot)}
-                                activeOpacity={0.8}
-                                style={{
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 8,
-                                  borderRadius: 12,
-                                  borderWidth: 1,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  backgroundColor: isSelected ? '#2563EB' : '#FFFFFF',
-                                  borderColor: isSelected ? '#1D4ED8' : '#E2E8F0',
-                                  shadowColor: isSelected ? '#2563EB' : 'transparent',
-                                  shadowOffset: { width: 0, height: 1 },
-                                  shadowOpacity: isSelected ? 0.2 : 0,
-                                  shadowRadius: 2,
-                                  elevation: isSelected ? 2 : 0,
-                                }}
-                              >
-                                <Clock size={12} color={isSelected ? '#FFFFFF' : '#64748B'} />
-                                <Text
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: '700',
-                                    color: isSelected ? '#FFFFFF' : '#334155',
-                                  }}
-                                >
-                                  {slot}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-
-                        {/* Consultation Fee Breakdown */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(226, 232, 240, 0.8)' }}>
-                          <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>
-                            {language === 'hi' ? 'परामर्श शुल्क (ऐप में दर):' : 'Consultation Fee (In-App):'}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={{ fontSize: 12, color: '#94A3B8', textDecorationLine: 'line-through' }}>
-                              ₹{selectedDoctor.consultation_fee}
-                            </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#16A34A' }}>
-                              ₹{selectedDoctor.discounted_fee}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Patient Information */}
-                  <View style={{ backgroundColor: '#FFF9F0', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(207, 138, 64, 0.3)', marginBottom: 16 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#182F3B' }}>
-                      {language === 'hi' ? 'मरीज की जानकारी:' : 'Patient Information:'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#334155', marginTop: 4 }}>
-                      {language === 'hi' ? 'नाम: ' : 'Name: '}<Text style={{ fontWeight: '700' }}>{user?.full_name || 'Rahul Jain'}</Text>
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>
-                      {language === 'hi' ? 'फ़ोन: ' : 'Phone: '}<Text style={{ fontWeight: '700' }}>{user?.phone || '+91 99999 99999'}</Text>
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={handleConfirmExotelBooking}
-                    disabled={isSubmitting}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#2563EB',
-                      paddingVertical: 14,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexDirection: 'row',
-                      gap: 8,
-                      shadowColor: '#2563EB',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 4,
-                      elevation: 2,
-                    }}
-                  >
-                    <Calendar size={16} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-                      {isSubmitting
-                        ? (language === 'hi' ? 'स्लॉट बुक किया जा रहा है...' : 'Reserving OPD Slot...')
-                        : (language === 'hi' ? 'पुष्टि करें और ओपीडी स्लॉट बुक करें' : 'Confirm & Reserve OPD Slot')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setBookingModalVisible(false)}
+          confirmedBooking={confirmedBooking}
+          bookingTargetDoctor={bookingTargetDoctor}
+          selectedModalSlot={selectedModalSlot}
+          onSelectModalSlot={setSelectedModalSlot}
+          isSubmitting={isSubmitting}
+          onConfirmBooking={handleConfirmBooking}
+          userPhone={user?.phone}
+          userName={user?.full_name}
+          language={language}
+          onViewAppointments={() => {
+            setBookingModalVisible(false);
+            router.push('/appointments');
+          }}
+        />
 
         {/* Branch Selection Dropdown Modal */}
         <Modal

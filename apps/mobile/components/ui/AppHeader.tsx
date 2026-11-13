@@ -7,9 +7,11 @@ import {
   ViewStyle,
   useWindowDimensions,
 } from 'react-native';
-import { MapPin, User, ChevronDown } from 'lucide-react-native';
+import { MapPin, User, ChevronDown, Bell } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '../../src/context/LanguageContext';
+import { useLocation } from '../../src/context/LocationContext';
 import { translateAddress } from '../../src/utils/hindiDictionary';
 
 interface AppHeaderProps {
@@ -23,11 +25,11 @@ interface AppHeaderProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const CITIES = ['Saket, South Delhi NCR', 'Koramangala, Bengaluru', 'Malviya Nagar, Jaipur'];
+const CITIES = ['Surajpole Gate, Jaipur', 'C-Scheme, Jaipur', 'Malviya Nagar, Jaipur'];
 
 export function AppHeader({
   title,
-  subtitle = 'Saket, South Delhi NCR',
+  subtitle = 'Surajpole Gate, Jaipur',
   onPressProfile,
   onPressLocation,
   rightAction,
@@ -37,25 +39,24 @@ export function AppHeader({
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-
-  const [cityIndex, setCityIndex] = useState(0);
-
-  // Responsive font sizing: scales for fold outer screen (narrow 320-350px), standard (375-430px), duos & tablets (600px+)
   const titleFontSize = width < 360 ? 21 : width < 410 ? 24 : 26;
   const titleLineHeight = titleFontSize + 5;
+
+  const { currentLocationName, activeAddress, openLocationPicker } = useLocation();
 
   const handleLocationPress = () => {
     if (onPressLocation) {
       onPressLocation();
     } else {
-      setCityIndex((prev) => (prev + 1) % CITIES.length);
+      openLocationPicker();
     }
   };
 
   const { language } = useLanguage();
-  const rawLocation = subtitle !== 'South Delhi NCR · within 10 km' && subtitle
-    ? subtitle
-    : CITIES[cityIndex];
+  const router = useRouter();
+  const rawLocation = activeAddress
+    ? `${activeAddress.type === 'Other' && activeAddress.label ? activeAddress.label : activeAddress.type}: ${activeAddress.landmark_street || activeAddress.city}`
+    : currentLocationName;
   const displayLocation = translateAddress(rawLocation, language === 'hi');
 
   return (
@@ -175,14 +176,18 @@ export function AppHeader({
               paddingVertical: 3.5,
               borderRadius: 999,
               alignSelf: 'flex-start',
+              maxWidth: '85%',
             }}
           >
             <MapPin size={11} color="#2563EB" strokeWidth={2.4} />
             <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
               style={{
                 fontSize: 11.5,
                 fontWeight: '700',
                 color: '#1E40AF',
+                flexShrink: 1,
               }}
             >
               {displayLocation}
@@ -196,6 +201,21 @@ export function AppHeader({
             </View>
           )}
         </View>
+
+        {/* Optional screen descriptive subtitle */}
+        {subtitle && subtitle !== 'South Delhi NCR · within 10 km' && subtitle !== 'Saket, South Delhi NCR' && (
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 12,
+              color: '#64748B',
+              fontWeight: '500',
+              marginTop: 5,
+            }}
+          >
+            {subtitle}
+          </Text>
+        )}
 
         {/* Children (Unified Search Bar & Segment Controls) */}
         {children && <View style={{ marginTop: 12 }}>{children}</View>}

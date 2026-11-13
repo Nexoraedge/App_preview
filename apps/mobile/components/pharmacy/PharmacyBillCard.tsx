@@ -18,7 +18,7 @@ interface PharmacyBillCardProps {
   mode: Mode;
   isHi: boolean;
   onPayInApp: () => void;
-  onPayAtShop: () => void;
+  onPayAtShop?: () => void;
 }
 
 export function PharmacyBillCard({
@@ -30,7 +30,6 @@ export function PharmacyBillCard({
   mode,
   isHi,
   onPayInApp,
-  onPayAtShop,
 }: PharmacyBillCardProps) {
   return (
     <Animated.View
@@ -134,36 +133,11 @@ export function PharmacyBillCard({
         <PrimaryButton
           label={
             isHi
-              ? `${inr(total)} भुगतान करें और ${inr(discount)} बचाएं`
-              : `Pay ${inr(total)} and save ${inr(discount)}`
+              ? `${inr(total)} ऑनलाइन भुगतान करें और ${inr(discount)} बचाएं`
+              : `Pay ${inr(total)} Online and save ${inr(discount)}`
           }
           onPress={onPayInApp}
         />
-        <Pressable
-          onPress={onPayAtShop}
-          style={{
-            height: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: C.sub,
-              textAlign: 'center',
-            }}
-          >
-            {mode === 'pickup'
-              ? isHi
-                ? `दुकान पर भुगतान करें (${inr(subtotal)}, ऐप छूट नहीं)`
-                : `Pay at the shop instead (${inr(subtotal)}, no in-app discount)`
-              : isHi
-              ? `डिलीवरी पर नकद भुगतान करें (${inr(subtotal)}, ऐप छूट नहीं)`
-              : `Pay on delivery instead (${inr(subtotal)}, no in-app discount)`}
-          </Text>
-        </Pressable>
       </View>
     </Animated.View>
   );

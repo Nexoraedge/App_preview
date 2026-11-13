@@ -12,8 +12,6 @@ interface TrustGridSectionProps {
 }
 
 export function TrustGridSection({ isHi }: TrustGridSectionProps) {
-  const { width } = Dimensions.get('window');
-  const cardWidth = Math.floor((width - 32 - 10) / 2);
   const c = isHi ? homeCopy.hi : homeCopy.en;
 
   return (
@@ -39,7 +37,7 @@ export function TrustGridSection({ isHi }: TrustGridSectionProps) {
             <View
               key={pillar.id}
               style={{
-                width: cardWidth,
+                width: '48.5%',
                 backgroundColor: '#FFFFFF',
                 borderRadius: 16,
                 paddingHorizontal: 12,

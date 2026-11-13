@@ -1,11 +1,26 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { StatusBar as RNStatusBar, Platform } from 'react-native';
+import { StatusBar as RNStatusBar, Platform, Text, TextInput } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/context/AuthContext';
 import { LanguageProvider } from '../src/context/LanguageContext';
 import { FamilyProvider } from '../src/context/FamilyContext';
+import { LocationProvider } from '../src/context/LocationContext';
+import { LocationPickerModal } from '../components/ui/LocationPickerModal';
+
+// Lock font scaling globally so device accessibility font sizes never break or distort UI layout
+if ((Text as any).defaultProps == null) {
+  (Text as any).defaultProps = {};
+}
+(Text as any).defaultProps.allowFontScaling = false;
+(Text as any).defaultProps.maxFontSizeMultiplier = 1.0;
+
+if ((TextInput as any).defaultProps == null) {
+  (TextInput as any).defaultProps = {};
+}
+(TextInput as any).defaultProps.allowFontScaling = false;
+(TextInput as any).defaultProps.maxFontSizeMultiplier = 1.0;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,7 +73,8 @@ export default function RootLayout() {
         <AuthProvider>
           <LanguageProvider>
             <FamilyProvider>
-              <RNStatusBar
+              <LocationProvider>
+                <RNStatusBar
                 barStyle="light-content"
                 backgroundColor="#172554"
                 translucent={false}
@@ -110,6 +126,13 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen
+                  name="notifications"
+                  options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                  }}
+                />
+                <Stack.Screen
                   name="settings"
                   options={{
                     headerShown: false,
@@ -131,7 +154,10 @@ export default function RootLayout() {
                   }}
                 />
               </Stack>
-            </FamilyProvider>
+              {/* Global Swiggy-Style Location & Address Modal */}
+              <LocationPickerModal />
+            </LocationProvider>
+          </FamilyProvider>
           </LanguageProvider>
         </AuthProvider>
       </QueryClientProvider>

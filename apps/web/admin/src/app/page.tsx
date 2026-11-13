@@ -148,7 +148,7 @@ export default function CallCenterDashboard() {
 
   // Mock simulator to trigger incoming request from mobile app
   const simulateIncomingPatientRequest = () => {
-    const randomHospital = ['Jain ENT , Saket', 'Fortis Memorial Gurugram', 'Medanta - The Medicity'][Math.floor(Math.random() * 3)];
+    const randomHospital = ['SDMH Hospital Jaipur', 'Eternal Hospital Jaipur', 'SMS Hospital Jaipur'][Math.floor(Math.random() * 3)];
     const randomNames = ['Aman Jain', 'Priya Deshmukh', 'Rajeev Kapoor', 'Ananya Gupta', 'Kavita Chawla'];
     const randomPatient = randomNames[Math.floor(Math.random() * randomNames.length)];
     const mockRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;

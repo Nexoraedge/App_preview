@@ -10,11 +10,15 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { List, LayoutGrid } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking } from '@adityam/types';
+import { saveNewBooking, subscribeCloudBookings } from '../../src/services/bookingStorage';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage } from '../../src/context/LanguageContext';
+import { useLocation } from '../../src/context/LocationContext';
+import { uploadPrescriptionSlip } from '../../src/lib/supabase';
 import { ipdCopy } from '../../src/i18n/ipdCopy';
 import {
   CategoryFilter,
@@ -23,7 +27,9 @@ import {
   MASTER_SURGERIES,
   MASTER_HOSPITALS,
 } from '../../src/data/ipdData';
+import { useIpdSurgeries } from '../../src/hooks/useSupabaseData';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { QuickAssistBar } from '../../components/ui/QuickAssistBar';
 import { IpdCardSkeleton } from '../../components/ui/SkeletonBox';
 import { IpdHeroHeader } from '../../components/ipd/IpdHeroHeader';
 import { CategoryChipsRow } from '../../components/ipd/CategoryChipsRow';
@@ -32,11 +38,14 @@ import { AdmissionHospitalCard } from '../../components/ipd/AdmissionHospitalCar
 import { EmergencyBanner } from '../../components/ipd/EmergencyBanner';
 import { DoctorSlipUploadModal } from '../../components/ipd/DoctorSlipUploadModal';
 import { AdmissionBookingSheet } from '../../components/ipd/AdmissionBookingSheet';
+import { VerifyPhoneModal } from '../../components/auth/VerifyPhoneModal';
 
 export default function IpdScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const { activeAddress, currentLocationName } = useLocation();
   const isHi = language === 'hi';
   const c = isHi ? ipdCopy.hi : ipdCopy.en;
 
@@ -45,6 +54,8 @@ export default function IpdScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [profileVisible, setProfileVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
+  const [pendingIpdAction, setPendingIpdAction] = useState<'admission' | 'advice' | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 300);
@@ -57,9 +68,34 @@ export default function IpdScreen() {
     setTimeout(() => setIsRefreshing(false), 500);
   }, []);
 
+  const { data: dbSurgeries } = useIpdSurgeries(selectedCategory !== 'ALL' ? selectedCategory : undefined);
+
+  const liveSurgeries: PlannedSurgery[] = useMemo(() => {
+    if (dbSurgeries && dbSurgeries.length > 0) {
+      return dbSurgeries.map((s: any) => ({
+        id: s.id,
+        shortName: s.short_name,
+        shortNameHi: s.short_name_hi ?? s.short_name,
+        name: s.name,
+        nameHi: s.name_hi ?? s.name,
+        category: s.category as PlannedSurgery['category'],
+        stayDays: s.stay_days,
+        stayDaysHi: s.stay_days_hi ?? s.stay_days,
+        price: Number(s.price),
+        tag: s.tag ?? '',
+        tagHi: s.tag_hi ?? s.tag ?? '',
+        whatItInvolves: s.what_it_involves ?? '',
+        whatItInvolvesHi: s.what_it_involves_hi ?? s.what_it_involves ?? '',
+        recoveryTimeline: s.recovery_timeline ?? '',
+        recoveryTimelineHi: s.recovery_timeline_hi ?? s.recovery_timeline ?? '',
+      }));
+    }
+    return MASTER_SURGERIES;
+  }, [dbSurgeries]);
+
   // Filtered surgeries based on search query and category chip
   const filteredSurgeries = useMemo(() => {
-    let list = MASTER_SURGERIES;
+    let list = liveSurgeries;
     if (selectedCategory !== 'ALL') {
       list = list.filter((s) => s.category === selectedCategory);
     }
@@ -98,8 +134,25 @@ export default function IpdScreen() {
   const [selectedHospital, setSelectedHospital] = useState<HospitalAdmissionInfo | null>(null);
 
   // Booking fields
-  const [patientName, setPatientName] = useState(user?.full_name || 'Rahul Jain');
-  const [patientPhone, setPatientPhone] = useState(user?.phone || '+91 98112 44550');
+  const [patientName, setPatientName] = useState(user?.full_name || '');
+  const [patientPhone, setPatientPhone] = useState(
+    user?.phone && user.phone !== '+91 99999 99999' && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910')
+      ? user.phone
+      : ''
+  );
+
+  useEffect(() => {
+    if (user?.full_name) setPatientName(user.full_name);
+    if (user?.phone && user.phone !== '+91 99999 99999' && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910')) {
+      setPatientPhone(user.phone);
+    }
+  }, [user]);
+
+  // Realtime subscription for Supabase cloud bookings
+  useEffect(() => {
+    const unsub = subscribeCloudBookings(user?.id);
+    return () => unsub();
+  }, [user?.id]);
   const [roomType, setRoomType] = useState<'DELUXE' | 'SEMI' | 'GENERAL' | 'ICU'>('DELUXE');
   const [insurancePolicy, setInsurancePolicy] = useState('Star Health Insurance');
   const [admissionReason, setAdmissionReason] = useState('');
@@ -127,29 +180,40 @@ export default function IpdScreen() {
   };
 
   const handleConfirmAdmissionBooking = async () => {
+    if (!user?.phone) {
+      setPendingIpdAction('admission');
+      setIsVerifyPhoneOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
     const bookingRef = `IPD-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
       booking_ref: bookingRef,
       service_type: 'IPD_ENQUIRY',
-      user_id: user?.id,
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       patient_name: patientName,
       patient_phone: patientPhone,
       hospital_name: selectedHospital?.name || 'Network Hospital',
       doctor_name: selectedSurgery?.name || 'Inpatient Specialist',
       slot_time: 'Next Available Admission',
       specialty_requested: selectedSurgery?.category || 'Surgery & Inpatient Care',
-      status: 'NEW',
-      call_status: 'pending',
+      status: 'CONFIRMED',
+      call_status: 'connected',
+      doctor_fee: 0,
+      final_payable: 0,
       notes: `Room: ${roomType} | Insurance: ${insurancePolicy} | Reason: ${admissionReason}`,
       created_at: new Date().toISOString(),
     };
 
     try {
-      const supabase = getSupabaseClient();
-      await supabase.from('bookings').insert(newBooking);
+      await saveNewBooking(newBooking);
     } catch {
       // Offline fallback handling
     }
@@ -160,28 +224,56 @@ export default function IpdScreen() {
     }, 700);
   };
 
-  const handleSubmitAdvice = async () => {
+  const handleSubmitAdvice = async (slipUri?: string | null, slipBase64?: string) => {
+    if (!user?.phone) {
+      setPendingIpdAction('advice');
+      setIsVerifyPhoneOpen(true);
+      return;
+    }
+
     setIsSubmittingAdvice(true);
     const caseId = `DOC-ADVICE-${Math.floor(10000 + Math.random() * 90000)}`;
 
+    let uploadedUrl: string | undefined;
+    if (slipUri) {
+      try {
+        uploadedUrl = await uploadPrescriptionSlip(slipUri, `${caseId}_advice.jpg`, slipBase64);
+      } catch {}
+    }
+
+    const resolvedLocation = activeAddress
+      ? [activeAddress.house_flat, activeAddress.landmark_street, activeAddress.city]
+          .filter(Boolean)
+          .join(', ')
+      : currentLocationName || 'Jaipur';
+
     const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
       booking_ref: caseId,
       service_type: 'IPD_ENQUIRY',
-      user_id: user?.id,
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       patient_name: patientName,
       patient_phone: patientPhone,
       hospital_name: 'Adityam Review Desk',
-      slot_time: 'Immediate',
-      status: 'NEW',
-      call_status: 'pending',
-      notes: `Prescription Advice Upload: ${adviceNote}`,
+      branch_name: resolvedLocation,
+      doctor_name: 'Inpatient Concierge Coordinator',
+      slot_time: 'Immediate Concierge Review',
+      specialty_requested: 'IPD Doctor Advice / Admission',
+      status: 'CONFIRMED',
+      call_status: 'connected',
+      doctor_fee: 0,
+      final_payable: 0,
+      bill_image_url: uploadedUrl,
+      notes: `Prescription Advice Upload (${resolvedLocation}): ${adviceNote}`,
       created_at: new Date().toISOString(),
     };
 
     try {
-      const supabase = getSupabaseClient();
-      await supabase.from('bookings').insert(newBooking);
+      await saveNewBooking(newBooking);
     } catch {
       // Offline fallback handling
     }
@@ -209,6 +301,7 @@ export default function IpdScreen() {
           paddingBottom: Math.max(insets.bottom, 16) + 80,
         }}
       >
+        <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         {/* Modular Hero Header with Search & Advice Slip Upload */}
         <IpdHeroHeader
           isHi={isHi}
@@ -220,6 +313,18 @@ export default function IpdScreen() {
             setAdviceSheetVisible(true);
           }}
         />
+
+        {/* Quick Assistance 3-Pill Bar (Call, Doctor Advice Upload, WhatsApp) */}
+        <View style={{ paddingHorizontal: 16, marginTop: 10, marginBottom: 4 }}>
+          <QuickAssistBar
+            context="ipd"
+            isHi={isHi}
+            onPressQuickOrder={() => {
+              setAdviceSuccessRef(null);
+              setAdviceSheetVisible(true);
+            }}
+          />
+        </View>
 
         {/* Modular Surgery Category Chips */}
         <CategoryChipsRow
@@ -447,6 +552,7 @@ export default function IpdScreen() {
 
         {/* Calm Emergency Banner */}
         <EmergencyBanner isHi={isHi} />
+        </View>
       </ScrollView>
 
       {/* Modular Admission Booking Bottom Sheet */}
@@ -469,6 +575,10 @@ export default function IpdScreen() {
         isSubmitting={isSubmitting}
         onSubmit={handleConfirmAdmissionBooking}
         confirmedBookingId={confirmedBookingId}
+        onViewAppointments={() => {
+          setBottomSheetVisible(false);
+          router.push('/appointments');
+        }}
       />
 
       {/* Modular Doctor Advice Slip Upload Modal */}
@@ -485,12 +595,43 @@ export default function IpdScreen() {
         isSubmitting={isSubmittingAdvice}
         onSubmit={handleSubmitAdvice}
         successRef={adviceSuccessRef}
+        onViewAppointments={() => {
+          setAdviceSheetVisible(false);
+          router.push('/appointments');
+        }}
       />
 
       {/* Profile & Language Modal */}
       <ProfileModal
         visible={profileVisible}
         onClose={() => setProfileVisible(false)}
+      />
+
+      {/* Progressive Phone Verification for Google Login Users */}
+      <VerifyPhoneModal
+        visible={isVerifyPhoneOpen}
+        onClose={() => {
+          setIsVerifyPhoneOpen(false);
+          setPendingIpdAction(null);
+        }}
+        onSuccess={(verifiedPhone) => {
+          setIsVerifyPhoneOpen(false);
+          setPatientPhone(verifiedPhone);
+          const action = pendingIpdAction;
+          setPendingIpdAction(null);
+          if (action === 'admission') {
+            handleConfirmAdmissionBooking();
+          } else if (action === 'advice') {
+            handleSubmitAdvice();
+          }
+        }}
+        isHi={isHi}
+        title={isHi ? 'अस्पताल भर्ती हेतु मोबाइल सत्यापन' : 'Verify Phone for Hospital Admission'}
+        subtitle={
+          isHi
+            ? 'कैशलेस टीपीए क्लेम और अस्पताल कंसीयर्ज सहायता हेतु अपना मोबाइल नंबर सत्यापित करें।'
+            : 'Hospital TPA and clinical concierge coordinators require a verified mobile number to process cashless admission.'
+        }
       />
     </View>
   );

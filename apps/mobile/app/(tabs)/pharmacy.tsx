@@ -7,6 +7,7 @@ import {
   Text,
   ScrollView,
   Pressable,
+  TouchableOpacity,
   Alert,
   Linking,
   Platform,
@@ -16,6 +17,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import {
+  ArrowLeft,
   ChevronLeft,
   ChevronDown,
   Users,
@@ -32,8 +34,14 @@ import { PrimaryButton, SheetFrame, tap, Segmented } from '../../components/ui/k
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppSearchBar } from '../../components/ui/AppSearchBar';
 import { ProfileModal } from '../../components/ui/ProfileModal';
+import { VerifyPhoneModal } from '../../components/auth/VerifyPhoneModal';
 import { useLanguage } from '../../src/context/LanguageContext';
 import { useFamilyOptional } from '../../src/context/FamilyContext';
+import { useAuth } from '../../src/context/AuthContext';
+import { useLocation } from '../../src/context/LocationContext';
+import { saveNewBooking, getLocalBookings, subscribeBookings, subscribeCloudBookings } from '../../src/services/bookingStorage';
+import { triggerBrowserNotification } from '../../src/services/notificationService';
+import { uploadPrescriptionSlip } from '../../src/lib/supabase';
 import {
   PHARMACIES,
   SAMPLE_BILL,
@@ -41,7 +49,9 @@ import {
   getPharmacyName,
   getPharmacyArea,
   type RequestStatus,
+  type Pharmacy,
 } from '../../src/data/pharmacySample';
+import { usePharmacies } from '../../src/hooks/useSupabaseData';
 import {
   Stage,
   Mode,
@@ -91,7 +101,9 @@ export default function PharmacyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const fam = useFamilyOptional();
+  const { user } = useAuth();
   const { language } = useLanguage();
+  const { coords: ctxCoords, activeAddress, currentLocationName } = useLocation();
   const isHi = language === 'hi';
   const c = isHi ? pharmacyCopy.hi : pharmacyCopy.en;
 
@@ -111,9 +123,120 @@ export default function PharmacyScreen() {
   const [memberSheet, setMemberSheet] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [profileVisible, setProfileVisible] = useState(false);
+  const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
   const askedLoc = useRef(false);
 
-  // Ask for location permission when user enters shops stage
+  // Load real pharmacy orders for logged-in user (clean state for fresh accounts)
+  useEffect(() => {
+    const loadRealPharmacyOrders = async () => {
+      try {
+        const allBookings = await getLocalBookings();
+        const isDemo = user?.id === '00000000-0000-0000-0000-000000000001';
+        const pharmacyBookings = allBookings.filter(
+          (b) =>
+            b.service_type === 'PHARMACY_SCAN_PAY' &&
+            (isDemo
+              ? b.user_id === '00000000-0000-0000-0000-000000000001' || !b.user_id
+              : user?.id && b.user_id === user.id)
+        );
+
+        if (pharmacyBookings.length > 0) {
+          const items: HistoryItem[] = pharmacyBookings.map((b) => {
+            const hasRealBill = (b.final_payable && b.final_payable > 0) || (b.bill_amount && b.bill_amount > 0);
+            return {
+              ref: b.booking_ref,
+              shop: b.hospital_name || 'Adityam Partner Pharmacy',
+              shopHi: b.hospital_name || 'आदित्यम पार्टनर फार्मेसी',
+              shopAddress: b.branch_name || 'Surajpole Gate, Jaipur',
+              shopPhone: b.patient_phone || '+91 82713 10911',
+              total: hasRealBill ? (b.final_payable || 0) : 0,
+              subtotal: hasRealBill ? (b.bill_amount || 0) : 0,
+              discount: hasRealBill ? (b.discount_amount || 0) : 0,
+              deliveryFee: 0,
+              mode: (b.slot_time || '').toLowerCase().includes('delivery') ? 'delivery' : 'pickup',
+              paidInApp: Boolean(hasRealBill),
+              date: new Date(b.created_at).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              status: hasRealBill ? (b.status === 'PAID' ? 'delivered' : 'ready') : 'ready',
+              patientName: b.patient_name || 'Myself',
+              items: [
+                {
+                  id: 'rx-1',
+                  name: 'Prescription Medicine Order',
+                  nameHi: 'पर्चे अनुसार औषधियां',
+                  qty: 1,
+                  price: hasRealBill ? (b.final_payable || b.bill_amount || 0) : 0,
+                },
+              ],
+            };
+          });
+          setHistory(items);
+        } else {
+          setHistory([]);
+        }
+      } catch {
+        setHistory([]);
+      }
+    };
+
+    loadRealPharmacyOrders();
+    const unsub = subscribeBookings(loadRealPharmacyOrders);
+    return () => unsub();
+  }, [user?.id]);
+
+  const { data: dbPharmacies } = usePharmacies();
+
+  // Combine database pharmacies with comprehensive city partner network
+  const livePharmacies: Pharmacy[] = useMemo(() => {
+    const list: Pharmacy[] = [...PHARMACIES];
+    if (dbPharmacies && dbPharmacies.length > 0) {
+      dbPharmacies.forEach((p: any) => {
+        if (!list.some((existing) => existing.id === p.id)) {
+          list.push({
+            id: p.id,
+            name: p.name,
+            nameHi: p.name_hi ?? p.name,
+            area: p.area,
+            areaHi: p.area_hi ?? p.area,
+            lat: Number(p.latitude ?? p.lat ?? 28.5355),
+            lng: Number(p.longitude ?? p.lng ?? 77.21),
+            sampleKm: Number(p.distance_km ?? 1.2),
+            rating: Number(p.rating ?? 4.5),
+            reviews: Number(p.reviews ?? 100),
+            delivery: Boolean(p.delivery),
+            pickup: Boolean(p.pickup),
+            appDiscountPct: Number(p.app_discount_pct ?? 15),
+          });
+        }
+      });
+    }
+    return list;
+  }, [dbPharmacies]);
+
+  // Priority coordinate resolution: Active Saved Address > LocationContext Coords > GPS > Regional Fallback
+  const userCoords = useMemo(() => {
+    if (activeAddress?.latitude && activeAddress?.longitude) {
+      return { lat: Number(activeAddress.latitude), lng: Number(activeAddress.longitude) };
+    }
+    if (ctxCoords?.latitude && ctxCoords?.longitude) {
+      return { lat: Number(ctxCoords.latitude), lng: Number(ctxCoords.longitude) };
+    }
+    if (coords?.lat && coords?.lng) {
+      return coords;
+    }
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    if (locText.includes('jaipur')) {
+      return { lat: 26.9205, lng: 75.8450 }; // Mohanbari / Surajpole Gate, Jaipur
+    }
+    return { lat: 26.9205, lng: 75.8450 }; // Mohanbari / Surajpole Gate, Jaipur
+  }, [activeAddress, ctxCoords, coords, currentLocationName, user?.city]);
+
+  // Ask for location permission when user enters shops stage if not already determined
   useEffect(() => {
     if (stage !== 'shops' || askedLoc.current) return;
     askedLoc.current = true;
@@ -136,27 +259,31 @@ export default function PharmacyScreen() {
     })();
   }, [stage]);
 
-  // Demo simulation of pharmacist response times
+  // Realtime subscription for Supabase cloud bookings
   useEffect(() => {
-    if (stage !== 'track') return;
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (status === 'sent') t = setTimeout(() => setStatus('reviewing'), 1800);
-    else if (status === 'reviewing') t = setTimeout(() => setStatus('quoted'), 3500);
-    else if (status === 'paid') t = setTimeout(() => setStatus('ready'), 2200);
-    return () => {
-      if (t) clearTimeout(t);
-    };
-  }, [stage, status]);
+    const unsub = subscribeCloudBookings(user?.id);
+    return () => unsub();
+  }, [user?.id]);
 
+  // Calculate live real-time distance and filter pharmacies within active city radius
   const { shops, isSample } = useMemo(() => {
-    const real = coords ? PHARMACIES.map((p) => distanceKm(coords, p)) : [];
-    const usable = real.length > 0 && Math.min(...real) < 60;
-    const list = PHARMACIES.map((p, i) => ({
-      ...p,
-      km: Math.round((usable ? real[i] : p.sampleKm) * 10) / 10,
-    }));
-    return { shops: list, isSample: !usable };
-  }, [coords]);
+    const listWithDistance = livePharmacies.map((p) => {
+      const d = distanceKm(userCoords, p);
+      return {
+        ...p,
+        km: Math.round(d * 10) / 10,
+      };
+    });
+
+    // Match local pharmacies (within 35 km of delivery doorstep)
+    const nearby = listWithDistance.filter((p) => p.km <= 35);
+    const usable = nearby.length > 0;
+    const finalShops = usable
+      ? nearby.sort((a, b) => a.km - b.km)
+      : listWithDistance.sort((a, b) => a.km - b.km);
+
+    return { shops: finalShops, isSample: !usable };
+  }, [userCoords, livePharmacies]);
 
   const visibleShops = useMemo(() => {
     let l = shops.filter((s) => (mode === 'delivery' ? s.delivery : s.pickup));
@@ -179,7 +306,7 @@ export default function PharmacyScreen() {
   const subtotal = SAMPLE_BILL.reduce((s, l) => s + l.price * l.qty, 0);
   const discount = shop ? Math.round((subtotal * shop.appDiscountPct) / 100) : 0;
   const total = subtotal - discount;
-  const maxPct = Math.max(...PHARMACIES.map((p) => p.appDiscountPct));
+  const maxPct = Math.max(...livePharmacies.map((p) => p.appDiscountPct));
   const forName = fam?.active
     ? fam.active.relation === 'Self'
       ? isHi
@@ -233,13 +360,73 @@ export default function PharmacyScreen() {
     }
   };
 
-  const sendRequest = () => {
+  const sendRequest = async () => {
     if (!shop) return;
-    setReqRef('RX-' + Math.floor(1000 + Math.random() * 9000));
-    setCode(String(Math.floor(1000 + Math.random() * 9000)));
-    setPaidInApp(null);
-    setStatus('sent');
+    if (!user?.phone || user.phone === '+91 99999 99999' || user.phone.startsWith('+9100') || user.phone.startsWith('+910')) {
+      setIsVerifyPhoneOpen(true);
+      return;
+    }
+    const orderRef = `AN-RX-${Math.floor(100000 + Math.random() * 900000)}`;
+    const verifyCode = String(Math.floor(1000 + Math.random() * 9000));
+    setReqRef(orderRef);
+    setCode(verifyCode);
+    setPaidInApp(true);
+    setStatus('reviewing');
     setStage('track');
+
+    // Upload first slip to Supabase storage
+    let uploadedImageUrl = null;
+    if (images.length > 0) {
+      try {
+        uploadedImageUrl = await uploadPrescriptionSlip(images[0], `${orderRef}_slip.jpg`);
+      } catch (err) {
+        console.warn('Storage upload error:', err);
+      }
+    }
+
+    // Instantly save real booking to Supabase cloud
+    const newBooking: any = {
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
+      booking_ref: orderRef,
+      service_type: 'PHARMACY_SCAN_PAY',
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
+      patient_name: forName || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
+      patient_phone: (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999') ? user.phone : '',
+      hospital_name: shop.name,
+      branch_name: shop.area,
+      doctor_name: 'Adityam Partner Pharmacy',
+      doctor_fee: 0,
+      slot_time: mode === 'delivery' ? 'Home Delivery (45 mins)' : 'Counter Pickup',
+      specialty_requested: 'Pharmacy & Medicines',
+      status: 'PAID',
+      call_status: 'connected',
+      bill_amount: 0,
+      discount_amount: 0,
+      final_payable: 0,
+      bill_image_url: uploadedImageUrl || images[0] || null,
+      notes: `Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Verification PIN: ${verifyCode}. Mode: ${mode}.${
+        mode === 'delivery'
+          ? ` Delivery Address: ${
+              activeAddress
+                ? [activeAddress.house_flat, activeAddress.landmark_street, activeAddress.city, activeAddress.pincode]
+                    .filter(Boolean)
+                    .join(', ')
+                : currentLocationName || 'Current Location'
+            }.`
+          : ''
+      }`,
+      created_at: new Date().toISOString(),
+    };
+
+    await saveNewBooking(newBooking).catch(() => {});
+    triggerBrowserNotification(
+      'Prescription Sent to Pharmacy',
+      `Order #${orderRef} dispatched to ${shop.name}. Mode: ${mode === 'delivery' ? 'Home Delivery' : 'Pickup'}`
+    );
   };
 
   const payInApp = () => {
@@ -253,27 +440,6 @@ export default function PharmacyScreen() {
   };
 
   const finish = () => {
-    if (shop) {
-      const orderStatus = mode === 'delivery' ? 'out_for_delivery' : 'ready';
-      const newOrder: HistoryItem = {
-        ref: reqRef || `RX-${Math.floor(1000 + Math.random() * 9000)}`,
-        shop: shop.name,
-        shopHi: shop.nameHi,
-        shopAddress: `${shop.area}, New Delhi`,
-        shopPhone: '+91 98112 34567',
-        total: paidInApp ? total : subtotal,
-        subtotal,
-        discount: paidInApp ? discount : 0,
-        deliveryFee: 0,
-        mode,
-        paidInApp: !!paidInApp,
-        date: 'Just now',
-        status: orderStatus,
-        patientName: forName || 'Myself',
-        items: [...SAMPLE_BILL],
-      };
-      setHistory((h) => [newOrder, ...h].slice(0, 5));
-    }
     setImages([]);
     setShopId(null);
     setStatus('sent');
@@ -325,7 +491,6 @@ export default function PharmacyScreen() {
       >
         <AppHeader
           title={c.headerTitle}
-          subtitle={c.headerSubtitle}
           onPressProfile={() => setProfileVisible(true)}
         >
           <AppSearchBar
@@ -671,6 +836,34 @@ export default function PharmacyScreen() {
               }}
             >
               <View style={[wrap, { paddingTop: 10 }]}>
+                {/* Back to Pharmacy Header */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setStage('home');
+                    setImages([]);
+                    setShopId(null);
+                  }}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingVertical: 7,
+                    paddingHorizontal: 12,
+                    backgroundColor: '#EFF6FF',
+                    borderRadius: 10,
+                    alignSelf: 'flex-start',
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                  }}
+                >
+                  <ArrowLeft size={16} color="#2563EB" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>
+                    {isHi ? '← दवा सूची व मुख्य पृष्ठ' : '← Back to Pharmacy'}
+                  </Text>
+                </TouchableOpacity>
+
                 <Text
                   style={{
                     fontSize: 22,
@@ -870,11 +1063,12 @@ export default function PharmacyScreen() {
               </View>
             </ScrollView>
 
-            {status === 'ready' && (
-              <BottomBar>
-                <PrimaryButton label={c.doneBtn} onPress={finish} />
-              </BottomBar>
-            )}
+            <BottomBar>
+              <PrimaryButton
+                label={c.doneBtn || (isHi ? 'संपन्न व मुख्य पृष्ठ' : 'Done / Return to Pharmacy')}
+                onPress={finish}
+              />
+            </BottomBar>
           </View>
         )}
       </View>
@@ -980,6 +1174,23 @@ export default function PharmacyScreen() {
       <ProfileModal
         visible={profileVisible}
         onClose={() => setProfileVisible(false)}
+      />
+
+      {/* Progressive Phone Verification for Google Login Users */}
+      <VerifyPhoneModal
+        visible={isVerifyPhoneOpen}
+        onClose={() => setIsVerifyPhoneOpen(false)}
+        onSuccess={() => {
+          setIsVerifyPhoneOpen(false);
+          sendRequest();
+        }}
+        isHi={isHi}
+        title={isHi ? 'दवा ऑर्डर हेतु मोबाइल सत्यापन' : 'Verify Phone for Medicine Order'}
+        subtitle={
+          isHi
+            ? 'दवा डिलीवरी और पार्टनर फार्मेसी डिस्पैच समन्वय के लिए 10-अंकों का मोबाइल नंबर सत्यापित करें।'
+            : 'Delivery partners and licensed pharmacies require your verified mobile number to coordinate medicine dispatch and delivery.'
+        }
       />
     </View>
   );

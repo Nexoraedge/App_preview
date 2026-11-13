@@ -1,18 +1,20 @@
 // apps/mobile/components/home/HomeHeader.tsx
 // Royal Medical Curved Header with Brand Logo, City Switcher, Profile Avatar, and Search Bar
 
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, ChevronDown, User } from 'lucide-react-native';
+import { MapPin, ChevronDown, User, Bell } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { AppSearchBar } from '../ui/AppSearchBar';
 import { homeCopy } from '../../src/i18n/homeCopy';
+import { useLocation } from '../../src/context/LocationContext';
 
 interface HomeHeaderProps {
   isHi: boolean;
   topInset: number;
-  selectedCity: string;
-  onCycleCity: () => void;
+  selectedCity?: string;
+  onCycleCity?: () => void;
   onOpenProfile: () => void;
   onSearchPress: () => void;
 }
@@ -20,19 +22,21 @@ interface HomeHeaderProps {
 export function HomeHeader({
   isHi,
   topInset,
-  selectedCity,
-  onCycleCity,
   onOpenProfile,
   onSearchPress,
 }: HomeHeaderProps) {
   const c = isHi ? homeCopy.hi : homeCopy.en;
+  const { currentLocationName, activeAddress, openLocationPicker } = useLocation();
 
-  const getCityLabel = (raw: string) => {
-    if (!isHi) return raw;
-    if (raw.includes('Bengaluru')) return c.cityBengaluru;
-    if (raw.includes('Jaipur')) return c.cityJaipur;
-    return c.citySaket;
-  };
+  const displayLocation = useMemo(() => {
+    if (activeAddress) {
+      const typeLabel = activeAddress.type === 'Home' ? (isHi ? 'घर' : 'Home') : activeAddress.type === 'Work' ? (isHi ? 'दफ़्तर' : 'Work') : activeAddress.label || (isHi ? 'अन्य' : 'Other');
+      return `${typeLabel}: ${activeAddress.landmark_street || activeAddress.city}`;
+    }
+    return currentLocationName;
+  }, [activeAddress, currentLocationName, isHi]);
+
+  const router = useRouter();
 
   return (
     <LinearGradient
@@ -43,6 +47,9 @@ export function HomeHeader({
         paddingTop: Math.max(topInset, 14) + 6,
         paddingHorizontal: 18,
         paddingBottom: 22,
+        borderTopLeftRadius: Platform.OS === 'web' ? 24 : 0,
+        borderTopRightRadius: Platform.OS === 'web' ? 24 : 0,
+        marginTop: Platform.OS === 'web' ? 12 : 0,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
         shadowColor: '#1E3A8A',
@@ -83,7 +90,7 @@ export function HomeHeader({
 
           {/* Location Selector Capsule Pill */}
           <TouchableOpacity
-            onPress={onCycleCity}
+            onPress={openLocationPicker}
             activeOpacity={0.7}
             style={{
               flexDirection: 'row',
@@ -97,11 +104,12 @@ export function HomeHeader({
               borderWidth: 1,
               borderColor: 'rgba(255, 255, 255, 0.28)',
               alignSelf: 'flex-start',
+              maxWidth: 240,
             }}
           >
             <MapPin size={10} color="#BFDBFE" strokeWidth={2.4} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
-              {getCityLabel(selectedCity)}
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', flexShrink: 1 }} numberOfLines={1}>
+              {displayLocation}
             </Text>
             <ChevronDown size={10} color="#BFDBFE" strokeWidth={2.2} />
           </TouchableOpacity>

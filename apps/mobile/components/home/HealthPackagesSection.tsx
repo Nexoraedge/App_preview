@@ -6,6 +6,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Clock } from 'lucide-react-native';
 import { homeCopy } from '../../src/i18n/homeCopy';
+import { useHealthPackages } from '../../src/hooks/useSupabaseData';
 
 interface HealthPackagesSectionProps {
   isHi: boolean;
@@ -14,6 +15,22 @@ interface HealthPackagesSectionProps {
 export function HealthPackagesSection({ isHi }: HealthPackagesSectionProps) {
   const router = useRouter();
   const c = isHi ? homeCopy.hi : homeCopy.en;
+
+  const { data: packages } = useHealthPackages();
+  const topPkg = packages && packages.length > 0 ? packages[0] : null;
+
+  const packageName = topPkg
+    ? (isHi ? topPkg.name_hi || topPkg.name_en || topPkg.name : topPkg.name_en || topPkg.name)
+    : c.fullBodyPkg;
+  const testsCountText = topPkg && topPkg.tests_count
+    ? (isHi ? `${topPkg.tests_count} परीक्षण शामिल` : `${topPkg.tests_count} Vital Tests Included`)
+    : c.checkupPkgTestsCount;
+
+  const currentPrice = topPkg?.discounted_price ?? topPkg?.price ?? 1499;
+  const basePrice = topPkg?.base_price ?? topPkg?.original_price ?? 3000;
+
+  const priceDisplay = `₹${Number(currentPrice).toLocaleString('en-IN')}`;
+  const originalPriceDisplay = `₹${Number(basePrice).toLocaleString('en-IN')}`;
 
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
@@ -62,10 +79,10 @@ export function HealthPackagesSection({ isHi }: HealthPackagesSectionProps) {
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={{ fontSize: 16, fontWeight: '900', color: '#182F3B', lineHeight: 21 }}>
-              {c.fullBodyPkg}
+              {packageName}
             </Text>
             <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#2563EB', marginTop: 4 }}>
-              {c.checkupPkgTestsCount}
+              {testsCountText}
             </Text>
             <Text style={{ fontSize: 11, fontWeight: '500', color: '#64748B', marginTop: 2, lineHeight: 16 }}>
               {c.checkupPkgOrgans}
@@ -118,9 +135,9 @@ export function HealthPackagesSection({ isHi }: HealthPackagesSectionProps) {
         >
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={{ fontSize: 20, fontWeight: '900', color: '#182F3B' }}>₹1,499</Text>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: '#182F3B' }}>{priceDisplay}</Text>
               <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8', textDecorationLine: 'line-through' }}>
-                ₹3,000
+                {originalPriceDisplay}
               </Text>
             </View>
             <Text style={{ fontSize: 10, fontWeight: '700', color: '#2563EB', marginTop: 1 }}>

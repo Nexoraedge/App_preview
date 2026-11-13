@@ -108,553 +108,298 @@ export async function verifyPhoneOtp(
 // Seed hospitals with structured branches and verified doctors for immediate testing & offline fallback
 export const SEED_HOSPITALS: Hospital[] = [
   {
-    id: '22222222-2222-2222-2222-222222222201',
-    name: 'Jain ENT Hospital',
-    slug: 'jain-ent-hospital-saket',
-    address: '1, 2, Press Enclave Marg, Saket Institutional Area, New Delhi',
-    city: 'New Delhi',
-    state: 'Delhi NCR',
-    pincode: '110017',
-    latitude: 28.5283,
-    longitude: 77.2120,
-    rating: 5.0,
-    total_reviews: 680,
-    specialties: ['ENT', 'Cardiology', 'Orthopedics', 'Micro-Surgery', 'General Medicine', 'Dentistry'],
-    facilities: ['24x7 Emergency', 'NABH Accredited', 'Best ENT & Surgery Center', 'Audiology Lab', 'Cashless Desk'],
-    contact_number: '+91-11-2651-5050',
-    virtual_exotel_number: '+911140008801',
-    discount_percentage: 25,
+    id: '22222222-2222-2222-2222-222222222210',
+    name: 'Santokba Durlabhji Memorial Hospital (SDMH)',
+    slug: 'sdmh-jaipur',
+    address: 'Bhawani Singh Road, Jaipur, Rajasthan',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    pincode: '302005',
+    latitude: 26.9124,
+    longitude: 75.8013,
+    rating: 4.8,
+    total_reviews: 920,
+    specialties: ['Cardiology', 'Neurology', 'Orthopedics', 'General Surgery', 'Pediatrics', 'General Medicine'],
+    facilities: ['24x7 Emergency', 'NABH Accredited', 'Cardiac ICU', 'Cath Lab', 'Blood Bank'],
+    contact_number: '+91-141-2566251',
+    virtual_exotel_number: '+911141000210',
+    discount_percentage: 20,
     image_url: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=800&q=80',
     is_active: true,
     featured: true,
     branches: [
       {
-        id: 'branch-jain-saket',
-        hospital_id: '22222222-2222-2222-2222-222222222201',
-        name: 'Saket Main Hospital',
-        area: 'Saket, South Delhi',
-        address: '1, 2, Press Enclave Marg, Saket Institutional Area, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5283,
-        longitude: 77.2120,
-        distance_km: 1.2,
-        contact_number: '+91-11-2651-5050',
-        virtual_exotel_number: '+911140008801',
+        id: 'branch-sdmh-main',
+        hospital_id: '22222222-2222-2222-2222-222222222210',
+        name: 'SDMH Main Campus',
+        area: 'Bhawani Singh Road, Jaipur',
+        address: 'Bhawani Singh Road, Jaipur, Rajasthan - 302005',
+        city: 'Jaipur',
+        latitude: 26.9124,
+        longitude: 75.8013,
+        distance_km: 1.9,
+        contact_number: '+91-141-2566251',
+        virtual_exotel_number: '+911141000210',
         is_main_branch: true,
         doctors: [
           {
-            id: 'doc-satish-jain',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-jain-saket',
-            name: 'Dr. Satish Jain',
-            specialty: 'ENT',
-            qualification: 'MBBS, MS (ENT), DLO - Chief Senior Specialist',
-            experience_years: 24,
-            rating: 5.0,
-            total_reviews: 950,
+            id: 'doc-sdmh-1',
+            hospital_id: '22222222-2222-2222-2222-222222222210',
+            branch_id: 'branch-sdmh-main',
+            name: 'Dr. Rajesh Sharma',
+            specialty: 'Cardiology',
+            qualification: 'MBBS, MD, DM (Cardiology), FACC',
+            experience_years: 20,
+            rating: 4.9,
+            total_reviews: 540,
             consultation_fee: 800,
-            discounted_fee: 600,
-            next_available_slot: 'Today, 5:30 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 10:00 AM - 02:00 PM, 05:00 PM - 08:00 PM',
+            discounted_fee: 640,
+            next_available_slot: 'Today, 5:00 PM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 10:00 AM - 02:00 PM, 05:00 PM - 07:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
           },
           {
-            id: 'doc-max-2',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-max-saket',
-            name: 'Dr. Meenakshi Sundaram',
+            id: 'doc-sdmh-2',
+            hospital_id: '22222222-2222-2222-2222-222222222210',
+            branch_id: 'branch-sdmh-main',
+            name: 'Dr. Priya Agarwal',
             specialty: 'General Medicine',
             qualification: 'MBBS, MD (Internal Medicine)',
             experience_years: 14,
             rating: 4.8,
-            total_reviews: 240,
-            consultation_fee: 800,
-            discounted_fee: 600,
-            next_available_slot: 'Today, 7:15 PM',
-            languages: ['English', 'Hindi', 'Tamil'],
-            opd_timing: 'Mon-Sat: 09:00 AM - 04:00 PM',
+            total_reviews: 320,
+            consultation_fee: 600,
+            discounted_fee: 480,
+            next_available_slot: 'Today, 6:30 PM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 09:00 AM - 05:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1594824813583-36c1e57c6b54?auto=format&fit=crop&w=300&q=80',
           },
           {
-            id: 'doc-max-3',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-max-saket',
-            name: 'Dr. Vikramaditya Sen',
+            id: 'doc-sdmh-3',
+            hospital_id: '22222222-2222-2222-2222-222222222210',
+            branch_id: 'branch-sdmh-main',
+            name: 'Dr. Amit Joshi',
             specialty: 'Orthopedics',
-            qualification: 'MBBS, MS (Ortho), M.Ch',
+            qualification: 'MBBS, MS (Ortho)',
             experience_years: 16,
-            rating: 4.9,
-            total_reviews: 195,
-            consultation_fee: 1100,
-            discounted_fee: 825,
-            next_available_slot: 'Tomorrow, 11:00 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Tue-Sun: 11:00 AM - 06:00 PM',
+            rating: 4.7,
+            total_reviews: 280,
+            consultation_fee: 700,
+            discounted_fee: 560,
+            next_available_slot: 'Tomorrow, 10:00 AM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Fri: 10:00 AM - 04:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300&q=80',
           },
         ],
       },
+    ],
+  },
+  {
+    id: '22222222-2222-2222-2222-222222222211',
+    name: 'Eternal Hospital Jaipur',
+    slug: 'eternal-hospital-jaipur',
+    address: 'JLN Marg, Jawahar Lal Nehru Marg, Jaipur, Rajasthan',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    pincode: '302017',
+    latitude: 26.8900,
+    longitude: 75.8203,
+    rating: 4.7,
+    total_reviews: 750,
+    specialties: ['Cardiology', 'Oncology', 'Neurology', 'Gastroenterology', 'Pediatrics'],
+    facilities: ['24x7 Emergency', 'NABH Accredited', 'Cancer Centre', 'Kidney Transplant', 'Level 3 ICU'],
+    contact_number: '+91-141-2607777',
+    virtual_exotel_number: '+911141000211',
+    discount_percentage: 25,
+    image_url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
+    is_active: true,
+    featured: true,
+    branches: [
       {
-        id: 'branch-max-panchsheel',
-        hospital_id: '22222222-2222-2222-2222-222222222201',
-        name: 'Panchsheel Park Clinic',
-        area: 'Panchsheel Park, South Delhi',
-        address: 'B-19, Chirag Enclave, Panchsheel Park, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5412,
-        longitude: 77.2185,
-        distance_km: 3.2,
-        contact_number: '+91-11-4609-7200',
-        virtual_exotel_number: '+911140008801',
-        is_main_branch: false,
+        id: 'branch-eternal-main',
+        hospital_id: '22222222-2222-2222-2222-222222222211',
+        name: 'Eternal Hospital Main',
+        area: 'JLN Marg, Jaipur',
+        address: 'JLN Marg, Jaipur, Rajasthan - 302017',
+        city: 'Jaipur',
+        latitude: 26.8900,
+        longitude: 75.8203,
+        distance_km: 3.5,
+        contact_number: '+91-141-2607777',
+        virtual_exotel_number: '+911141000211',
+        is_main_branch: true,
         doctors: [
           {
-            id: 'doc-max-4',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-max-panchsheel',
-            name: 'Dr. Anita Deshmukh',
-            specialty: 'Pediatrics',
-            qualification: 'MBBS, DCH, DNB (Pediatrics)',
-            experience_years: 12,
-            rating: 4.9,
-            total_reviews: 180,
-            consultation_fee: 900,
-            discounted_fee: 675,
-            next_available_slot: 'Today, 6:45 PM',
-            languages: ['English', 'Hindi', 'Marathi'],
-            opd_timing: 'Mon-Fri: 10:00 AM - 07:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            id: 'doc-max-5',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-max-panchsheel',
-            name: 'Dr. Saurabh Grover',
-            specialty: 'Dentistry',
-            qualification: 'BDS, MDS (Endodontics)',
-            experience_years: 10,
-            rating: 4.8,
-            total_reviews: 140,
-            consultation_fee: 700,
-            discounted_fee: 525,
-            next_available_slot: 'Tomorrow, 10:30 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 10:00 AM - 06:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-      {
-        id: 'branch-max-patparganj',
-        hospital_id: '22222222-2222-2222-2222-222222222201',
-        name: 'Patparganj Unit',
-        area: 'Patparganj, East Delhi',
-        address: '108A, I.P. Extension, Patparganj, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.6300,
-        longitude: 77.3000,
-        distance_km: 9.5,
-        contact_number: '+91-11-4303-3333',
-        virtual_exotel_number: '+911140008801',
-        is_main_branch: false,
-        doctors: [
-          {
-            id: 'doc-max-6',
-            hospital_id: '22222222-2222-2222-2222-222222222201',
-            branch_id: 'branch-max-patparganj',
-            name: 'Dr. Rakesh Tandon',
+            id: 'doc-eternal-1',
+            hospital_id: '22222222-2222-2222-2222-222222222211',
+            branch_id: 'branch-eternal-main',
+            name: 'Dr. Suresh Gupta',
             specialty: 'Neurology',
             qualification: 'MBBS, MD, DM (Neurology)',
-            experience_years: 20,
-            rating: 4.9,
-            total_reviews: 320,
-            consultation_fee: 1400,
-            discounted_fee: 1050,
-            next_available_slot: 'Tomorrow, 02:00 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Tue-Sat: 12:00 PM - 05:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222204',
-    name: 'CSK Hospital',
-    slug: 'csk-hospital-delhi',
-    address: 'A-24, Outer Ring Road, South Extension, New Delhi',
-    city: 'New Delhi',
-    state: 'Delhi NCR',
-    pincode: '110049',
-    latitude: 28.5720,
-    longitude: 77.2215,
-    rating: 5.0,
-    total_reviews: 540,
-    specialties: ['Laparoscopic Surgery', 'Cardiology', 'Orthopedics', 'ENT', 'General Medicine'],
-    facilities: ['24x7 Emergency', 'NABH & JCI Accredited', 'Best Multispeciality Care', 'Level 1 Trauma Center', 'Cashless Desk'],
-    contact_number: '+91-11-7179-1090',
-    virtual_exotel_number: '+911140008804',
-    discount_percentage: 25,
-    image_url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
-    is_active: true,
-    featured: true,
-    branches: [
-      {
-        id: 'branch-csk-south-ext',
-        hospital_id: '22222222-2222-2222-2222-222222222204',
-        name: 'South Extension Main Unit',
-        area: 'South Extension, South Delhi',
-        address: 'A-24, Outer Ring Road, South Extension, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5720,
-        longitude: 77.2215,
-        distance_km: 2.5,
-        contact_number: '+91-11-7179-1090',
-        virtual_exotel_number: '+911140008804',
-        is_main_branch: true,
-        doctors: [
-          {
-            id: 'doc-csk-1',
-            hospital_id: '22222222-2222-2222-2222-222222222204',
-            branch_id: 'branch-csk-south-ext',
-            name: 'Dr. Alok Verma',
-            specialty: 'Laparoscopic Surgery',
-            qualification: 'MS (General Surgery), FIAGES - Chief Consultant',
             experience_years: 18,
-            rating: 5.0,
-            total_reviews: 480,
-            consultation_fee: 1000,
-            discounted_fee: 750,
-            next_available_slot: 'Today, 7:00 PM',
-            languages: ['English', 'Hindi', 'Telugu'],
-            opd_timing: 'Mon-Sat: 10:00 AM - 04:30 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1594824813583-36c1e57c6b54?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            id: 'doc-apollo-2',
-            hospital_id: '22222222-2222-2222-2222-222222222204',
-            branch_id: 'branch-apollo-sarita-vihar',
-            name: 'Dr. Rohan Kapur',
-            specialty: 'Cardiology',
-            qualification: 'MBBS, MD, DM',
-            experience_years: 17,
-            rating: 4.8,
-            total_reviews: 290,
-            consultation_fee: 1300,
-            discounted_fee: 1040,
-            next_available_slot: 'Tomorrow, 10:00 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 09:30 AM - 03:30 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-      {
-        id: 'branch-apollo-nehru-enclave',
-        hospital_id: '22222222-2222-2222-2222-222222222204',
-        name: 'Apollo Cradle & Clinic, Nehru Enclave',
-        area: 'Nehru Enclave, Kalkaji',
-        address: 'B-1, Nehru Enclave, Outer Ring Road, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5489,
-        longitude: 77.2512,
-        distance_km: 4.5,
-        contact_number: '+91-11-4088-8888',
-        virtual_exotel_number: '+911140008804',
-        is_main_branch: false,
-        doctors: [
-          {
-            id: 'doc-apollo-3',
-            hospital_id: '22222222-2222-2222-2222-222222222204',
-            branch_id: 'branch-apollo-nehru-enclave',
-            name: 'Dr. Priya Jain',
-            specialty: 'Pediatrics',
-            qualification: 'MBBS, MD (Pediatrics), Fellowship Neonatology',
-            experience_years: 13,
             rating: 4.9,
-            total_reviews: 230,
+            total_reviews: 460,
             consultation_fee: 900,
-            discounted_fee: 720,
-            next_available_slot: 'Today, 6:00 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 11:00 AM - 07:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            id: 'doc-apollo-4',
-            hospital_id: '22222222-2222-2222-2222-222222222204',
-            branch_id: 'branch-apollo-nehru-enclave',
-            name: 'Dr. Divya Nambiar',
-            specialty: 'Dermatology',
-            qualification: 'MBBS, MD (Dermatology & Cosmetology)',
-            experience_years: 11,
-            rating: 4.8,
-            total_reviews: 165,
-            consultation_fee: 850,
-            discounted_fee: 680,
-            next_available_slot: 'Tomorrow, 11:30 AM',
-            languages: ['English', 'Hindi', 'Malayalam'],
-            opd_timing: 'Tue-Sat: 10:00 AM - 04:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1594824813583-36c1e57c6b54?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222202',
-    name: 'Fortis Healthcare',
-    slug: 'fortis-memorial-gurugram',
-    address: 'Sector - 44, Opposite HUDA City Centre Metro Station, Gurugram, Haryana',
-    city: 'Gurugram',
-    state: 'Delhi NCR',
-    pincode: '122002',
-    latitude: 28.4595,
-    longitude: 77.0726,
-    rating: 4.8,
-    total_reviews: 380,
-    specialties: ['Cardiology', 'Pediatrics', 'Gastroenterology', 'Neurology', 'Orthopedics'],
-    facilities: ['24x7 Emergency', 'JCI Accredited', 'Dedicated ICU', 'Organ Transplant', 'Valet Parking'],
-    contact_number: '+91-124-4962200',
-    virtual_exotel_number: '+911140008802',
-    discount_percentage: 20,
-    image_url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
-    is_active: true,
-    featured: true,
-    branches: [
-      {
-        id: 'branch-fortis-vasant-kunj',
-        hospital_id: '22222222-2222-2222-2222-222222222202',
-        name: 'Fortis Hospital, Vasant Kunj',
-        area: 'Vasant Kunj, South Delhi',
-        address: 'Sector B, Pocket 1, Aruna Asaf Ali Marg, Vasant Kunj, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5244,
-        longitude: 77.1582,
-        distance_km: 6.2,
-        contact_number: '+91-11-4277-6222',
-        virtual_exotel_number: '+911140008802',
-        is_main_branch: false,
-        doctors: [
-          {
-            id: 'doc-fortis-1',
-            hospital_id: '22222222-2222-2222-2222-222222222202',
-            branch_id: 'branch-fortis-vasant-kunj',
-            name: 'Dr. Nitin Sood',
-            specialty: 'Cardiology',
-            qualification: 'MBBS, MD, FACC',
-            experience_years: 19,
-            rating: 4.9,
-            total_reviews: 280,
-            consultation_fee: 1200,
-            discounted_fee: 960,
-            next_available_slot: 'Today, 6:45 PM',
-            languages: ['English', 'Hindi', 'Punjabi'],
-            opd_timing: 'Mon-Sat: 09:00 AM - 03:00 PM',
+            discounted_fee: 675,
+            next_available_slot: 'Today, 4:30 PM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 10:00 AM - 03:00 PM, 05:00 PM - 07:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
           },
           {
-            id: 'doc-fortis-2',
-            hospital_id: '22222222-2222-2222-2222-222222222202',
-            branch_id: 'branch-fortis-vasant-kunj',
-            name: 'Dr. Shweta Bansal',
-            specialty: 'General Medicine',
-            qualification: 'MBBS, DNB (Internal Medicine)',
-            experience_years: 11,
-            rating: 4.8,
-            total_reviews: 145,
-            consultation_fee: 750,
-            discounted_fee: 600,
-            next_available_slot: 'Today, 7:30 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Fri: 11:00 AM - 06:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1594824813583-36c1e57c6b54?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-      {
-        id: 'branch-fortis-gurugram',
-        hospital_id: '22222222-2222-2222-2222-222222222202',
-        name: 'FMRI Main Campus, Gurugram',
-        area: 'Sector 44, Gurugram',
-        address: 'Sector - 44, Opposite HUDA City Centre, Gurugram, Haryana',
-        city: 'Gurugram',
-        latitude: 28.4595,
-        longitude: 77.0726,
-        distance_km: 18.5,
-        contact_number: '+91-124-4962200',
-        virtual_exotel_number: '+911140008802',
-        is_main_branch: true,
-        doctors: [
-          {
-            id: 'doc-fortis-3',
-            hospital_id: '22222222-2222-2222-2222-222222222202',
-            branch_id: 'branch-fortis-gurugram',
-            name: 'Dr. Ashok Sethi',
-            specialty: 'Neurology',
-            qualification: 'MBBS, MD, DM (Neuro), FRCP',
-            experience_years: 22,
-            rating: 4.9,
-            total_reviews: 410,
-            consultation_fee: 1500,
-            discounted_fee: 1200,
-            next_available_slot: 'Tomorrow, 11:30 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 10:00 AM - 04:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300&q=80',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222203',
-    name: 'Medanta - The Medicity',
-    slug: 'medanta-the-medicity-gurugram',
-    address: 'CH Bakhtawar Singh Road, Sector 38, Gurugram, Haryana',
-    city: 'Gurugram',
-    state: 'Delhi NCR',
-    pincode: '122001',
-    latitude: 28.4391,
-    longitude: 77.0426,
-    rating: 4.9,
-    total_reviews: 510,
-    specialties: ['Cardiology', 'Cardiac Surgery', 'Neurosciences', 'Kidney & Urology', 'General Medicine'],
-    facilities: ['24x7 Emergency', 'CyberKnife', 'Bone Marrow Transplant', 'Helipad', 'Air Ambulance'],
-    contact_number: '+91-124-4141414',
-    virtual_exotel_number: '+911140008803',
-    discount_percentage: 25,
-    image_url: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=800&q=80',
-    is_active: true,
-    featured: true,
-    branches: [
-      {
-        id: 'branch-medanta-defence-colony',
-        hospital_id: '22222222-2222-2222-2222-222222222203',
-        name: 'Medanta Mediclinic, Defence Colony',
-        area: 'Defence Colony, South Delhi',
-        address: 'E-18, Defence Colony, Ring Road, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.5729,
-        longitude: 77.2345,
-        distance_km: 5.0,
-        contact_number: '+91-11-4411-4411',
-        virtual_exotel_number: '+911140008803',
-        is_main_branch: false,
-        doctors: [
-          {
-            id: 'doc-medanta-1',
-            hospital_id: '22222222-2222-2222-2222-222222222203',
-            branch_id: 'branch-medanta-defence-colony',
-            name: 'Dr. Monica Vasudev',
-            specialty: 'General Medicine',
-            qualification: 'MBBS, MD (Medicine)',
-            experience_years: 15,
-            rating: 4.9,
-            total_reviews: 290,
-            consultation_fee: 1000,
-            discounted_fee: 750,
-            next_available_slot: 'Today, 7:00 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 09:30 AM - 05:30 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            id: 'doc-medanta-2',
-            hospital_id: '22222222-2222-2222-2222-222222222203',
-            branch_id: 'branch-medanta-defence-colony',
-            name: 'Dr. Vivek Taneja',
-            specialty: 'Cardiology',
-            qualification: 'MBBS, MD, DM (Cardiology)',
-            experience_years: 17,
+            id: 'doc-eternal-2',
+            hospital_id: '22222222-2222-2222-2222-222222222211',
+            branch_id: 'branch-eternal-main',
+            name: 'Dr. Meera Sharma',
+            specialty: 'Pediatrics',
+            qualification: 'MBBS, MD (Pediatrics), DCH',
+            experience_years: 12,
             rating: 4.8,
             total_reviews: 310,
-            consultation_fee: 1400,
-            discounted_fee: 1050,
-            next_available_slot: 'Tomorrow, 10:30 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 10:00 AM - 04:00 PM',
-            avatar_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300&q=80',
+            consultation_fee: 650,
+            discounted_fee: 490,
+            next_available_slot: 'Today, 7:00 PM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 09:00 AM - 06:00 PM',
+            avatar_url: 'https://images.unsplash.com/photo-1594824813583-36c1e57c6b54?auto=format&fit=crop&w=300&q=80',
           },
         ],
       },
     ],
   },
   {
-    id: '22222222-2222-2222-2222-222222222205',
-    name: 'Sir Ganga Ram Hospital',
-    slug: 'sir-ganga-ram-hospital',
-    address: 'Rajinder Nagar, New Delhi',
-    city: 'New Delhi',
-    state: 'Delhi NCR',
-    pincode: '110060',
-    latitude: 28.6389,
-    longitude: 77.1897,
-    rating: 4.7,
-    total_reviews: 340,
-    specialties: ['General Medicine', 'Nephrology', 'General Surgery', 'Gastroenterology', 'ENT'],
-    facilities: ['24x7 Emergency', 'Blood Bank', 'Advanced Pathology', 'Dialysis'],
-    contact_number: '+91-11-2575-0000',
-    virtual_exotel_number: '+911140008805',
-    discount_percentage: 15,
-    image_url: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?auto=format&fit=crop&w=800&q=80',
+    id: '22222222-2222-2222-2222-222222222212',
+    name: 'Fortis Escorts Hospital Jaipur',
+    slug: 'fortis-escorts-jaipur',
+    address: 'JLN Marg, Malviya Nagar, Jaipur, Rajasthan',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    pincode: '302017',
+    latitude: 26.8689,
+    longitude: 75.8277,
+    rating: 4.8,
+    total_reviews: 820,
+    specialties: ['Cardiology', 'Cardiac Surgery', 'Nephrology', 'Orthopedics', 'General Surgery'],
+    facilities: ['24x7 Emergency', 'JCI Accredited', 'Cardiac Cath Lab', 'Renal Transplant', 'Robotic Surgery'],
+    contact_number: '+91-141-2547000',
+    virtual_exotel_number: '+911141000212',
+    discount_percentage: 20,
+    image_url: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?auto=format&fit=crop&w=800&q=80',
     is_active: true,
     featured: false,
     branches: [
       {
-        id: 'branch-sgrh-rajinder-nagar',
-        hospital_id: '22222222-2222-2222-2222-222222222205',
-        name: 'Rajinder Nagar Main Unit',
-        area: 'Old Rajinder Nagar, Central Delhi',
-        address: 'Sir Ganga Ram Hospital Marg, Rajinder Nagar, New Delhi',
-        city: 'New Delhi',
-        latitude: 28.6389,
-        longitude: 77.1897,
-        distance_km: 11.5,
-        contact_number: '+91-11-2575-0000',
-        virtual_exotel_number: '+911140008805',
+        id: 'branch-fortis-jaipur',
+        hospital_id: '22222222-2222-2222-2222-222222222212',
+        name: 'Fortis Escorts Jaipur',
+        area: 'JLN Marg, Malviya Nagar, Jaipur',
+        address: 'JLN Marg, Malviya Nagar, Jaipur - 302017',
+        city: 'Jaipur',
+        latitude: 26.8689,
+        longitude: 75.8277,
+        distance_km: 4.2,
+        contact_number: '+91-141-2547000',
+        virtual_exotel_number: '+911141000212',
         is_main_branch: true,
         doctors: [
           {
-            id: 'doc-sgrh-1',
-            hospital_id: '22222222-2222-2222-2222-222222222205',
-            branch_id: 'branch-sgrh-rajinder-nagar',
-            name: 'Dr. S.P. Byotra',
-            specialty: 'General Medicine',
-            qualification: 'MBBS, MD (General Medicine), FRCP',
-            experience_years: 25,
+            id: 'doc-fortis-jp-1',
+            hospital_id: '22222222-2222-2222-2222-222222222212',
+            branch_id: 'branch-fortis-jaipur',
+            name: 'Dr. Kapil Boob',
+            specialty: 'Cardiology',
+            qualification: 'MBBS, MD, DM (Cardiology), FESC',
+            experience_years: 22,
             rating: 4.9,
-            total_reviews: 350,
-            consultation_fee: 900,
-            discounted_fee: 765,
-            next_available_slot: 'Today, 7:30 PM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 11:00 AM - 06:00 PM',
+            total_reviews: 680,
+            consultation_fee: 1000,
+            discounted_fee: 800,
+            next_available_slot: 'Today, 5:30 PM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 10:00 AM - 02:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
           },
           {
-            id: 'doc-sgrh-2',
-            hospital_id: '22222222-2222-2222-2222-222222222205',
-            branch_id: 'branch-sgrh-rajinder-nagar',
-            name: 'Dr. Ajay Swaroop',
-            specialty: 'ENT',
-            qualification: 'MBBS, MS (ENT), DNB',
-            experience_years: 18,
-            rating: 4.8,
-            total_reviews: 220,
-            consultation_fee: 850,
-            discounted_fee: 720,
-            next_available_slot: 'Tomorrow, 09:30 AM',
-            languages: ['English', 'Hindi'],
-            opd_timing: 'Mon-Sat: 09:30 AM - 03:00 PM',
+            id: 'doc-fortis-jp-2',
+            hospital_id: '22222222-2222-2222-2222-222222222212',
+            branch_id: 'branch-fortis-jaipur',
+            name: 'Dr. Vinod Sharma',
+            specialty: 'Orthopedics',
+            qualification: 'MBBS, MS (Ortho), MCh',
+            experience_years: 17,
+            rating: 4.7,
+            total_reviews: 290,
+            consultation_fee: 800,
+            discounted_fee: 640,
+            next_available_slot: 'Tomorrow, 11:00 AM',
+            languages: ['Hindi', 'English', 'Rajasthani'],
+            opd_timing: 'Mon-Fri: 11:00 AM - 05:00 PM',
             avatar_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=300&q=80',
           },
         ],
       },
     ],
   },
+  {
+    id: '22222222-2222-2222-2222-222222222213',
+    name: 'Narayana Multispeciality Hospital Jaipur',
+    slug: 'narayana-hospital-jaipur',
+    address: 'Sector 28, Sudarshanpura, Jaipur, Rajasthan',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    pincode: '302006',
+    latitude: 26.9345,
+    longitude: 75.7623,
+    rating: 4.6,
+    total_reviews: 540,
+    specialties: ['Cardiac Surgery', 'Oncology', 'Neurosurgery', 'General Surgery', 'Gastroenterology'],
+    facilities: ['24x7 Emergency', 'NABH Accredited', 'Bone Marrow Transplant', 'Blood Bank', 'Level 3 NICU'],
+    contact_number: '+91-141-7101010',
+    virtual_exotel_number: '+911141000213',
+    discount_percentage: 15,
+    image_url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
+    is_active: true,
+    featured: false,
+    branches: [
+      {
+        id: 'branch-narayana-jaipur',
+        hospital_id: '22222222-2222-2222-2222-222222222213',
+        name: 'Narayana Hospital Jaipur',
+        area: 'Sudarshanpura, Jaipur',
+        address: 'Sector 28, Sudarshanpura, Jaipur - 302006',
+        city: 'Jaipur',
+        latitude: 26.9345,
+        longitude: 75.7623,
+        distance_km: 6.0,
+        contact_number: '+91-141-7101010',
+        virtual_exotel_number: '+911141000213',
+        is_main_branch: true,
+        doctors: [
+          {
+            id: 'doc-narayana-jp-1',
+            hospital_id: '22222222-2222-2222-2222-222222222213',
+            branch_id: 'branch-narayana-jaipur',
+            name: 'Dr. Ramesh Choudhary',
+            specialty: 'Cardiac Surgery',
+            qualification: 'MBBS, MS, MCh (CTVS)',
+            experience_years: 19,
+            rating: 4.8,
+            total_reviews: 380,
+            consultation_fee: 900,
+            discounted_fee: 765,
+            next_available_slot: 'Tomorrow, 10:00 AM',
+            languages: ['Hindi', 'English'],
+            opd_timing: 'Mon-Sat: 10:00 AM - 03:00 PM',
+            avatar_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80',
+          },
+        ],
+      },
+    ],
+  },
+  // — End of Jaipur seed hospitals (fetched live from Supabase beyond this)
 ];
 
 // In-browser/in-app Haversine formula mirroring PostGIS ST_Distance spheroid calculations
@@ -690,7 +435,69 @@ export async function fetchNearbyHospitals(
     });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
+      const hospitalIds = data.map((h: any) => h.id);
+
+      try {
+        const { data: branchesData } = await client
+          .from('hospital_branches')
+          .select('*, doctors(*)')
+          .in('hospital_id', hospitalIds)
+          .eq('is_active', true)
+          .order('is_main_branch', { ascending: false });
+
+        if (branchesData && branchesData.length > 0) {
+          const branchesByHosp: Record<string, any[]> = {};
+          for (const b of branchesData) {
+            if (!branchesByHosp[b.hospital_id]) branchesByHosp[b.hospital_id] = [];
+            branchesByHosp[b.hospital_id].push({
+              id: b.id,
+              hospital_id: b.hospital_id,
+              name: b.name,
+              area: b.area,
+              address: b.address,
+              city: b.city,
+              latitude: Number(b.latitude),
+              longitude: Number(b.longitude),
+              distance_km: calculateDistanceKm(userLat, userLng, Number(b.latitude), Number(b.longitude)),
+              contact_number: b.contact_number,
+              virtual_exotel_number: b.virtual_exotel_number,
+              is_main_branch: b.is_main_branch,
+              doctors: (b.doctors || []).map((doc: any) => ({
+                id: doc.id,
+                hospital_id: doc.hospital_id,
+                branch_id: doc.branch_id,
+                name: doc.name,
+                specialty: doc.specialty,
+                qualification: doc.qualification,
+                experience_years: doc.experience_years,
+                rating: Number(doc.rating),
+                total_reviews: doc.total_reviews,
+                consultation_fee: doc.consultation_fee,
+                discounted_fee: doc.discounted_fee,
+                next_available_slot: doc.next_available_slot,
+                avatar_url: doc.avatar_url,
+                languages: doc.languages,
+                opd_timing: doc.opd_timing,
+              })),
+            });
+          }
+
+          return data.map((h: any) => ({
+            ...h,
+            branches: branchesByHosp[h.id] || [],
+          }));
+        }
+      } catch {
+        // Fall back to seed matching if branch query fails
+      }
+
+      return data.map((h: any) => {
+        const seedMatch = SEED_HOSPITALS.find((s) => s.id === h.id);
+        return {
+          ...h,
+          branches: seedMatch?.branches || [],
+        };
+      });
     }
   } catch {
     // Graceful fallback to client calculation
@@ -707,7 +514,7 @@ export async function fetchNearbyHospitals(
     });
   }
 
-  return filtered
+  const mapped = filtered
     .map(h => {
       const dist = calculateDistanceKm(userLat, userLng, h.latitude, h.longitude);
       // Recalculate branch distances
@@ -724,53 +531,279 @@ export async function fetchNearbyHospitals(
       };
     })
     .sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+
+  // If nearby hospitals within 50 km exist for the user's city/coords, only return those
+  const withinCity = mapped.filter(h => (h.distance_km || 0) <= 50);
+  return withinCity.length > 0 ? withinCity : mapped;
 }
 
-// Initial Mock Bookings for CRM stream
-export const SEED_BOOKINGS: Booking[] = [
-  {
-    id: '33333333-3333-3333-3333-333333333301',
-    booking_ref: 'AN-2026-9041',
-    service_type: 'OPD_CONCIERGE',
-    patient_name: 'Rahul Jain',
-    patient_phone: '+919999999999',
-    hospital_id: '22222222-2222-2222-2222-222222222201',
-    hospital_name: 'Jain ENT Hospital, Saket',
-    specialty_requested: 'ENT',
-    status: 'NEW',
-    call_status: 'pending',
-    notes: 'Patient requested consultation with Dr. Satish Jain tomorrow 10:30 AM.',
-    created_at: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333302',
-    booking_ref: 'AN-2026-9042',
-    service_type: 'PHARMACY_SCAN_PAY',
-    patient_name: 'Sunita Malhotra',
-    patient_phone: '+919811223344',
-    hospital_id: '22222222-2222-2222-2222-222222222203',
-    hospital_name: 'Medanta Medstore Saket',
-    bill_amount: 1600,
-    discount_amount: 400,
-    final_payable: 1200,
-    status: 'PAID',
-    call_status: 'completed',
-    notes: 'Counter bill ₹1,600. Applied 25% Adityam discount ₹400. Paid ₹1,200 via UPI.',
-    created_at: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333303',
-    booking_ref: 'AN-2026-9043',
-    service_type: 'IPD_ENQUIRY',
-    patient_name: 'Rajesh Mehra',
-    patient_phone: '+919876543210',
-    hospital_id: '22222222-2222-2222-2222-222222222202',
-    hospital_name: 'Fortis Memorial Research Institute (FMRI)',
-    specialty_requested: 'Orthopedics (Knee Replacement)',
-    status: 'CALLING',
-    call_status: 'calling',
-    assigned_agent: 'Simran K. (Agent #4)',
-    notes: 'Inquiring about cashless TPA coverage with Star Health. Agent Simran calling via Exotel.',
-    created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-  },
-];
+// CRM stream – demo bookings purged for Jaipur launch (all bookings fetch live from Supabase)
+export const SEED_BOOKINGS: Booking[] = [];
+
+// ─── LAB ITEMS ───────────────────────────────────────────────────────────────
+
+export async function fetchLabItems(segment?: string): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    let query = client.from('lab_items').select('*').eq('is_active', true);
+    if (segment && segment !== 'all') {
+      query = query.eq('segment', segment);
+    }
+    const { data, error } = await query.order('name');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchLabCentres(): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('lab_centres')
+      .select('*')
+      .eq('is_active', true)
+      .order('distance_km');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchLabCentrePrice(centreId: string, itemId: string): Promise<number | null> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('lab_centre_prices')
+      .select('price')
+      .eq('centre_id', centreId)
+      .eq('item_id', itemId)
+      .eq('is_available', true)
+      .single();
+    if (!error && data) {
+      return data.price;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+export async function fetchLabPricesForItems(itemIds: string[]): Promise<any[]> {
+  if (!itemIds.length) return [];
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('lab_centre_prices')
+      .select('*')
+      .in('item_id', itemIds)
+      .eq('is_available', true);
+    if (!error && data) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+// ─── PHARMACIES ───────────────────────────────────────────────────────────────
+
+export async function fetchPharmacies(): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('pharmacies')
+      .select('*')
+      .eq('is_active', true)
+      .order('rating', { ascending: false });
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+// ─── IPD SURGERIES ────────────────────────────────────────────────────────────
+
+export async function fetchIpdSurgeries(category?: string): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    let query = client.from('ipd_surgeries').select('*').eq('is_active', true);
+    if (category && category !== 'ALL') {
+      query = query.eq('category', category);
+    }
+    const { data, error } = await query.order('price');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+// ─── HOME CONTENT ─────────────────────────────────────────────────────────────
+
+export async function fetchHeroBanners(): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('hero_banners')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchHealthPackages(): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('health_packages')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchPartnerOffers(): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('partner_offers')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchHospitalBranchesWithDoctors(hospitalIds: string[]): Promise<any[]> {
+  if (!hospitalIds.length) return [];
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('hospital_branches')
+      .select('*, doctors(*)')
+      .in('hospital_id', hospitalIds)
+      .eq('is_active', true)
+      .order('is_main_branch', { ascending: false });
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function fetchUserAddressesFromDb(userId?: string | null, phone?: string | null): Promise<any[]> {
+  try {
+    const client = getSupabaseClient();
+    let query = client.from('user_addresses').select('*').order('created_at', { ascending: false });
+    const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    if (isUuid && phone) {
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      query = query.or(`user_id.eq.${userId},phone.ilike.%${cleanPhone}%,contact_phone.ilike.%${cleanPhone}%`);
+    } else if (isUuid) {
+      query = query.eq('user_id', userId);
+    } else if (phone) {
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      query = query.or(`phone.ilike.%${cleanPhone}%,contact_phone.ilike.%${cleanPhone}%`);
+    }
+    const { data, error } = await query;
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+export async function saveUserAddressToDb(address: Record<string, any>): Promise<any> {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client.from('user_addresses').upsert(address).select().single();
+    if (!error) return data;
+  } catch { /* fall through */ }
+  return null;
+}
+
+export async function deleteUserAddressFromDb(id: string): Promise<boolean> {
+  try {
+    const client = getSupabaseClient();
+    const { error } = await client.from('user_addresses').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function uploadPrescriptionSlip(
+  fileUri: string,
+  fileName?: string,
+  base64Data?: string
+): Promise<string> {
+  let blobForFallback: Blob | null = null;
+  try {
+    const client = getSupabaseClient();
+    const cleanName = fileName || `rx_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+
+    let body: any;
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+      blobForFallback = blob;
+      body = blob;
+    } else {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: fileUri,
+        name: cleanName,
+        type: 'image/jpeg',
+      } as any);
+      body = formData;
+    }
+
+    const { data, error } = await client.storage
+      .from('prescriptions')
+      .upload(`slips/${cleanName}`, body, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (!error && data?.path) {
+      const { data: pub } = client.storage.from('prescriptions').getPublicUrl(data.path);
+      if (pub?.publicUrl) return pub.publicUrl;
+    }
+  } catch {
+    // Fall through to base64 persistence
+  }
+
+  if (base64Data) {
+    return base64Data.startsWith('data:') ? base64Data : `data:image/jpeg;base64,${base64Data}`;
+  }
+
+  if (blobForFallback && typeof FileReader !== 'undefined') {
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(blobForFallback!);
+      });
+      if (dataUrl) return dataUrl;
+    } catch {
+      // Ignore FileReader fallback error
+    }
+  }
+
+  return fileUri;
+}
+
+

@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { confirmDialog } from '../src/utils/crossAlert';
 import {
   ArrowLeft,
   Calendar,
@@ -48,6 +49,11 @@ import {
   Scissors,
   Sparkles,
   PhoneCall,
+  Pill,
+  FlaskConical,
+  Bed,
+  CreditCard,
+  Lock,
 } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking, ServiceType, BookingStatus } from '@adityam/types';
@@ -55,10 +61,15 @@ import {
   fetchAllBookings,
   updateBookingStatus,
   subscribeBookings,
+  isBookingUpcoming,
+  parseSlotDetails,
 } from '../src/services/bookingStorage';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
+import { inr } from '../src/theme';
 import { PressableCard } from '../components/PressableCard';
+import { PaymentGatewayModal, PaymentMethod } from '../components/payment/PaymentGatewayModal';
+import { AppointmentQrCode } from '../components/ui/AppointmentQrCode';
 
 export interface EnrichedAppointment {
   id: string;
@@ -82,154 +93,15 @@ export interface EnrichedAppointment {
   tokenNumber: number;
   roomNumber: string;
   doctorFee: number;
-  paymentStatus: 'PAID' | 'PAY_AT_CLINIC';
+  paymentStatus: 'PAID' | 'CANCELLED';
   prescriptionUrl?: string;
   isUpcoming: boolean;
   notes?: string;
   createdDate: string;
 }
 
-// Initial Realistic Seed Appointments
-const SEED_APPOINTMENTS: EnrichedAppointment[] = [
-  {
-    id: 'apt-1',
-    bookingRef: 'AN-OPD-7821',
-    serviceType: 'OPD_CONCIERGE',
-    status: 'CONFIRMED',
-    doctorName: 'Dr. Satish Jain',
-    doctorNameHi: 'डॉ. सतीश जैन',
-    specialty: 'ENT & Head-Neck Surgery',
-    specialtyHi: 'ईएनटी व हेड-नेक विशेषज्ञ',
-    qualification: 'MBBS, MS (ENT), DLO • 24+ Yrs Exp • 5.0 ★',
-    hospitalName: 'Jain ENT Hospital',
-    hospitalNameHi: 'जैन ईएनटी अस्पताल',
-    hospitalAddress: 'Press Enclave Marg, Saket, New Delhi',
-    hospitalAddressHi: 'प्रेस एन्क्लेव मार्ग, साकेत, नई दिल्ली',
-    patientName: 'Rahul Jain',
-    patientPhone: '+91 98112 44550',
-    slotDate: 'Tomorrow, Oct 21',
-    slotDateHi: 'कल, 21 अक्टूबर',
-    slotTime: '10:30 AM',
-    tokenNumber: 14,
-    roomNumber: 'OPD Block B, Room 204',
-    doctorFee: 800,
-    paymentStatus: 'PAID',
-    isUpcoming: true,
-    notes: 'Ear & sinus consultation with Dr. Satish Jain.',
-    createdDate: 'Oct 19, 2026',
-  },
-  {
-    id: 'apt-2',
-    bookingRef: 'AN-IPD-4412',
-    serviceType: 'IPD_ENQUIRY',
-    status: 'CONFIRMED',
-    doctorName: 'Dr. Alok Verma & Surgery Team',
-    doctorNameHi: 'डॉ. आलोक वर्मा व सर्जरी टीम',
-    specialty: 'Laparoscopic Surgery',
-    specialtyHi: 'लैप्रोस्कोपिक सर्जरी (General Surgery)',
-    qualification: 'MS (General Surgery), FIAGES • 18+ Yrs Exp • 5.0 ★',
-    hospitalName: 'CSK Hospital',
-    hospitalNameHi: 'सीएसके अस्पताल',
-    hospitalAddress: 'A-24, Outer Ring Road, South Extension, New Delhi',
-    hospitalAddressHi: 'साउथ एक्सटेंशन, नई दिल्ली',
-    patientName: 'Rahul Jain',
-    patientPhone: '+91 98112 44550',
-    slotDate: 'Friday, Oct 24',
-    slotDateHi: 'शुक्रवार, 24 अक्टूबर',
-    slotTime: '02:00 PM',
-    tokenNumber: 5,
-    roomNumber: 'Concierge Desk, Ground Floor',
-    doctorFee: 45000,
-    paymentStatus: 'PAY_AT_CLINIC',
-    isUpcoming: true,
-    notes: 'Gallbladder keyhole procedure pre-admission evaluation.',
-    createdDate: 'Oct 18, 2026',
-  },
-  {
-    id: 'apt-3',
-    bookingRef: 'AN-OPD-6109',
-    serviceType: 'OPD_CONCIERGE',
-    status: 'PAID',
-    doctorName: 'Dr. Sunita Mehra',
-    doctorNameHi: 'डॉ. सुनीता मेहरा',
-    specialty: 'Pediatrics & Child Care',
-    specialtyHi: 'बाल रोग विशेषज्ञ (Pediatrics)',
-    qualification: 'MBBS, DCH, DNB (Pediatrics)',
-    hospitalName: 'Fortis Memorial Research Institute',
-    hospitalNameHi: 'फोर्टिस मेमोरियल रिसर्च इंस्टीट्यूट',
-    hospitalAddress: 'Sector 44, Gurugram',
-    hospitalAddressHi: 'सेक्टर 44, गुरुग्राम',
-    patientName: 'Aarav Jain (Son)',
-    patientPhone: '+91 98112 44550',
-    slotDate: 'Oct 12, 2026',
-    slotDateHi: '12 अक्टूबर 2026',
-    slotTime: '11:30 AM',
-    tokenNumber: 9,
-    roomNumber: 'Pediatrics Wing, Room 102',
-    doctorFee: 800,
-    paymentStatus: 'PAID',
-    prescriptionUrl: 'https://adityam.health/rx/AN-OPD-6109.pdf',
-    isUpcoming: false,
-    notes: 'Seasonal allergy & viral fever recovery checkup.',
-    createdDate: 'Oct 11, 2026',
-  },
-  {
-    id: 'apt-4',
-    bookingRef: 'AN-OPD-5284',
-    serviceType: 'OPD_CONCIERGE',
-    status: 'PAID',
-    doctorName: 'Dr. Vivek Tandon',
-    doctorNameHi: 'डॉ. विवेक टंडन',
-    specialty: 'Orthopedics & Joint Care',
-    specialtyHi: 'हड्डी व जोड़ रोग (Orthopedics)',
-    qualification: 'MBBS, MS (Ortho), MCh (Joint Replacement)',
-    hospitalName: 'Medanta Super Speciality Clinic',
-    hospitalNameHi: 'मेदांता सुपर स्पेशियलिटी क्लिनिक',
-    hospitalAddress: 'Defence Colony, South Delhi',
-    hospitalAddressHi: 'डिफेंस कॉलोनी, दक्षिण दिल्ली',
-    patientName: 'Rahul Jain',
-    patientPhone: '+91 98112 44550',
-    slotDate: 'Sep 28, 2026',
-    slotDateHi: '28 सितंबर 2026',
-    slotTime: '04:00 PM',
-    tokenNumber: 21,
-    roomNumber: 'Ortho Suite 3',
-    doctorFee: 1000,
-    paymentStatus: 'PAID',
-    prescriptionUrl: 'https://adityam.health/rx/AN-OPD-5284.pdf',
-    isUpcoming: false,
-    notes: 'Knee joint pain assessment. Physio advised.',
-    createdDate: 'Sep 27, 2026',
-  },
-  {
-    id: 'apt-5',
-    bookingRef: 'AN-LAB-3190',
-    serviceType: 'INVESTIGATION',
-    status: 'PAID',
-    doctorName: 'Comprehensive Health Checkup Desk',
-    doctorNameHi: 'सम्पूर्ण स्वास्थ्य जांच डेस्क',
-    specialty: 'Pathology & Diagnostics',
-    specialtyHi: 'पैथोलॉजी व डायग्नोस्टिक्स (Lab)',
-    qualification: 'NABL Accredited Diagnostics Team',
-    hospitalName: 'Adityam Partner Labs • Saket Center',
-    hospitalNameHi: 'आदित्यम पार्टनर लैब्स • साकेत केंद्र',
-    hospitalAddress: 'Community Center, Saket, New Delhi',
-    hospitalAddressHi: 'कम्युनिटी सेंटर, साकेत, नई दिल्ली',
-    patientName: 'Rahul Jain',
-    patientPhone: '+91 98112 44550',
-    slotDate: 'Sep 15, 2026',
-    slotDateHi: '15 सितंबर 2026',
-    slotTime: '08:00 AM',
-    tokenNumber: 3,
-    roomNumber: 'Sample Collection Bay 2',
-    doctorFee: 1499,
-    paymentStatus: 'PAID',
-    prescriptionUrl: 'https://adityam.health/reports/AN-LAB-3190.pdf',
-    isUpcoming: false,
-    notes: 'Lipid, HbA1c, Liver Function & Kidney Panel.',
-    createdDate: 'Sep 14, 2026',
-  },
-];
+// Realtime Bookings from Supabase
+const SEED_APPOINTMENTS: EnrichedAppointment[] = [];
 
 type TabType = 'UPCOMING' | 'PAST' | 'ALL';
 
@@ -245,63 +117,148 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<EnrichedAppointment[]>(SEED_APPOINTMENTS);
   const [selectedAppointment, setSelectedAppointment] = useState<EnrichedAppointment | null>(null);
   const [ticketModalVisible, setTicketModalVisible] = useState(false);
+  const [payingAppointment, setPayingAppointment] = useState<EnrichedAppointment | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
 
   // Fetch real bookings from local storage & Supabase
   const loadBookings = useCallback(async () => {
     try {
-      const data = await fetchAllBookings(user?.phone);
-      if (Array.isArray(data) && data.length > 0) {
-        // Merge with seeds
+      const data = await fetchAllBookings(user?.phone, user?.id);
+      if (Array.isArray(data)) {
         const realMapped: EnrichedAppointment[] = data.map((b: Booking, idx: number) => {
-          const isUpc = b.status === 'NEW' || b.status === 'CONFIRMED' || b.status === 'CALLING';
+          const isUpc = isBookingUpcoming(b);
+          const isCancelled = b.status === 'CANCELLED';
+          const isMissed = b.status === 'MISSED';
+          const slot = parseSlotDetails(b.slot_time, b.service_type, isHi);
+
+          // For fee display: IPD is cashless TPA coordination (0 consultation fee)
+          const fee =
+            b.service_type === 'IPD_ENQUIRY'
+              ? 0
+              : b.doctor_fee || (b.final_payable ? Number(b.final_payable) : 800);
+
           return {
             id: b.id,
             bookingRef: b.booking_ref || `AN-${b.service_type.slice(0, 3)}-${1000 + idx}`,
             serviceType: b.service_type,
-            status: b.status,
-            doctorName: b.doctor_name || 'Dr. Satish Jain',
-            doctorNameHi: b.doctor_name || 'डॉ. सतीश जैन',
-            specialty: b.specialty_requested || 'ENT & Head-Neck Surgery',
-            specialtyHi: b.specialty_requested || 'ईएनटी व हेड-नेक विशेषज्ञ',
-            qualification: 'Certified Specialist • 5.0 ★',
-            hospitalName: b.hospital_name || 'Jain ENT Hospital',
-            hospitalNameHi: b.hospital_name || 'जैन ईएनटी अस्पताल',
+            status: isCancelled ? 'CANCELLED' : isMissed ? 'MISSED' : (!isUpc ? 'COMPLETED' : b.status),
+            doctorName:
+              b.doctor_name ||
+              (b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'Adityam Partner Pharmacy'
+                : b.service_type === 'INVESTIGATION'
+                  ? 'Diagnostic Tests Panel'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'Inpatient Surgery Care'
+                    : 'Specialist Consultation'),
+            doctorNameHi:
+              b.doctor_name ||
+              (b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'आदित्यम पार्टनर फार्मेसी'
+                : b.service_type === 'INVESTIGATION'
+                  ? 'डायग्नोस्टिक जांच पैनल'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'अस्पताल भर्ती व सर्जरी'
+                    : 'विशेषज्ञ परामर्श'),
+            specialty:
+              b.specialty_requested ||
+              (b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'Pharmacy & Medicines'
+                : b.service_type === 'INVESTIGATION'
+                  ? 'Pathology & Scans'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'Surgery & Inpatient Care'
+                    : 'General Consultation'),
+            specialtyHi:
+              b.specialty_requested ||
+              (b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'दवाएं व फार्मेसी'
+                : b.service_type === 'INVESTIGATION'
+                  ? 'पैथोलॉजी व स्कैन'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'सर्जरी व भर्ती देखभाल'
+                    : 'सामान्य परामर्श'),
+            qualification:
+              b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'Licensed Pharmacy Partner'
+                : b.service_type === 'INVESTIGATION'
+                  ? '100% NABL Accredited Diagnostics'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'NABH / JCI Partner Facility'
+                    : 'Verified Specialist • 5.0 ★',
+            hospitalName: b.hospital_name || 'Adityam Partner Network',
+            hospitalNameHi: b.hospital_name || 'आदित्यम पार्टनर नेटवर्क',
             hospitalAddress: b.branch_name || 'Hospital Campus Desk',
             hospitalAddressHi: b.branch_name || 'अस्पताल परिसर डेस्क',
-            patientName: b.patient_name || user?.full_name || 'Abhishek Jain',
-            patientPhone: b.patient_phone || user?.phone || '+91 99999 99999',
-            slotDate: b.slot_time ? b.slot_time.split(',')[0] || 'Scheduled Date' : 'Scheduled Date',
-            slotDateHi: b.slot_time ? b.slot_time.split(',')[0] || 'नियत तिथि' : 'नियत तिथि',
-            slotTime: b.slot_time && b.slot_time.includes(',') ? b.slot_time.split(',')[1].trim() : '11:00 AM',
+            patientName: b.patient_name || user?.full_name || 'Patient',
+            patientPhone: b.patient_phone || (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999' ? user.phone : ''),
+            slotDate: slot.slotDate,
+            slotDateHi: slot.slotDateHi,
+            slotTime: slot.slotTime,
             tokenNumber: 10 + (idx % 20),
-            roomNumber: 'OPD Desk Room 101',
-            doctorFee: b.doctor_fee || 800,
-            paymentStatus: b.status === 'PAID' ? 'PAID' : 'PAY_AT_CLINIC',
+            roomNumber:
+              b.service_type === 'PHARMACY_SCAN_PAY'
+                ? 'Pharmacy Dispatch Desk'
+                : b.service_type === 'INVESTIGATION'
+                  ? 'Sample Collection Bay'
+                  : b.service_type === 'IPD_ENQUIRY'
+                    ? 'Inpatient Desk Room 101'
+                    : 'OPD Desk Room 101',
+            doctorFee: fee,
+            paymentStatus: (b.status === 'CANCELLED' ? 'CANCELLED' : 'PAID') as any,
             isUpcoming: isUpc,
             notes: b.notes || 'Hospital booking confirmed.',
             createdDate: new Date(b.created_at).toLocaleDateString(),
           };
         });
 
-        // Avoid duplicate refs
-        const existingRefs = new Set(realMapped.map((r) => r.bookingRef));
-        const combined = [...realMapped, ...SEED_APPOINTMENTS.filter((s) => !existingRefs.has(s.bookingRef))];
-        setAppointments(combined);
+        setAppointments(realMapped);
       } else {
-        setAppointments([...SEED_APPOINTMENTS]);
+        setAppointments([]);
       }
     } catch {
-      setAppointments([...SEED_APPOINTMENTS]);
+      setAppointments([]);
     }
-  }, [user]);
+  }, [user, isHi]);
 
   useEffect(() => {
     loadBookings();
     const unsubscribe = subscribeBookings(() => {
       loadBookings();
     });
-    return unsubscribe;
+
+    // Realtime listener for bookings changes from cloud
+    let channel: any = null;
+    try {
+      const supabase = getSupabaseClient();
+      channel = supabase
+        .channel('realtime-bookings-screen')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          () => {
+            loadBookings();
+          }
+        )
+        .subscribe();
+    } catch {}
+
+    return () => {
+      unsubscribe();
+      if (channel) {
+        try {
+          channel.unsubscribe();
+        } catch {}
+      }
+    };
   }, [loadBookings]);
 
   // Handle Manual Refresh
@@ -342,37 +299,33 @@ export default function AppointmentsScreen() {
 
   // Cancel Appointment Handler with permanent storage persistence
   const handleCancelAppointment = (apt: EnrichedAppointment) => {
-    Alert.alert(
+    confirmDialog(
       isHi ? 'अपॉइंटमेंट रद्द करें' : 'Cancel Appointment',
       isHi
         ? `क्या आप निश्चित रूप से ${apt.doctorName} के साथ अपॉइंटमेंट (${apt.bookingRef}) रद्द करना चाहते हैं?`
         : `Are you sure you want to cancel appointment ${apt.bookingRef} with ${apt.doctorName}?`,
-      [
-        { text: isHi ? 'नहीं' : 'No', style: 'cancel' },
-        {
-          text: isHi ? 'हाँ, रद्द करें' : 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            await updateBookingStatus(apt.bookingRef, 'CANCELLED', 'User requested cancellation');
-            setAppointments((prev) =>
-              prev.map((item) =>
-                item.id === apt.id
-                  ? { ...item, status: 'CANCELLED' as BookingStatus, isUpcoming: false }
-                  : item
-              )
-            );
-            if (selectedAppointment?.id === apt.id) {
-              setTicketModalVisible(false);
-            }
-            Alert.alert(
-              isHi ? 'अपॉइंटमेंट रद्द हो गई' : 'Appointment Cancelled',
-              isHi
-                ? 'आपकी अपॉइंटमेंट सफलतापूर्वक रद्द कर दी गई है।'
-                : 'Your appointment has been cancelled successfully.'
-            );
-          },
-        },
-      ]
+      async () => {
+        await updateBookingStatus(apt.bookingRef, 'CANCELLED', 'User requested cancellation');
+        setAppointments((prev) =>
+          prev.map((item) =>
+            item.id === apt.id
+              ? { ...item, status: 'CANCELLED' as BookingStatus, isUpcoming: false }
+              : item
+          )
+        );
+        if (selectedAppointment?.id === apt.id) {
+          setTicketModalVisible(false);
+        }
+        Alert.alert(
+          isHi ? 'अपॉइंटमेंट रद्द हो गई' : 'Appointment Cancelled',
+          isHi
+            ? 'आपकी अपॉइंटमेंट सफलतापूर्वक रद्द कर दी गई है।'
+            : 'Your appointment has been cancelled successfully.'
+        );
+      },
+      isHi ? 'हाँ, रद्द करें' : 'Yes, Cancel',
+      isHi ? 'नहीं' : 'No',
+      true
     );
   };
 
@@ -386,6 +339,35 @@ export default function AppointmentsScreen() {
     Linking.openURL(url).catch(() => {
       Alert.alert('Directions', 'Unable to open maps on this device.');
     });
+  };
+
+  // Payment Handler
+  const handlePaymentSuccess = async (method: PaymentMethod, txnId: string) => {
+    if (!payingAppointment) return;
+    const ref = payingAppointment.bookingRef;
+    await updateBookingStatus(ref, 'PAID', `Paid via ${method} (${txnId})`);
+
+    setAppointments((prev) =>
+      prev.map((item) =>
+        item.bookingRef === ref
+          ? { ...item, status: 'PAID' as BookingStatus, paymentStatus: 'PAID' }
+          : item
+      )
+    );
+
+    if (selectedAppointment?.bookingRef === ref) {
+      setSelectedAppointment((prev) =>
+        prev ? { ...prev, status: 'PAID' as BookingStatus, paymentStatus: 'PAID' } : null
+      );
+    }
+
+    setPayingAppointment(null);
+    Alert.alert(
+      isHi ? 'भुगतान सफल! 🎉' : 'Payment Successful! 🎉',
+      isHi
+        ? `संदर्भ: ${ref}\nलेनदेन आईडी: ${txnId}\nआपकी रसीद जारी कर दी गई है।`
+        : `Ref: ${ref}\nTransaction ID: ${txnId}\nPaid receipt & digital token confirmed.`
+    );
   };
 
   // Prescription / Receipt Simulation
@@ -434,7 +416,7 @@ export default function AppointmentsScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleBack}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={{
                 width: 34,
@@ -787,6 +769,7 @@ export default function AppointmentsScreen() {
 
               const isUpcoming = apt.isUpcoming;
               const isCancelled = apt.status === 'CANCELLED';
+              const isMissed = apt.status === 'MISSED';
 
               return (
                 <PressableCard
@@ -831,7 +814,9 @@ export default function AppointmentsScreen() {
                                 ? '#EFF6FF'
                                 : apt.serviceType === 'IPD_ENQUIRY'
                                   ? '#F5F3FF'
-                                  : '#ECFDF5',
+                                  : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                    ? '#FFFBEB'
+                                    : '#ECFDF5',
                             paddingHorizontal: 8,
                             paddingVertical: 3,
                             borderRadius: 7,
@@ -846,7 +831,9 @@ export default function AppointmentsScreen() {
                                   ? '#1D4ED8'
                                   : apt.serviceType === 'IPD_ENQUIRY'
                                     ? '#7C3AED'
-                                    : '#059669',
+                                    : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                      ? '#B45309'
+                                      : '#059669',
                               textTransform: 'uppercase',
                               letterSpacing: 0.3,
                             }}
@@ -855,7 +842,9 @@ export default function AppointmentsScreen() {
                               ? isHi ? 'ओपीडी परामर्श' : 'OPD Consultation'
                               : apt.serviceType === 'IPD_ENQUIRY'
                                 ? isHi ? 'अस्पताल भर्ती' : 'Hospital Admission'
-                                : isHi ? 'लैब टेस्ट' : 'Diagnostic Lab'}
+                                : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                  ? isHi ? 'दवाएं व फार्मेसी' : 'Pharmacy Order'
+                                  : isHi ? 'लैब व स्कैन' : 'Diagnostic Lab'}
                           </Text>
                         </View>
 
@@ -872,9 +861,11 @@ export default function AppointmentsScreen() {
                           gap: 4,
                           backgroundColor: isCancelled
                             ? '#FEF2F2'
-                            : isUpcoming
-                              ? '#ECFDF5'
-                              : '#F1F5F9',
+                            : isMissed
+                              ? '#FFFBEB'
+                              : isUpcoming
+                                ? '#ECFDF5'
+                                : '#F1F5F9',
                           paddingHorizontal: 8,
                           paddingVertical: 3,
                           borderRadius: 8,
@@ -882,6 +873,8 @@ export default function AppointmentsScreen() {
                       >
                         {isCancelled ? (
                           <X size={11} color="#DC2626" />
+                        ) : isMissed ? (
+                          <AlertCircle size={11} color="#D97706" />
                         ) : isUpcoming ? (
                           <CheckCircle2 size={11} color="#059669" />
                         ) : (
@@ -891,14 +884,16 @@ export default function AppointmentsScreen() {
                           style={{
                             fontSize: 11,
                             fontWeight: '700',
-                            color: isCancelled ? '#DC2626' : isUpcoming ? '#059669' : '#475569',
+                            color: isCancelled ? '#DC2626' : isMissed ? '#D97706' : isUpcoming ? '#059669' : '#475569',
                           }}
                         >
                           {isCancelled
                             ? isHi ? 'रद्द' : 'Cancelled'
-                            : isUpcoming
-                              ? isHi ? 'पुष्टि' : 'Confirmed'
-                              : isHi ? 'संपन्न' : 'Completed'}
+                            : isMissed
+                              ? isHi ? 'छूट गया' : 'Missed'
+                              : isUpcoming
+                                ? isHi ? 'पुष्टि' : 'Confirmed'
+                                : isHi ? 'संपन्न' : 'Completed'}
                         </Text>
                       </View>
                     </View>
@@ -915,7 +910,9 @@ export default function AppointmentsScreen() {
                               ? '#EFF6FF'
                               : apt.serviceType === 'IPD_ENQUIRY'
                                 ? '#F5F3FF'
-                                : '#ECFDF5',
+                                : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                  ? '#FFFBEB'
+                                  : '#ECFDF5',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -923,9 +920,11 @@ export default function AppointmentsScreen() {
                         {apt.serviceType === 'OPD_CONCIERGE' ? (
                           <Stethoscope size={22} color="#2563EB" />
                         ) : apt.serviceType === 'IPD_ENQUIRY' ? (
-                          <Scissors size={20} color="#7C3AED" />
+                          <Bed size={20} color="#7C3AED" />
+                        ) : apt.serviceType === 'PHARMACY_SCAN_PAY' ? (
+                          <Pill size={20} color="#D97706" />
                         ) : (
-                          <Sparkles size={20} color="#059669" />
+                          <FlaskConical size={20} color="#059669" />
                         )}
                       </View>
 
@@ -992,15 +991,97 @@ export default function AppointmentsScreen() {
                             borderRadius: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF' }}>
-                            {isHi ? 'टोकन ' : 'Token '}#{apt.tokenNumber}
+                          <Text
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: '800',
+                              color:
+                                apt.serviceType === 'IPD_ENQUIRY'
+                                  ? '#7C3AED'
+                                  : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                    ? '#D97706'
+                                    : apt.serviceType === 'INVESTIGATION'
+                                      ? '#059669'
+                                      : '#1E40AF',
+                            }}
+                          >
+                            {apt.serviceType === 'IPD_ENQUIRY'
+                              ? `${isHi ? 'प्रवेश #' : 'Admission #'}${apt.tokenNumber}`
+                              : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                ? `${isHi ? 'ऑर्डर #' : 'Order #'}${apt.tokenNumber}`
+                                : apt.serviceType === 'INVESTIGATION'
+                                  ? `${isHi ? 'लैब बे #' : 'Lab Bay #'}${apt.tokenNumber}`
+                                  : `${isHi ? 'टोकन #' : 'Token #'}${apt.tokenNumber}`}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669', marginTop: 2 }}>
-                          {inr(apt.doctorFee)} {apt.paymentStatus === 'PAID' ? (isHi ? '• भुगतान' : '• Paid') : (isHi ? '• काउंटर' : '• at Desk')}
-                        </Text>
+                        {apt.serviceType === 'IPD_ENQUIRY' ? (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#7C3AED', marginTop: 2 }}>
+                            {isHi ? 'कैशलेस टीपीए • सक्रिय' : 'Cashless TPA • Active'}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669', marginTop: 2 }}>
+                            {inr(apt.doctorFee)} {isHi ? '• भुगतान पूर्ण' : '• Paid'}
+                          </Text>
+                        )}
                       </View>
                     </View>
+
+                    {/* REFUND STATUS STRIP FOR CANCELLED APPOINTMENTS */}
+                    {isCancelled && (
+                      <View
+                        style={{
+                          backgroundColor: '#FEF2F2',
+                          borderRadius: 12,
+                          padding: 11,
+                          marginTop: 10,
+                          borderWidth: 1,
+                          borderColor: '#FEE2E2',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <CheckCircle2 size={13} color="#DC2626" />
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>
+                              {isHi ? '100% रिफंड जारी किया गया' : '100% Refund Processed'}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#991B1B' }}>
+                            {inr(apt.doctorFee)}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#7F1D1D', marginTop: 3 }}>
+                          {isHi
+                            ? `रिफंड संदर्भ: RFND-${apt.bookingRef} • मूल भुगतान स्रोत पर 2–6 कार्य दिवसों में क्रेडिट`
+                            : `Ref: RFND-${apt.bookingRef} • Credited back to original source in 2–6 working days`}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* MISSED BY DOCTOR NOTICE STRIP */}
+                    {isMissed && (
+                      <View
+                        style={{
+                          backgroundColor: '#FFFBEB',
+                          borderRadius: 12,
+                          padding: 11,
+                          marginTop: 10,
+                          borderWidth: 1,
+                          borderColor: '#FEF3C7',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <AlertCircle size={14} color="#D97706" />
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#B45309' }}>
+                            {isHi ? 'डॉक्टर आपातकालीन ड्यूटी पर थे / परामर्श छूट गया' : 'Doctor Emergency / Missed Slot'}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#92400E', marginTop: 3, lineHeight: 15 }}>
+                          {isHi
+                            ? 'डॉक्टर को आपातकालीन केस में जाना पड़ा। आप बिना किसी अतिरिक्त शुल्क के तुरंत समय बदल सकते हैं या 100% रिफंड ले सकते हैं।'
+                            : 'The doctor was called into an urgent emergency procedure. You can reschedule for free or claim a 100% refund.'}
+                        </Text>
+                      </View>
+                    )}
 
                     {/* ACTION BUTTONS ROW */}
                     <View
@@ -1067,19 +1148,103 @@ export default function AppointmentsScreen() {
                             }}
                             activeOpacity={0.85}
                             style={{
+                              flex: 1,
                               backgroundColor: '#1E40AF',
                               paddingVertical: 8,
-                              paddingHorizontal: 12,
                               borderRadius: 10,
                               flexDirection: 'row',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: 4,
+                              gap: 5,
                             }}
                           >
                             <QrCode size={13} color="#FFFFFF" />
                             <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
-                              {isHi ? 'पास' : 'Pass'}
+                              {isHi ? 'पास देखें' : 'Pass'}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : isCancelled ? (
+                        <>
+                          <TouchableOpacity
+                            onPress={() => Linking.openURL('tel:+919811244550')}
+                            activeOpacity={0.8}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#F1F5F9',
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <Phone size={13} color="#475569" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#475569' }}>
+                              {isHi ? 'सहायता केंद्र' : 'Help Desk'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => router.push('/opd')}
+                            activeOpacity={0.85}
+                            style={{
+                              flex: 1.2,
+                              backgroundColor: '#2563EB',
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <Calendar size={13} color="#FFFFFF" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                              {isHi ? 'नया अपॉइंटमेंट' : 'Book New Slot'}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : isMissed ? (
+                        <>
+                          <TouchableOpacity
+                            onPress={() => Linking.openURL('tel:+919811244550')}
+                            activeOpacity={0.8}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#FEF3C7',
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <Phone size={13} color="#B45309" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#B45309' }}>
+                              {isHi ? 'रिफंड सहायता' : 'Refund Help'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => router.push('/opd')}
+                            activeOpacity={0.85}
+                            style={{
+                              flex: 1.3,
+                              backgroundColor: '#2563EB',
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                            }}
+                          >
+                            <RefreshCw size={13} color="#FFFFFF" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' }}>
+                              {isHi ? 'मुफ्त में समय बदलें' : 'Free Reschedule'}
                             </Text>
                           </TouchableOpacity>
                         </>
@@ -1102,13 +1267,24 @@ export default function AppointmentsScreen() {
                           >
                             <Download size={13} color="#2563EB" />
                             <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
-                              {isHi ? 'पर्चा डाउनलोड' : 'Prescription'}
+                              {apt.serviceType === 'INVESTIGATION'
+                                ? isHi ? 'लैब रिपोर्ट' : 'Lab Report'
+                                : apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                  ? isHi ? 'बिल रसीद' : 'Invoice'
+                                  : apt.serviceType === 'IPD_ENQUIRY'
+                                    ? isHi ? 'डिस्चार्ज सारांश' : 'Summary'
+                                    : isHi ? 'पर्चा डाउनलोड' : 'Prescription'}
                             </Text>
                           </TouchableOpacity>
 
                           {/* Book Again */}
                           <TouchableOpacity
-                            onPress={() => router.push('/opd')}
+                            onPress={() => {
+                              if (apt.serviceType === 'INVESTIGATION') router.push('/labs');
+                              else if (apt.serviceType === 'PHARMACY_SCAN_PAY') router.push('/pharmacy');
+                              else if (apt.serviceType === 'IPD_ENQUIRY') router.push('/ipd');
+                              else router.push('/opd');
+                            }}
                             activeOpacity={0.85}
                             style={{
                               flex: 1,
@@ -1125,7 +1301,9 @@ export default function AppointmentsScreen() {
                           >
                             <Calendar size={13} color="#0F172A" />
                             <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#0F172A' }}>
-                              {isHi ? 'पुनः बुक करें' : 'Book Again'}
+                              {apt.serviceType === 'PHARMACY_SCAN_PAY'
+                                ? isHi ? 'पुनः ऑर्डर' : 'Reorder'
+                                : isHi ? 'पुनः बुक करें' : 'Book Again'}
                             </Text>
                           </TouchableOpacity>
                         </>
@@ -1200,50 +1378,136 @@ export default function AppointmentsScreen() {
 
             {/* Ticket Body */}
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520, padding: 20 }}>
-              {/* Token & QR Simulation Card */}
-              <View
-                style={{
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: 18,
-                  padding: 16,
-                  alignItems: 'center',
-                  borderWidth: 1,
-                  borderColor: '#E2E8F0',
-                }}
-              >
+              {selectedAppointment?.status === 'CANCELLED' ? (
                 <View
                   style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: 16,
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: '#CBD5E1',
+                    backgroundColor: '#FEF2F2',
+                    borderRadius: 18,
+                    padding: 18,
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 10,
-                    shadowColor: '#0F172A',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 4,
+                    borderWidth: 1,
+                    borderColor: '#FEE2E2',
                   }}
                 >
-                  <QrCode size={48} color="#1E40AF" strokeWidth={1.8} />
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
+                      backgroundColor: '#FEE2E2',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <CheckCircle2 size={28} color="#DC2626" />
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#991B1B' }}>
+                    {isHi ? 'रिफंड रसीद (100% स्वीकृत)' : '100% Refund Receipt'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626', marginTop: 4 }}>
+                    {inr(selectedAppointment?.doctorFee || 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#7F1D1D', marginTop: 6, textAlign: 'center', lineHeight: 16 }}>
+                    {isHi
+                      ? `रिफंड संदर्भ: RFND-${selectedAppointment.bookingRef}\nराशि 2–6 कार्य दिवसों में आपके बैंक/UPI खाते में जमा कर दी जाएगी।`
+                      : `Refund Ref: RFND-${selectedAppointment.bookingRef}\nAmount will reflect in your original payment method in 2–6 working days.`}
+                  </Text>
                 </View>
+              ) : selectedAppointment?.status === 'MISSED' ? (
+                <View
+                  style={{
+                    backgroundColor: '#FFFBEB',
+                    borderRadius: 18,
+                    padding: 18,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#FEF3C7',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
+                      backgroundColor: '#FEF3C7',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <AlertCircle size={28} color="#D97706" />
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#92400E', textAlign: 'center' }}>
+                    {isHi ? 'डॉक्टर आपातकालीन ड्यूटी पर थे' : 'Doctor Emergency / Missed'}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#78350F', marginTop: 6, textAlign: 'center', lineHeight: 16 }}>
+                    {isHi
+                      ? 'डॉक्टर को आपातकालीन केस में जाना पड़ा। आप 1-टैप में निःशुल्क नया स्लॉट चुन सकते हैं।'
+                      : 'Doctor had an emergency. You can reschedule for free at your convenience.'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setTicketModalVisible(false);
+                      router.push('/opd');
+                    }}
+                    style={{
+                      marginTop: 12,
+                      backgroundColor: '#2563EB',
+                      paddingHorizontal: 16,
+                      paddingVertical: 9,
+                      borderRadius: 10,
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
+                      {isHi ? 'मुफ्त में नया स्लॉट चुनें' : 'Reschedule for Free'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* QR Code and Token Card */
+                <View
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 18,
+                    padding: 18,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  {selectedAppointment && (
+                    <AppointmentQrCode
+                      bookingRef={selectedAppointment.bookingRef}
+                      tokenNumber={selectedAppointment.tokenNumber}
+                      patientName={selectedAppointment.patientName}
+                      doctorName={isHi && selectedAppointment.doctorNameHi ? selectedAppointment.doctorNameHi : selectedAppointment.doctorName}
+                      hospitalName={isHi && selectedAppointment.hospitalNameHi ? selectedAppointment.hospitalNameHi : selectedAppointment.hospitalName}
+                      slotTime={`${selectedAppointment.slotDate} • ${selectedAppointment.slotTime}`}
+                      size={140}
+                    />
+                  )}
 
-                <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A' }}>
-                  {isHi ? 'टोकन क्रमांक' : 'Token'} #{selectedAppointment?.tokenNumber}
-                </Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                  {isHi ? 'अस्पताल रिसेप्शन डेस्क पर यह QR कोड दिखाएं' : 'Scan at hospital reception for fast-track entry'}
-                </Text>
-              </View>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 12 }}>
+                    {selectedAppointment?.serviceType === 'IPD_ENQUIRY'
+                      ? `${isHi ? 'प्रवेश टोकन #' : 'Admission Token #'}${selectedAppointment?.tokenNumber}`
+                      : selectedAppointment?.serviceType === 'PHARMACY_SCAN_PAY'
+                        ? `${isHi ? 'ऑर्डर टोकन #' : 'Order Token #'}${selectedAppointment?.tokenNumber}`
+                        : selectedAppointment?.serviceType === 'INVESTIGATION'
+                          ? `${isHi ? 'लैब बे #' : 'Lab Bay #'}${selectedAppointment?.tokenNumber}`
+                          : `${isHi ? 'टोकन क्रमांक #' : 'Token #'}${selectedAppointment?.tokenNumber}`}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
+                    {isHi ? 'अस्पताल रिसेप्शन डेस्क पर यह QR कोड दिखाएं' : 'Scan at hospital reception for fast-track entry'}
+                  </Text>
+                </View>
+              )}
 
               {/* Patient and Visit Details Grid */}
               <View style={{ marginTop: 16, gap: 10 }}>
                 {/* Doctor */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <Text style={{ fontSize: 12, color: '#64748B' }}>{isHi ? 'डॉक्टर' : 'Doctor'}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>{isHi ? 'सेवा / डॉक्टर' : 'Service / Doctor'}</Text>
                   <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', textAlign: 'right' }}>
                     {isHi && selectedAppointment?.doctorNameHi ? selectedAppointment.doctorNameHi : selectedAppointment?.doctorName}
                   </Text>
@@ -1283,9 +1547,26 @@ export default function AppointmentsScreen() {
 
                 {/* Fee & Payment */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-                  <Text style={{ fontSize: 12, color: '#64748B' }}>{isHi ? 'परामर्श शुल्क' : 'Consultation Fee'}</Text>
-                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#059669', textAlign: 'right' }}>
-                    {inr(selectedAppointment?.doctorFee || 0)} ({selectedAppointment?.paymentStatus === 'PAID' ? 'Paid' : 'Pay at Counter'})
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>
+                    {selectedAppointment?.serviceType === 'IPD_ENQUIRY'
+                      ? (isHi ? 'प्रवेश व टीपीए' : 'Coverage / Concierge')
+                      : selectedAppointment?.serviceType === 'PHARMACY_SCAN_PAY'
+                        ? (isHi ? 'दवा राशि' : 'Medicine Total')
+                        : selectedAppointment?.serviceType === 'INVESTIGATION'
+                          ? (isHi ? 'जांच पैकेज शुल्क' : 'Test Package Fee')
+                          : (isHi ? 'परामर्श शुल्क' : 'Consultation Fee')}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '800',
+                      color: selectedAppointment?.serviceType === 'IPD_ENQUIRY' ? '#7C3AED' : '#059669',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {selectedAppointment?.serviceType === 'IPD_ENQUIRY'
+                      ? (isHi ? 'कैशलेस टीपीए समन्वय (निशुल्क)' : 'Cashless TPA Coordination (Free)')
+                      : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`}
                   </Text>
                 </View>
               </View>
@@ -1384,6 +1665,20 @@ export default function AppointmentsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Payment Gateway Modal (Razorpay / UPI / Cards) */}
+      {payingAppointment && (
+        <PaymentGatewayModal
+          visible={Boolean(payingAppointment)}
+          onClose={() => setPayingAppointment(null)}
+          amount={payingAppointment.doctorFee}
+          serviceTitle={payingAppointment.specialty}
+          providerName={payingAppointment.doctorName}
+          patientName={payingAppointment.patientName}
+          bookingRef={payingAppointment.bookingRef}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </View>
   );
 }

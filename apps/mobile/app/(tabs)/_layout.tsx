@@ -144,7 +144,10 @@ function UiverseBottomNav({ state, descriptors, navigation }: any) {
     }
   };
 
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 10);
+  const bottomInset = Math.max(
+    insets.bottom,
+    Platform.OS === 'web' ? 16 : Platform.OS === 'ios' ? 12 : 10
+  );
 
   // Filter strictly to the 5 primary tabs
   const visibleRoutes = state.routes.filter((route: any) =>
@@ -152,17 +155,14 @@ function UiverseBottomNav({ state, descriptors, navigation }: any) {
   );
 
   const currentRouteName = state.routes[state.index]?.name;
-
-  // Never render bottom navigation bar on Profile page or non-tab routes
-  if (currentRouteName === 'profile' || !ALLOWED_TABS.includes(currentRouteName)) {
-    return null;
-  }
+  const isVisible = currentRouteName !== 'profile' && ALLOWED_TABS.includes(currentRouteName);
 
   const activeIdx = Math.max(
     0,
     visibleRoutes.findIndex((r: any) => r.name === currentRouteName)
   );
 
+  // ALL HOOKS MUST RUN UNCONDITIONALLY ON EVERY RENDER (React 19 Rules of Hooks)
   const navAnim = useRef(new Animated.Value(activeIdx)).current;
   const [navWidth, setNavWidth] = useState(
     Math.min(Dimensions.get('window').width * 0.94, 480)
@@ -176,6 +176,11 @@ function UiverseBottomNav({ state, descriptors, navigation }: any) {
       speed: 15,
     }).start();
   }, [activeIdx]);
+
+  // Safely return null AFTER all hooks have executed
+  if (!isVisible) {
+    return null;
+  }
 
   const numTabs = visibleRoutes.length || 5;
   const slotWidth = navWidth > 0 ? (navWidth - 12) / numTabs : 0;

@@ -63,8 +63,11 @@ export function LabFilterPillsRow({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={{ width: '100%', alignSelf: 'center' }}
       contentContainerStyle={{
-        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 0,
         gap: 8,
         paddingTop: 10,
       }}

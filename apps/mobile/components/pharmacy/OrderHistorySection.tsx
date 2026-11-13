@@ -19,7 +19,35 @@ export function OrderHistorySection({
   isHi,
   onSelectOrder,
 }: OrderHistorySectionProps) {
-  if (history.length === 0) return null;
+  if (history.length === 0) {
+    return (
+      <View style={{ marginTop: 22 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: C.ink, marginBottom: 10 }}>
+          {isHi ? 'हाल के ऑर्डर व अनुरोध' : 'Recent requests'}
+        </Text>
+        <View
+          style={{
+            padding: 20,
+            backgroundColor: '#F8FAFC',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            alignItems: 'center',
+          }}
+        >
+          <Pill size={28} color="#94A3B8" />
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#334155', marginTop: 8 }}>
+            {isHi ? 'कोई ऑर्डर नहीं' : 'No recent orders'}
+          </Text>
+          <Text style={{ fontSize: 11.5, color: '#64748B', textAlign: 'center', marginTop: 4, lineHeight: 16 }}>
+            {isHi
+              ? 'आपके फार्मेसी ऑर्डर यहाँ दिखाई देंगे।'
+              : 'Your pharmacy orders will appear here.'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ marginTop: 22 }}>

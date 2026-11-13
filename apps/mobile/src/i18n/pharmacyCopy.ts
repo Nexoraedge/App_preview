@@ -5,7 +5,7 @@ export const pharmacyCopy = {
   en: {
     headerTitle: 'Pharmacy & Medicines',
     headerSubtitle: 'Upload prescription, compare local chemist bills & get delivered',
-    searchPlaceholder: "Search pharmacy by name or location (e.g. 'Saket')...",
+    searchPlaceholder: "Search pharmacy by name or location (e.g. 'Surajpole', 'Raja Park')...",
 
     // Step 1: Upload Prescription
     uploadTitle: 'Upload Doctor Prescription',
@@ -74,7 +74,7 @@ export const pharmacyCopy = {
   hi: {
     headerTitle: 'दवाएं एवं फार्मेसी',
     headerSubtitle: 'पर्चा अपलोड करें, स्थानीय केमिस्ट बिल तुलना करें और घर मंगाएं',
-    searchPlaceholder: "फार्मेसी नाम या स्थान खोजें (उदा. 'साकेत')...",
+    searchPlaceholder: "फार्मेसी नाम या स्थान खोजें (उदा. 'सूरजपोल', 'राजा पार्क')...",
 
     // Step 1: Upload Prescription
     uploadTitle: 'डॉक्टर का पर्चा अपलोड करें',

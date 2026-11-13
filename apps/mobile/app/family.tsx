@@ -3,7 +3,7 @@
 // Statutory consent is required before saving someone else's details. No invasive data (Aadhaar, religion, caste) is collected.
 // Fully localized (English & Hindi) with zero haptics, responsive layout, and smooth SheetFrame modal.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,11 @@ import {
   Alert,
   StatusBar as RNStatusBar,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { confirmDialog } from '../src/utils/crossAlert';
 import {
   ChevronLeft,
   Plus,
@@ -133,7 +135,18 @@ export default function FamilyScreen() {
   const { language } = useLanguage();
   const isHi = language === 'hi';
 
-  const { members, activeId, setActive, add, update, remove } = useFamily();
+  const { members, activeId, setActive, add, update, remove, refreshFamily, isLoading } = useFamily();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    refreshFamily();
+  }, [refreshFamily]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshFamily();
+    setTimeout(() => setIsRefreshing(false), 400);
+  };
 
   const [sheet, setSheet] = useState<{ id: string | null } | null>(null); // id null = adding
   const [name, setName] = useState('');
@@ -168,7 +181,12 @@ export default function FamilyScreen() {
     setSheet({ id: m.id });
   };
 
-  const phoneOk = phone.length === 0 || /^\d{10}$/.test(phone);
+  const isAdult = !isNaN(ageNum) && ageNum >= 18;
+  const phoneRequired = isAdult && !isSelf;
+  const phoneOk = phoneRequired
+    ? /^\d{10}$/.test(phone.trim())
+    : (phone.trim().length === 0 || /^\d{10}$/.test(phone.trim()));
+
   const valid =
     name.trim().length >= 2 &&
     !isNaN(ageNum) &&
@@ -204,19 +222,15 @@ export default function FamilyScreen() {
 
   const confirmRemove = (m: Member) => {
     const memberDisplayName = isHi && m.nameHi ? m.nameHi : m.name;
-    Alert.alert(
+    confirmDialog(
       isHi ? 'परिवार से हटाएं?' : 'Remove from family?',
       isHi
         ? `${memberDisplayName} को आपकी परिवार सूची से हटा दिया जाएगा।`
         : `${m.name} will be removed from your family list.`,
-      [
-        { text: isHi ? 'रद्द करें' : 'Cancel', style: 'cancel' },
-        {
-          text: isHi ? 'हटाएं' : 'Remove',
-          style: 'destructive',
-          onPress: () => remove(m.id),
-        },
-      ]
+      () => remove(m.id),
+      isHi ? 'हटाएं' : 'Remove',
+      isHi ? 'रद्द करें' : 'Cancel',
+      true
     );
   };
 
@@ -226,12 +240,26 @@ export default function FamilyScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[C.brand]}
+            tintColor={C.brand}
+          />
+        }
         contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
       >
         <View style={[wrap, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
           {/* Back Navigation Button */}
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)');
+              }
+            }}
             hitSlop={12}
             style={{
               flexDirection: 'row',
@@ -529,20 +557,40 @@ export default function FamilyScreen() {
           </Field>
 
           {/* Mobile Phone */}
-          <Field label={isHi ? 'मोबाइल नंबर (वैकल्पिक)' : 'Mobile number (optional)'}>
+          <Field
+            label={
+              phoneRequired
+                ? (isHi ? 'मोबाइल नंबर (18+ आयु हेतु आवश्यक) *' : 'Mobile number (Required for 18+) *')
+                : (isHi ? 'मोबाइल नंबर (वैकल्पिक)' : 'Mobile number (optional)')
+            }
+          >
             <TextInput
               value={phone}
               onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
               placeholder={isHi ? '10 अंकों का मोबाइल नंबर' : '10 digits mobile number'}
               placeholderTextColor={C.mute}
               keyboardType="number-pad"
-              style={inputStyle}
+              style={[
+                inputStyle,
+                phoneRequired && !phoneOk && phone.length > 0 ? { borderColor: C.danger } : null,
+              ]}
             />
             {!phoneOk && (
               <Text style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>
+                {phoneRequired
+                  ? (isHi
+                      ? '18+ वर्ष के सदस्यों हेतु 10 अंकों का फोन नंबर अनिवार्य है ताकि वे स्वयं लॉगिन कर सकें।'
+                      : '10-digit mobile number is mandatory for adult members (18+) to enable independent login.')
+                  : (isHi
+                      ? '10 अंकों का वैध मोबाइल नंबर दर्ज करें, या इसे खाली छोड़ दें।'
+                      : 'Enter a valid 10-digit number, or leave it empty.')}
+              </Text>
+            )}
+            {phoneRequired && phoneOk && phone.trim().length === 10 && (
+              <Text style={{ fontSize: 11.5, color: '#16A34A', marginTop: 4, fontWeight: '600' }}>
                 {isHi
-                  ? '10 अंकों का वैध मोबाइल नंबर दर्ज करें, या इसे खाली छोड़ दें।'
-                  : 'Enter a valid 10-digit number, or leave it empty.'}
+                  ? '✓ यह सदस्य अपने इस फोन नंबर से सीधे लॉगिन करके परिवार की स्थिति देख सकते हैं।'
+                  : '✓ This member can directly log in with this phone number to view family health status.'}
               </Text>
             )}
           </Field>

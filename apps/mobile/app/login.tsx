@@ -36,13 +36,14 @@ import { PrimaryButton } from '../components/ui/kit';
 import { LogoMark } from '../components/brand/LogoMark';
 import { LangToggle } from '../components/launch/LangToggle';
 import { OtpInputBoxes } from '../components/auth/OtpInputBoxes';
+import { GoogleIcon } from '../components/auth/GoogleIcon';
 import { requestOtp, verifyPhoneOtp } from '../src/lib/supabase';
 
 const RESEND_SECONDS = 30;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginWithPhone } = useAuth();
+  const { user, loginWithPhone, loginWithGoogle } = useAuth();
   const { language } = useLanguage() as any;
   const isHi = language === 'hi';
   const t = pickLoginCopy(language);
@@ -55,6 +56,13 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(0);
+
+  // Auto-redirect if user is already signed in (or after OAuth callback returns)
+  useEffect(() => {
+    if (user) {
+      router.replace(ROUTES.home as any);
+    }
+  }, [user]);
 
   // Resend countdown timer
   useEffect(() => {
@@ -72,6 +80,24 @@ export default function LoginScreen() {
     setFullName('Abhishek Jain');
     setPhone('9999999999');
     setError('');
+  };
+
+  const handleOneTapReviewerLogin = () => {
+    loginWithPhone('9999999999', '123456', 'Abhishek Jain');
+    router.replace(ROUTES.home as any);
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await loginWithGoogle();
+      // On web/mobile, loginWithGoogle redirects the browser to the official Google Sign-In page.
+      // Navigation happens naturally once Google redirects back and user session is established.
+    } catch (err: any) {
+      setError(err?.message || (isHi ? 'गूगल लॉगिन विफल रहा' : 'Google sign-in failed'));
+      setBusy(false);
+    }
   };
 
   const handleSendOtp = async (targetChannel: 'whatsapp' | 'sms' = channel) => {
@@ -297,6 +323,111 @@ export default function LoginScreen() {
 
                 {step === 'phone' ? (
                   <View style={{ marginTop: 22 }}>
+                    {/* Apple App Store Reviewer & Demo 1-Tap Banner */}
+                    <TouchableOpacity
+                      onPress={handleOneTapReviewerLogin}
+                      activeOpacity={0.88}
+                      style={{
+                        backgroundColor: '#F0FDF4',
+                        borderWidth: 1.5,
+                        borderColor: '#86EFAC',
+                        borderRadius: 16,
+                        padding: 13,
+                        marginBottom: 18,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            backgroundColor: '#DCFCE7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Sparkles size={18} color="#16A34A" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#15803D' }}>
+                              {isHi ? 'ऐप्पल स्टोर परीक्षक 1-टैप डेमो' : 'App Store Reviewer Demo'}
+                            </Text>
+                            <View style={{ backgroundColor: '#16A34A', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFFFFF' }}>TEST ACC</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11, color: '#166534', fontWeight: '500', marginTop: 2 }}>
+                            +91 99999 99999 • OTP 123456 • {isHi ? 'तुरंत लॉगिन करें' : '1-Tap Instant Sign In'}
+                          </Text>
+                        </View>
+                      </View>
+                      <ArrowLeft size={16} color="#16A34A" style={{ transform: [{ rotate: '180deg' }] }} />
+                    </TouchableOpacity>
+
+                    {/* 1-Tap Google Sign-In (Instant Onboarding & Zero SMS Cost) */}
+                    <TouchableOpacity
+                      onPress={handleGoogleLogin}
+                      disabled={busy}
+                      activeOpacity={0.85}
+                      style={{
+                        marginBottom: 16,
+                        height: 52,
+                        borderRadius: R.md,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1.5,
+                        borderColor: '#E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 12,
+                        shadowColor: '#0F172A',
+                        shadowOpacity: 0.05,
+                        shadowRadius: 6,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: 1,
+                      }}
+                    >
+                      <GoogleIcon size={20} />
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '700',
+                          color: '#0F172A',
+                        }}
+                      >
+                        {isHi ? 'Google के साथ 1-टैप साइन-इन' : 'Continue with Google'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Clean Or Divider */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 16,
+                        gap: 12,
+                      }}
+                    >
+                      <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: '#94A3B8',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {isHi ? 'या मोबाइल नंबर से' : 'or with mobile number'}
+                      </Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+                    </View>
+
                     {/* Full Name Input */}
                     <View style={{ marginBottom: 16 }}>
                       <Text

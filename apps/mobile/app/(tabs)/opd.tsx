@@ -16,9 +16,11 @@ import { Building2, UserCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchNearbyHospitals } from '@adityam/supabase';
 import type { Hospital, Doctor, Booking } from '@adityam/types';
-import { saveNewBooking } from '../../src/services/bookingStorage';
+import { saveNewBooking, subscribeCloudBookings } from '../../src/services/bookingStorage';
+import { triggerBrowserNotification } from '../../src/services/notificationService';
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage } from '../../src/context/LanguageContext';
+import { useLocation } from '../../src/context/LocationContext';
 import { opdCopy } from '../../src/i18n/opdCopy';
 import { SortOption } from '../../src/data/opdData';
 import { ProfileModal } from '../../components/ui/ProfileModal';
@@ -42,14 +44,16 @@ export default function OpdConciergeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const { coords, activeAddress, currentLocationName } = useLocation();
   const isHi = language === 'hi';
   const c = isHi ? opdCopy.hi : opdCopy.en;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const contentWidth = Math.min(width, 720);
   const cardGap = 16;
-  const tabletCardWidth = (width - 40 - cardGap) / 2;
-  const topDoctorCardWidth = Math.min(width - 48, 330);
+  const tabletCardWidth = (contentWidth - 40 - cardGap) / 2;
+  const topDoctorCardWidth = Math.min(contentWidth - 48, 330);
 
   // Active tab state: Hospitals vs Doctors
   const [activeTab, setActiveTab] = useState<'hospitals' | 'doctors'>('hospitals');
@@ -72,6 +76,12 @@ export default function OpdConciergeScreen() {
     const t = setTimeout(() => setScreenLoading(false), 300);
     return () => clearTimeout(t);
   }, []);
+
+  // Realtime subscription for Supabase cloud bookings
+  useEffect(() => {
+    const unsub = subscribeCloudBookings(user?.id);
+    return () => unsub();
+  }, [user?.id]);
 
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [sortBy, setSortBy] = useState<SortOption>('nearest');
@@ -98,12 +108,37 @@ export default function OpdConciergeScreen() {
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
 
   // TanStack Query for PostGIS Nearby Hospitals
+  const activeLat = useMemo(() => {
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    const isJp = locText.includes('jaipur') || String(activeAddress?.pincode || '').startsWith('302');
+    if (isJp) {
+      const lat = Number(activeAddress?.latitude);
+      if (lat >= 26.0 && lat <= 28.0) return lat;
+      return 26.9205;
+    }
+    if (activeAddress?.latitude) return Number(activeAddress.latitude);
+    if (coords?.latitude) return Number(coords.latitude);
+    return 28.5244;
+  }, [activeAddress, coords, currentLocationName, user?.city]);
+
+  const activeLng = useMemo(() => {
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    const isJp = locText.includes('jaipur') || String(activeAddress?.pincode || '').startsWith('302');
+    if (isJp) {
+      const lng = Number(activeAddress?.longitude);
+      if (lng >= 75.0 && lng <= 77.0) return lng;
+      return 75.8450;
+    }
+    if (activeAddress?.longitude) return Number(activeAddress.longitude);
+    if (coords?.longitude) return Number(coords.longitude);
+    return 77.2167;
+  }, [activeAddress, coords, currentLocationName, user?.city]);
   const { data: hospitals = [], isLoading, refetch } = useQuery({
-    queryKey: ['nearby-hospitals', selectedSpecialty],
+    queryKey: ['nearby-hospitals', selectedSpecialty, activeLat, activeLng],
     queryFn: () =>
       fetchNearbyHospitals(
-        28.5355,
-        77.2,
+        activeLat,
+        activeLng,
         selectedSpecialty === 'All' ? undefined : selectedSpecialty
       ),
   });
@@ -121,7 +156,16 @@ export default function OpdConciergeScreen() {
   // Flattened doctors across all hospitals and branches
   const allDoctors = useMemo<FlattenedDoctor[]>(() => {
     const list: FlattenedDoctor[] = [];
-    hospitals.forEach((h) => {
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    const isJp = locText.includes('jaipur');
+
+    const sourceHospitals = isJp
+      ? hospitals.filter((h) => h.city.toLowerCase().includes('jaipur') || (h.distance_km ?? 999) <= 45)
+      : hospitals;
+
+    const targetHospitals = sourceHospitals.length > 0 ? sourceHospitals : hospitals;
+
+    targetHospitals.forEach((h) => {
       (h.branches || []).forEach((b) => {
         (b.doctors || []).forEach((d) => {
           list.push({
@@ -138,11 +182,19 @@ export default function OpdConciergeScreen() {
       });
     });
     return list;
-  }, [hospitals]);
+  }, [hospitals, activeAddress, currentLocationName, user?.city]);
 
   // Filtered & Sorted Hospitals
   const filteredHospitals = useMemo(() => {
     let list = [...hospitals];
+
+    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
+    if (locText.includes('jaipur')) {
+      const jaipurList = list.filter((h) => h.city.toLowerCase().includes('jaipur') || (h.distance_km ?? 999) <= 45);
+      if (jaipurList.length > 0) {
+        list = jaipurList;
+      }
+    }
 
     if (selectedSpecialty !== 'All') {
       const target = selectedSpecialty.toLowerCase();
@@ -290,32 +342,56 @@ export default function OpdConciergeScreen() {
 
   const handleConfirmBooking = async (
     patientName?: string,
-    patientPhone?: string
+    patientPhone?: string,
+    paymentMethod?: string,
+    txnId?: string,
+    reason?: string,
+    slot?: string
   ) => {
     if (!bookingTargetDoctor) return;
     setIsSubmitting(true);
 
-    const bookingRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const effectiveSlot = selectedModalSlot || bookingTargetDoctor.slot;
+    const bookingRef = `AN-OPD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const now = new Date();
+    const fmtDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const rawSlot = slot || selectedModalSlot || bookingTargetDoctor.slot;
+    const effectiveSlot = (rawSlot?.includes('·') || rawSlot?.includes(','))
+      ? rawSlot
+      : `Today, ${fmtDate} · ${rawSlot}`;
+    const isPayAtDesk = paymentMethod === 'AT_HOSPITAL';
+
     const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
+      id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }),
       booking_ref: bookingRef,
       service_type: 'OPD_CONCIERGE',
-      user_id: user?.id,
-      patient_name: patientName || user?.full_name || 'Abhishek Jain',
-      patient_phone: patientPhone || user?.phone || '+91 99999 99999',
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
+      patient_name: patientName || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
+      patient_phone: patientPhone || (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999' ? user.phone : ''),
+      hospital_id: bookingTargetDoctor.doctor.hospital_id,
       hospital_name: bookingTargetDoctor.hospitalName,
+      branch_id: bookingTargetDoctor.doctor.branch_id,
+      doctor_id: bookingTargetDoctor.doctor.id,
       doctor_name: bookingTargetDoctor.doctor.name,
       doctor_fee: bookingTargetDoctor.doctor.discounted_fee,
       slot_time: effectiveSlot,
       specialty_requested: bookingTargetDoctor.doctor.specialty,
-      status: 'CONFIRMED',
+      status: isPayAtDesk ? 'CONFIRMED' : 'PAID',
       call_status: 'connected',
-      notes: `OPD slot reserved for ${bookingTargetDoctor.doctor.name} at ${bookingTargetDoctor.hospitalName}. Token issued.`,
+      notes: `${reason ? `Reason / Symptoms: ${reason}. ` : ''}${isPayAtDesk ? 'Payable at hospital reception desk.' : `Paid online via ${paymentMethod || 'UPI'} (${txnId || 'RZP-SUCCESS'}).`} OPD priority token issued for ${bookingTargetDoctor.doctor.name} at ${bookingTargetDoctor.hospitalName}.`,
       created_at: new Date().toISOString(),
     };
 
     await saveNewBooking(newBooking);
+
+    // Trigger Notification
+    triggerBrowserNotification(
+      'OPD Appointment Confirmed',
+      `Token #14 issued for ${bookingTargetDoctor.doctor.name} at ${bookingTargetDoctor.hospitalName}. Slot: ${effectiveSlot}`
+    );
 
     setTimeout(() => {
       setIsSubmitting(false);
@@ -341,6 +417,7 @@ export default function OpdConciergeScreen() {
             Math.max(insets.bottom, 12) + (selectedSlotDoctor ? 150 : 90),
         }}
       >
+        <View style={{ width: '100%', maxWidth: 720, alignSelf: 'center' }}>
         {/* Modular Segmented Header & Search */}
         <OpdSegmentedHeader
           isHi={isHi}
@@ -624,6 +701,7 @@ export default function OpdConciergeScreen() {
             )}
           </View>
         )}
+        </View>
       </ScrollView>
 
       {/* Modular Floating Bottom Bar when slot selected */}

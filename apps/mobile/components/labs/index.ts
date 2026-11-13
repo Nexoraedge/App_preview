@@ -11,3 +11,5 @@ export * from './LabItemRow';
 export * from './LabCartStickyBar';
 export * from './TestDetailModal';
 export * from './CentreSelectionSheet';
+export * from './LabBookingModal';
+export * from './LabPrescriptionUploadModal';

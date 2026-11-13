@@ -33,7 +33,9 @@ export interface Item {
 export interface Centre {
   id: string;
   name: string;
+  nameHi?: string;
   area: string;
+  areaHi?: string;
   distanceKm: number;
   rating: number;
   reviews: number;
@@ -42,6 +44,9 @@ export interface Centre {
   offers: Segment[];
   factor: number; // price multiplier against BASE
   exclude?: string[];
+  lat?: number;
+  lng?: number;
+  city?: string;
 }
 
 export const CATEGORIES: Record<'lab' | 'scan', Category[]> = {
@@ -63,6 +68,8 @@ export const CATEGORIES: Record<'lab' | 'scan', Category[]> = {
     { id: 'ecg', label: 'Heart tests', labelHi: 'ईसीजी / इको', icon: 'Activity', tint: '#FFECEC', color: '#DC2626' },
   ],
 };
+
+
 
 export const ITEMS: Item[] = [
   // ---- Lab tests ----
@@ -137,25 +144,25 @@ export const ITEMS: Item[] = [
     nameHi: 'विटामिन डी (25-OH)',
     segment: 'lab',
     category: 'vitamins',
-    reportHrs: 24,
+    reportHrs: 12,
     fastingHrs: null,
-    about: 'Checks vitamin D level, which matters for bones and immunity.',
-    aboutHi: 'शरीर में विटामिन डी का स्तर जांचता है, जो हड्डियों की मजबूती और रोग प्रतिरोधक क्षमता के लिए आवश्यक है।',
-    prep: 'No fasting needed.',
-    prepHi: 'किसी तैयारी की आवश्यकता नहीं है।',
+    about: 'Checks vitamin D level for bone and muscle strength.',
+    aboutHi: 'हड्डियों, जोड़ों और मांसपेशियों की मजबूती के लिए विटामिन डी स्तर का सटीक परीक्षण।',
+    prep: 'No special preparation.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
   {
     id: 'b12',
     name: 'Vitamin B12',
-    nameHi: 'विटामिन बी12 (Vitamin B12)',
+    nameHi: 'विटामिन बी12',
     segment: 'lab',
     category: 'vitamins',
-    reportHrs: 24,
+    reportHrs: 12,
     fastingHrs: null,
-    about: 'Checks B12 level, linked to tiredness, nerves and anaemia.',
-    aboutHi: 'विटामिन बी12 के स्तर की जांच, जो थकान, नसों की कमजोरी और स्वस्थ रक्त कोशिकाओं के लिए जरूरी है।',
-    prep: 'No fasting needed.',
-    prepHi: 'किसी तैयारी की आवश्यकता नहीं है।',
+    about: 'Checks B12 for nerve health and red blood cell production.',
+    aboutHi: 'नसों के स्वास्थ्य, थकान मुक्ति और नई लाल रक्त कोशिकाओं के निर्माण हेतु बी12 स्तर की जांच।',
+    prep: 'No special preparation.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
   {
     id: 'lft',
@@ -164,11 +171,11 @@ export const ITEMS: Item[] = [
     segment: 'lab',
     category: 'organ',
     reportHrs: 12,
-    fastingHrs: 8,
-    about: 'Checks liver enzymes and proteins.',
-    aboutHi: 'लिवर एंजाइम (SGOT, SGPT), बिलीरुबिन और प्रोटीन की जांच कर लिवर के स्वास्थ्य की स्थिति बताता है।',
-    prep: 'Fast for 8 hours.',
-    prepHi: '8 घंटे तक खाली पेट रहें।',
+    fastingHrs: null,
+    about: 'Measures enzymes and proteins to check liver health.',
+    aboutHi: 'बिलीरुबिन, एसजीओटी, एसजीपीटी और प्रोटीन जांच से लिवर स्वास्थ्य और पाचन क्षमता का आकलन।',
+    prep: 'No fasting needed.',
+    prepHi: 'खाली पेट रहने की आवश्यकता नहीं है।',
   },
   {
     id: 'kft',
@@ -178,10 +185,10 @@ export const ITEMS: Item[] = [
     category: 'organ',
     reportHrs: 12,
     fastingHrs: null,
-    about: 'Checks how well your kidneys filter waste.',
-    aboutHi: 'सीरम क्रिएटिनिन, यूरिया और यूरिक एसिड की जांच से किडनी की कार्यक्षमता का पता लगाता है।',
-    prep: 'No fasting needed. Drink water normally.',
-    prepHi: 'खाली पेट की आवश्यकता नहीं। सामान्य रूप से पानी पिएं।',
+    about: 'Checks creatinine, urea and electrolytes for kidney health.',
+    aboutHi: 'सीरम क्रिएटिनिन, यूरिया और यूरिक एसिड द्वारा गुर्दे (किडनी) के फिल्टर कार्य की जांच।',
+    prep: 'No fasting needed.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
   {
     id: 'dengue',
@@ -245,62 +252,62 @@ export const ITEMS: Item[] = [
     category: 'xray',
     reportHrs: 2,
     fastingHrs: null,
-    about: 'Images of the knee bones and joint.',
-    aboutHi: 'घुटने के जोड़, गठिया (आर्थराइटिस) और हड्डियों में फ्रैक्चर की जांच हेतु डिजिटल इमेज।',
-    prep: 'No preparation.',
-    prepHi: 'किसी तैयारी की आवश्यकता नहीं है।',
+    about: 'Images of knee joint bones to check for arthritis or injury.',
+    aboutHi: 'घुटने के जोड़ों, हड्डियों के घिसाव (गठिया/आर्थराइटिस) या चोट की जांच।',
+    prep: 'No special prep.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
   {
     id: 'xr-spine',
-    name: 'X-Ray Lumbar Spine',
-    nameHi: 'एक्स-रे लम्बर स्पाइन (कमर की रीढ़)',
+    name: 'X-Ray Spine (L-S / Cervical)',
+    nameHi: 'एक्स-रे रीढ़ की हड्डी (कमर व गर्दन)',
     segment: 'scan',
     category: 'xray',
     reportHrs: 2,
     fastingHrs: null,
-    about: 'Images of the lower spine.',
-    aboutHi: 'कमर और रीढ़ की निचली हड्डियों के अलाइनमेंट और डिस्क स्पेस की डिजिटल इमेजिंग।',
-    prep: 'No preparation.',
-    prepHi: 'किसी तैयारी की आवश्यकता नहीं है।',
+    about: 'Images of the neck or lower back vertebrae.',
+    aboutHi: 'गर्दन या कमर की रीढ़ की हड्डी, डिस्क के गैप और सर्वाइकल/लम्बर दर्द की जांच।',
+    prep: 'No special prep.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
   {
     id: 'usg-abd',
-    name: 'Ultrasound Abdomen',
-    nameHi: 'अल्ट्रासाउंड पेट (USG Whole Abdomen)',
+    name: 'Ultrasound Whole Abdomen',
+    nameHi: 'अल्ट्रासाउंड पेट संपूर्ण (USG Abdomen)',
     segment: 'scan',
     category: 'usg',
-    reportHrs: 4,
-    fastingHrs: 6,
-    about: 'Looks at liver, gallbladder, kidneys and other organs.',
-    aboutHi: 'लिवर, पित्ताशय, गुर्दे, पथरी और अन्य पेट के आंतरिक अंगों की संपूर्ण सोनोग्राफी।',
-    prep: 'Fast for 6 hours. You may be asked to keep a full bladder.',
-    prepHi: '6 घंटे का उपवास रखें। जांच के समय मूत्राशय भरा (पेशाब रोककर) रखें।',
+    reportHrs: 2,
+    fastingHrs: 4,
+    about: 'Ultrasound scan of liver, gall bladder, kidneys, spleen and bladder.',
+    aboutHi: 'लिवर, पित्त की थैली की पथरी, किडनी और पेट के सभी आंतरिक अंगों की सोनोग्राफी।',
+    prep: 'Fast 4 hours. Full urinary bladder needed (drink 4-5 glasses of water).',
+    prepHi: '4 घंटे खाली पेट रहें। पेशाब रोक कर रखें (4-5 गिलास पानी पिएं)।',
   },
   {
     id: 'ct-head',
-    name: 'CT Scan Head',
-    nameHi: 'सीटी स्कैन हेड (CT Brain)',
+    name: 'CT Scan Head / Brain',
+    nameHi: 'सीटी स्कैन सिर व मस्तिष्क (CT Head)',
     segment: 'scan',
     category: 'ct',
-    reportHrs: 6,
+    reportHrs: 4,
     fastingHrs: null,
-    about: 'Detailed images of the brain and skull.',
-    aboutHi: 'सिरदर्द, चोट या आंतरिक रक्तस्राव की पहचान के लिए मस्तिष्क और खोपड़ी का 3D सीटी स्कैन।',
-    prep: 'Remove metal items. Tell the centre if you are pregnant.',
-    prepHi: 'धातु की वस्तुएं उतार दें। यदि गर्भवती हैं तो केंद्र को पहले ही सूचित करें।',
+    about: 'Cross-sectional imaging of brain for trauma, stroke or headache.',
+    aboutHi: 'सिर की चोट, स्ट्रोक, रक्तस्राव या गंभीर सिरदर्द की जांच हेतु मस्तिष्क का सीटी स्कैन।',
+    prep: 'Remove hairpins, earrings and metal objects.',
+    prepHi: 'कान की बालियां, हेयरपिन और धातु की सभी वस्तुएं उतार दें।',
   },
   {
     id: 'ct-chest',
-    name: 'CT Scan Chest',
-    nameHi: 'सीटी स्कैन चेस्ट (HRCT Chest)',
+    name: 'HRCT Chest',
+    nameHi: 'एचआरसीटी चेस्ट (HRCT Chest)',
     segment: 'scan',
     category: 'ct',
-    reportHrs: 6,
+    reportHrs: 4,
     fastingHrs: null,
-    about: 'Detailed images of the lungs and chest.',
-    aboutHi: 'फेफड़ों की संरचना और गंभीर संक्रमण की पहचान के लिए उच्च रिज़ॉल्यूशन वाली सीटी इमेजिंग।',
-    prep: 'Remove metal items. Tell the centre if you are pregnant.',
-    prepHi: 'धातु की वस्तुएं उतार दें। यदि गर्भवती हैं तो केंद्र को पहले ही सूचित करें।',
+    about: 'High-resolution scan of lung tissues.',
+    aboutHi: 'फेफड़ों के संक्रमण, फाइब्रोसिस और एलर्जी की उच्च-रिज़ॉल्यूशन 3D इमेजिंग।',
+    prep: 'Wear comfortable loose clothing without metal zips.',
+    prepHi: 'धातु की ज़िप रहित आरामदायक ढीले कपड़े पहनें।',
   },
   {
     id: 'mri-brain',
@@ -308,50 +315,50 @@ export const ITEMS: Item[] = [
     nameHi: 'एमआरआई ब्रेन (MRI Brain)',
     segment: 'scan',
     category: 'mri',
-    reportHrs: 24,
+    reportHrs: 6,
     fastingHrs: null,
-    about: 'Detailed images of the brain using magnets.',
-    aboutHi: 'शक्तिशाली चुंबकीय तरंगों द्वारा मस्तिष्क के सूक्ष्म ऊतकों, नसों और नसों के स्वास्थ्य की जांच।',
-    prep: 'Tell the centre about any implants or pacemaker. No metal on the body.',
-    prepHi: 'शरीर पर कोई धातु या पेसमेकर न हो। किसी भी मेडिकल इम्प्लांट की जानकारी केंद्र को दें।',
+    about: 'Detailed magnetic resonance imaging of brain tissues and nerves.',
+    aboutHi: 'मस्तिष्क के ऊतकों, नसों, ट्यूमर और तंत्रिका तंत्र की अत्यंत विस्तृत एमआरआई इमेजिंग।',
+    prep: 'Strictly no metallic implants, pacemakers or metallic items allowed.',
+    prepHi: 'पेसमेकर या किसी भी प्रकार के धातु इम्प्लांट के साथ अनुमति नहीं है।',
   },
   {
     id: 'mri-knee',
-    name: 'MRI Knee',
-    nameHi: 'एमआरआई घुटना (MRI Knee Joint)',
+    name: 'MRI Knee Joint',
+    nameHi: 'एमआरआई घुटना जोड़ (MRI Knee)',
     segment: 'scan',
     category: 'mri',
-    reportHrs: 24,
+    reportHrs: 6,
     fastingHrs: null,
-    about: 'Detailed images of knee ligaments and cartilage.',
-    aboutHi: 'घुटने के लिगामेंट इंजरी (ACL), मेनिस्कस टियर और कार्टिलेज की अत्यंत सटीक इमेजिंग।',
-    prep: 'Tell the centre about any implants. No metal on the body.',
-    prepHi: 'शरीर पर कोई धातु न हो। केंद्र को किसी भी इम्प्लांट की जानकारी दें।',
+    about: 'Detailed MRI of knee ligaments (ACL/PCL) and cartilage.',
+    aboutHi: 'घुटने के लिगामेंट (एसीएल/पीसीएल टियर), कार्टिलेज और मिनिसकस की सूक्ष्म जांच।',
+    prep: 'Remove all metallic items before the scan.',
+    prepHi: 'जांच से पहले सभी धातु की वस्तुएं उतार दें।',
   },
   {
     id: 'ecg',
-    name: 'ECG (12-lead)',
-    nameHi: 'ईसीजी (12-Lead ECG)',
+    name: 'ECG (12-Lead)',
+    nameHi: 'ईसीजी (12-लीड हृदय जांच)',
     segment: 'scan',
     category: 'ecg',
     reportHrs: 1,
     fastingHrs: null,
-    about: 'Records the electrical activity of your heart.',
-    aboutHi: 'हृदय की धड़कन, गति और विद्युत तरंगों को ग्राफ पर रिकॉर्ड कर हृदय स्वास्थ्य की जांच करता है।',
-    prep: 'No preparation. Wear loose clothing.',
-    prepHi: 'किसी तैयारी की आवश्यकता नहीं। ढीले और आरामदायक कपड़े पहनें।',
+    about: 'Records electrical activity of the heart for rhythm and ischemia.',
+    aboutHi: 'हृदय की धड़कन, गति और दिल के दौरे (एंजाइना) के शुरुआती लक्षणों की 12-लीड जांच।',
+    prep: 'No special prep. Keep relaxed.',
+    prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं। शांत रहें।',
   },
   {
     id: 'echo',
-    name: 'Echocardiography (2D Echo)',
-    nameHi: 'इकोकार्डियोग्राफी (2D Echo)',
+    name: '2D Echocardiography (ECHO)',
+    nameHi: '2D इकोकार्डियोग्राफी (2D Echo)',
     segment: 'scan',
     category: 'ecg',
     reportHrs: 2,
     fastingHrs: null,
-    about: 'Ultrasound of the heart showing how it pumps.',
-    aboutHi: 'हृदय के वाल्वों, रक्त पंप करने की क्षमता और मांसपेशियों की रीयल-टाइम अल्ट्रासाउंड जांच।',
-    prep: 'No preparation.',
+    about: 'Ultrasound of the beating heart to check pumping and valves.',
+    aboutHi: 'हृदय के वाल्व, पंपिंग क्षमता (इजेक्शन फ्रैक्शन) और कार्यप्रणाली का रंगीन अल्ट्रासाउंड।',
+    prep: 'No special preparation needed.',
     prepHi: 'किसी विशेष तैयारी की आवश्यकता नहीं है।',
   },
 
@@ -359,7 +366,7 @@ export const ITEMS: Item[] = [
   {
     id: 'pk-full',
     name: 'Complete Health Checkup',
-    nameHi: 'संपूर्ण स्वास्थ्य जांच',
+    nameHi: 'संपूर्ण स्वास्थ्य जांच (Full Body Checkup)',
     segment: 'package',
     category: 'package',
     reportHrs: 24,
@@ -449,67 +456,94 @@ const BASE: Record<string, number> = {
   'pk-women': 2600,
 };
 
+
+
 export const CENTRES: Centre[] = [
+  // --- Jaipur Verified Network Centres ---
   {
-    id: 'c1',
-    name: 'CityCare Diagnostics',
-    area: 'Saket',
-    distanceKm: 1.4,
-    rating: 4.7,
-    reviews: 420,
+    id: 'jp-c1',
+    name: 'Dr. Lal PathLabs - Surajpole',
+    nameHi: 'डॉ. लाल पैथलैब्स - सूरजपोल',
+    area: 'Surajpole Gate, Mohanbari, Jaipur',
+    areaHi: 'सूरजपोल गेट, मोहनबाड़ी, जयपुर',
+    distanceKm: 0.4,
+    rating: 4.8,
+    reviews: 680,
     home: true,
-    nextSlot: 'Today, 5:30 PM',
-    offers: ['lab', 'scan', 'package'],
-    factor: 1.0,
-  },
-  {
-    id: 'c2',
-    name: 'LifeLine Pathology',
-    area: 'Malviya Nagar',
-    distanceKm: 2.8,
-    rating: 4.5,
-    reviews: 260,
-    home: true,
-    nextSlot: 'Tomorrow, 7:00 AM',
+    nextSlot: 'Today, 5:00 PM',
     offers: ['lab', 'package'],
-    factor: 0.85,
+    factor: 1.0,
+    lat: 26.9212,
+    lng: 75.8455,
+    city: 'Jaipur',
   },
   {
-    id: 'c3',
-    name: 'Saket Imaging Centre',
-    area: 'Saket',
-    distanceKm: 1.9,
+    id: 'jp-c2',
+    name: 'Metropolis Healthcare - C-Scheme',
+    nameHi: 'मेट्रोपोलिस हेल्थकेयर - सी-स्कीम',
+    area: 'Ashok Marg, C-Scheme, Jaipur',
+    areaHi: 'अशोक मार्ग, सी-स्कीम, जयपुर',
+    distanceKm: 2.1,
+    rating: 4.7,
+    reviews: 490,
+    home: true,
+    nextSlot: 'Today, 6:30 PM',
+    offers: ['lab', 'scan', 'package'],
+    factor: 1.05,
+    lat: 26.9125,
+    lng: 75.8050,
+    city: 'Jaipur',
+  },
+  {
+    id: 'jp-c3',
+    name: 'SRL Diagnostics - MI Road',
+    nameHi: 'एसआरएल डायग्नोस्टिक्स - एमआई रोड',
+    area: 'Mirza Ismail Road, Jaipur',
+    areaHi: 'मिर्जा इस्माइल रोड, जयपुर',
+    distanceKm: 2.8,
     rating: 4.6,
     reviews: 310,
-    home: false,
-    nextSlot: 'Today, 6:15 PM',
-    offers: ['scan'],
-    factor: 0.9,
-    exclude: ['mri-brain', 'mri-knee'],
+    home: true,
+    nextSlot: 'Tomorrow, 7:00 AM',
+    offers: ['lab', 'scan', 'package'],
+    factor: 0.95,
+    lat: 26.9180,
+    lng: 75.8200,
+    city: 'Jaipur',
   },
   {
-    id: 'c4',
-    name: 'Green Park Labs',
-    area: 'Green Park',
-    distanceKm: 4.6,
+    id: 'jp-c4',
+    name: 'SMS Hospital Diagnostic Imaging Centre',
+    nameHi: 'एसएमएस अस्पताल डायग्नोस्टिक इमेजिंग सेंटर',
+    area: 'JLN Marg, Jaipur',
+    areaHi: 'जेएलएन मार्ग, जयपुर',
+    distanceKm: 3.6,
+    rating: 4.5,
+    reviews: 540,
+    home: false,
+    nextSlot: 'Today, 7:00 PM',
+    offers: ['lab', 'scan', 'package'],
+    factor: 0.85,
+    lat: 26.9038,
+    lng: 75.8172,
+    city: 'Jaipur',
+  },
+  {
+    id: 'jp-c5',
+    name: 'Thyrocare Wellness Centre - Raja Park',
+    nameHi: 'थायरोकेयर वेलनेस सेंटर - राजा पार्क',
+    area: 'Raja Park, Jaipur',
+    areaHi: 'राजा पार्क, जयपुर',
+    distanceKm: 4.3,
     rating: 4.4,
-    reviews: 180,
+    reviews: 220,
     home: true,
     nextSlot: 'Tomorrow, 8:00 AM',
     offers: ['lab', 'package'],
-    factor: 0.95,
-  },
-  {
-    id: 'c5',
-    name: 'Metro Scan & Lab',
-    area: 'Nehru Place',
-    distanceKm: 7.2,
-    rating: 4.8,
-    reviews: 540,
-    home: false,
-    nextSlot: 'Today, 7:45 PM',
-    offers: ['lab', 'scan', 'package'],
-    factor: 1.1,
+    factor: 0.90,
+    lat: 26.8920,
+    lng: 75.8300,
+    city: 'Jaipur',
   },
 ];
 
@@ -527,24 +561,66 @@ export const fromPrice = (item: Item): number => {
 export const homeAvailable = (item: Item): boolean =>
   CENTRES.some((c) => c.home && priceAt(item, c) !== null);
 
+// Haversine calculation for dynamic centre distances
+function calcLabDist(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
 // Centres that can do EVERY selected item, with the total at each one.
-export const centresFor = (items: Item[]): { centre: Centre; total: number }[] => {
+// Location-aware: recalculates distanceKm dynamically and prioritizes local centres
+export const centresFor = (
+  items: Item[],
+  userCoords?: { lat: number; lng: number } | null,
+  city?: string
+): { centre: Centre; total: number }[] => {
   if (!items.length) return [];
   const out: { centre: Centre; total: number }[] = [];
-  for (const centre of CENTRES) {
+
+  const isJaipurUser = (city || '').toLowerCase().includes('jaipur') ||
+    (userCoords && userCoords.lat >= 26.0 && userCoords.lat <= 28.0 && userCoords.lng >= 75.0 && userCoords.lng <= 77.0);
+
+  for (const rawCentre of CENTRES) {
     let total = 0;
     let ok = true;
     for (const it of items) {
-      const p = priceAt(it, centre);
+      const p = priceAt(it, rawCentre);
       if (p === null) {
         ok = false;
         break;
       }
       total += p;
     }
-    if (ok) out.push({ centre, total });
+    if (ok) {
+      const centre = { ...rawCentre };
+      if (userCoords && centre.lat && centre.lng) {
+        centre.distanceKm = calcLabDist(userCoords.lat, userCoords.lng, centre.lat, centre.lng);
+      }
+      out.push({ centre, total });
+    }
   }
-  return out;
+
+  // Filter centres within active radius (e.g., Jaipur users only see Jaipur centres)
+  if (isJaipurUser) {
+    const jpOnly = out.filter(
+      (o) => o.centre.city?.toLowerCase().includes('jaipur') || (o.centre.distanceKm && o.centre.distanceKm <= 40)
+    );
+    if (jpOnly.length > 0) return jpOnly.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
+  } else if (userCoords) {
+    const nearby = out.filter((o) => (o.centre.distanceKm && o.centre.distanceKm <= 45));
+    if (nearby.length > 0) return nearby.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
+  }
+
+  return out.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
 };
 
 // Helper accessors for Hindi localization

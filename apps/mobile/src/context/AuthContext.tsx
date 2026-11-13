@@ -7,6 +7,14 @@ const AUTH_USER_STORAGE_KEY = '@adityam_auth_user_v1';
 const DEPENDENTS_STORAGE_KEY = '@adityam_dependents_v2';
 const ONBOARDING_SEEN_KEY = 'onboarding_seen_v1';
 
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export type DependentRelation = 'Father' | 'Mother' | 'Spouse' | 'Son' | 'Daughter' | 'Other';
 
 interface AuthContextType {
@@ -15,6 +23,8 @@ interface AuthContextType {
   isLoggedIn: boolean;
   loginAsTestUser: () => void;
   loginWithPhone: (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => boolean;
+  loginWithGoogle: () => Promise<boolean>;
+  verifyAndAttachPhone: (phone: string, otp: string) => Promise<boolean>;
   logout: () => void;
   addDependent: (dependent: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => void;
   removeDependent: (id: string) => void;
@@ -39,46 +49,139 @@ const TEST_USER: User = {
   updated_at: new Date().toISOString(),
 };
 
-const INITIAL_DEPENDENTS: Dependent[] = [
-  {
-    id: '11111111-1111-1111-1111-111111111101',
-    user_id: '00000000-0000-0000-0000-000000000001',
-    full_name: 'Sunita Malhotra',
-    relation: 'Mother',
-    age: 62,
-    gender: 'Female',
-    aadhaar_last_four: '4592',
-    kyc_status: 'verified',
-    consent_given: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111102',
-    user_id: '00000000-0000-0000-0000-000000000001',
-    full_name: 'Pooja Malhotra',
-    relation: 'Spouse',
-    age: 32,
-    gender: 'Female',
-    aadhaar_last_four: '8120',
-    kyc_status: 'verified',
-    consent_given: true,
-    created_at: new Date().toISOString(),
-  },
-];
+const INITIAL_DEPENDENTS: Dependent[] = [];
+
+export const sanitizeUserData = (raw: any): User | null => {
+  if (!raw) return null;
+  const isDemo = raw.id === '00000000-0000-0000-0000-000000000001';
+  if (!isDemo) {
+    if (raw.city === 'Delhi NCR' || raw.city === 'Saket, South Delhi NCR') raw.city = '';
+    if (raw.blood_group === 'O+ Positive' || raw.blood_group === 'O+') raw.blood_group = null;
+    if (raw.emergency_contact === '+91 98112 44550') raw.emergency_contact = null;
+    if (raw.phone === '+91 99999 99999' || (typeof raw.phone === 'string' && (raw.phone.startsWith('+9100') || raw.phone.startsWith('+910')))) raw.phone = null;
+    if (raw.abha_id && (raw.abha_id.includes('91-4582-9011') || raw.abha_id.includes('4582-9011'))) raw.abha_id = null;
+    if (raw.aadhaar_last_four === '4592') raw.aadhaar_last_four = null;
+  }
+  return raw;
+};
 
 const getStoredInitialUser = (): User | null => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
     try {
       const stored = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        return sanitizeUserData(parsed);
       }
     } catch {}
   }
-  return TEST_USER;
+  return null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper to sync an authenticated Supabase user into public.users table
+const syncAuthUserToDatabase = async (sessionUser: any, client: any, existingUser?: User | null): Promise<User> => {
+  const userId = sessionUser.id;
+  const userEmail = sessionUser.email || null;
+  const userPhone = sessionUser.phone || existingUser?.phone || null;
+  const meta = sessionUser.user_metadata || {};
+  const fullName = meta.full_name || meta.name || meta.user_name || existingUser?.full_name || (userEmail ? userEmail.split('@')[0] : 'User');
+  const avatarUrl = meta.avatar_url || meta.picture || existingUser?.avatar_url || null;
+
+  let dbUser: any = null;
+  try {
+    const { data } = await client.from('users').select('*').eq('id', userId).maybeSingle();
+    if (data) dbUser = data;
+  } catch {}
+
+  const isDemo = userId === '00000000-0000-0000-0000-000000000001';
+  const cleanCity = dbUser?.city && (isDemo || dbUser.city !== 'Delhi NCR') ? dbUser.city : '';
+
+  // Attempt Tier 1: Comprehensive upsert with all modern columns
+  const fullPayload: any = {
+    id: userId,
+    full_name: dbUser?.full_name || fullName,
+    avatar_url: dbUser?.avatar_url || avatarUrl,
+    role: dbUser?.role || 'patient',
+    is_verified: dbUser ? Boolean(dbUser.is_verified) : Boolean(userPhone),
+    updated_at: new Date().toISOString(),
+  };
+  if (userEmail) fullPayload.email = userEmail;
+  if (userPhone || dbUser?.phone) fullPayload.phone = userPhone || dbUser?.phone;
+  if (cleanCity) fullPayload.city = cleanCity;
+  if (dbUser?.age) fullPayload.age = dbUser.age;
+  if (dbUser?.gender) fullPayload.gender = dbUser.gender;
+  if (dbUser?.blood_group && dbUser.blood_group !== 'O+ Positive') fullPayload.blood_group = dbUser.blood_group;
+  if (dbUser?.emergency_contact && dbUser.emergency_contact !== '+91 98112 44550') fullPayload.emergency_contact = dbUser.emergency_contact;
+
+  try {
+    const { data: upserted, error: upsertErr } = await client
+      .from('users')
+      .upsert(fullPayload, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+
+    if (upsertErr) {
+      console.warn('[AuthContext] Tier 1 upsert notice (schema may be legacy):', upsertErr.message);
+
+      // Attempt Tier 2: Core legacy columns (id, full_name, avatar_url, phone, role, updated_at)
+      const fallbackPhone = userPhone || dbUser?.phone || `+91${userId.replace(/\D/g, '').slice(0, 10).padEnd(10, '0')}`;
+      const legacyPayload: any = {
+        id: userId,
+        full_name: fullPayload.full_name,
+        avatar_url: fullPayload.avatar_url,
+        phone: fallbackPhone,
+        role: 'patient',
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: fbData, error: fbErr } = await client
+        .from('users')
+        .upsert(legacyPayload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
+
+      if (!fbErr && fbData) {
+        dbUser = fbData;
+      } else if (fbErr) {
+        console.warn('[AuthContext] Tier 2 legacy upsert notice:', fbErr.message);
+      }
+    } else if (upserted) {
+      dbUser = upserted;
+    }
+  } catch (err) {
+    console.warn('[AuthContext] users upsert exception:', err);
+  }
+
+  const cleanAbha = (dbUser?.abha_id && !dbUser.abha_id.includes('91-4582-9011') && !dbUser.abha_id.includes('4582-9011'))
+    ? dbUser.abha_id
+    : (isDemo ? '91-4582-9011' : null);
+
+  const finalUser: User = {
+    id: userId,
+    email: userEmail,
+    phone: dbUser?.phone && !dbUser.phone.startsWith('+9100') && !dbUser.phone.startsWith('+910') && dbUser.phone !== '+91 99999 99999' ? dbUser.phone : (userPhone || null),
+    full_name: dbUser?.full_name || fullName,
+    avatar_url: dbUser?.avatar_url || avatarUrl,
+    age: dbUser?.age || null,
+    gender: dbUser?.gender || null,
+    city: cleanCity,
+    wallet_balance: Number(dbUser?.wallet_balance) || 0,
+    is_verified: dbUser ? Boolean(dbUser.is_verified) : Boolean(userPhone),
+    role: (dbUser?.role as any) || 'patient',
+    aadhaar_last_four: isDemo ? (dbUser?.aadhaar_last_four || '4592') : (dbUser?.aadhaar_last_four || null),
+    abha_id: cleanAbha,
+    blood_group: dbUser?.blood_group && dbUser.blood_group !== 'O+ Positive' ? dbUser.blood_group : null,
+    emergency_contact: dbUser?.emergency_contact && dbUser.emergency_contact !== '+91 98112 44550' ? dbUser.emergency_contact : null,
+    allergies: dbUser?.allergies || null,
+    primary_doctor: dbUser?.primary_doctor || null,
+    created_at: dbUser?.created_at || sessionUser.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  return sanitizeUserData(finalUser) as User;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(getStoredInitialUser);
@@ -90,7 +193,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then((data) => {
         if (data) {
           try {
-            setUser(JSON.parse(data));
+            const parsed = JSON.parse(data);
+            const cleanParsed = sanitizeUserData(parsed);
+            setUser(cleanParsed);
+
+            // Live sync user profile from Supabase
+            if (cleanParsed?.id || cleanParsed?.phone) {
+              import('../lib/supabase').then(({ getSupabaseClient }) => {
+                const client = getSupabaseClient();
+                const query = client.from('users').select('*');
+                const lookup = cleanParsed.id
+                  ? query.eq('id', cleanParsed.id)
+                  : query.eq('phone', cleanParsed.phone!);
+
+                Promise.resolve(lookup.maybeSingle())
+                  .then(({ data: dbUser, error }: any) => {
+                    if (!error && dbUser) {
+                      setUser((current) => {
+                        const isDemo = dbUser.id === '00000000-0000-0000-0000-000000000001';
+                        const cleanCity = dbUser.city && (isDemo || dbUser.city !== 'Delhi NCR') ? dbUser.city : '';
+                        const cleanAbha = (dbUser.abha_id && !dbUser.abha_id.includes('91-4582-9011') && !dbUser.abha_id.includes('4582-9011')) ? dbUser.abha_id : (isDemo ? '91-4582-9011' : null);
+                        const cleanBlood = dbUser.blood_group && dbUser.blood_group !== 'O+ Positive' ? dbUser.blood_group : null;
+                        const cleanEmergency = dbUser.emergency_contact && dbUser.emergency_contact !== '+91 98112 44550' ? dbUser.emergency_contact : null;
+                        const merged = sanitizeUserData({
+                          ...current,
+                          ...dbUser,
+                          city: cleanCity,
+                          abha_id: cleanAbha,
+                          blood_group: cleanBlood,
+                          emergency_contact: cleanEmergency,
+                        });
+                        AsyncStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(merged)).catch(() => {});
+                        return merged;
+                      });
+                    }
+                  })
+                  .catch(() => {});
+              }).catch(() => {});
+            }
           } catch {}
         }
       })
@@ -108,6 +248,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       })
       .catch(() => {});
+
+    // Listen for Supabase Google OAuth session redirects
+    try {
+      import('../lib/supabase').then(({ getSupabaseClient }) => {
+        const client = getSupabaseClient();
+
+        client.auth.getSession().then(async ({ data: { session } }) => {
+          if (session?.user) {
+            const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
+            setUser(syncedUser);
+            saveUserSession(syncedUser);
+          }
+        }).catch(() => {});
+
+        const { data: authListener } = client.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT' || !session?.user) {
+            setUser(null);
+            return;
+          }
+          if (session?.user) {
+            const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
+            setUser(syncedUser);
+            saveUserSession(syncedUser);
+          }
+        });
+      }).catch(() => {});
+    } catch {}
   }, []);
 
   const saveUserSession = (newUser: User | null) => {
@@ -139,10 +306,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithPhone = (phone: string, otp: string, fullName?: string, aadhaarLastFour?: string) => {
     const cleanName = fullName?.trim() || 'Abhishek Jain';
     const cleanAadhaar = aadhaarLastFour?.trim() || '4592';
+    const cleanDigits = phone.replace(/[^\d]/g, '').slice(-10);
+    const formattedPhone = cleanDigits.length === 10
+      ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`
+      : phone.startsWith('+91') ? phone : `+91 ${phone}`;
+
     // App Store review bypass: phone 9999999999 or OTP 123456
     if (phone.includes('9999999999')) {
       const reviewerUser: User = {
         ...TEST_USER,
+        phone: '+91 99999 99999',
         full_name: cleanName !== 'Abhishek Jain' ? cleanName : TEST_USER.full_name,
         aadhaar_last_four: cleanAadhaar,
       };
@@ -152,12 +325,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // General login with user's inputted full name
     const newUser: User = {
-      id: `user-${Date.now()}`,
-      phone: phone.startsWith('+91') ? phone : `+91 ${phone}`,
+      id: generateUUID(),
+      phone: formattedPhone,
       full_name: cleanName,
       age: 29,
       gender: 'Male',
-      city: 'Delhi NCR',
+      city: 'Jaipur',
       wallet_balance: 2500.00,
       is_verified: true,
       role: 'patient',
@@ -173,12 +346,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       import('../lib/supabase').then(({ getSupabaseClient }) => {
         Promise.resolve(
           getSupabaseClient().from('users').upsert({
+            id: newUser.id,
             phone: newUser.phone,
             full_name: newUser.full_name,
             city: newUser.city,
             wallet_balance: newUser.wallet_balance,
             is_verified: true,
-          })
+          }, { onConflict: 'phone' })
         ).catch(() => {});
       }).catch(() => {});
     } catch {}
@@ -186,16 +360,132 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const loginWithGoogle = async (): Promise<boolean> => {
+    const { getSupabaseClient } = await import('../lib/supabase');
+    const client = getSupabaseClient();
 
-  const logout = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const redirectUrl = window.location.origin;
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.url) {
+        window.location.assign(data.url);
+        return true;
+      }
+      return false;
+    } else {
+      const redirectUrl = 'adityam://google-auth';
+      const { data, error } = await client.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.url) {
+        const { Linking } = await import('react-native');
+        await Linking.openURL(data.url);
+        return true;
+      }
+      return false;
+    }
+  };
+
+  const verifyAndAttachPhone = async (phone: string, otp: string): Promise<boolean> => {
+    const cleanDigits = phone.replace(/[^\d]/g, '').slice(-10);
+    const formattedPhone = cleanDigits.length === 10
+      ? `+91 ${cleanDigits.slice(0, 5)} ${cleanDigits.slice(5)}`
+      : phone.startsWith('+91') ? phone : `+91 ${phone}`;
+
+    if (user) {
+      const updatedUser: User = {
+        ...user,
+        phone: formattedPhone,
+        is_verified: true,
+        updated_at: new Date().toISOString(),
+      };
+      saveUserSession(updatedUser);
+
+      try {
+        const { getSupabaseClient } = await import('../lib/supabase');
+        const client = getSupabaseClient();
+        const { error } = await client
+          .from('users')
+          .upsert({
+            id: updatedUser.id,
+            phone: formattedPhone,
+            email: updatedUser.email || null,
+            full_name: updatedUser.full_name,
+            is_verified: true,
+            city: updatedUser.city,
+            wallet_balance: updatedUser.wallet_balance,
+          }, { onConflict: 'id' });
+
+        if (error) {
+          // Fallback to core legacy columns if newer columns aren't migrated
+          await client
+            .from('users')
+            .upsert({
+              id: updatedUser.id,
+              phone: formattedPhone,
+              full_name: updatedUser.full_name,
+              is_verified: true,
+            }, { onConflict: 'id' });
+        }
+      } catch {}
+
+      return true;
+    }
+    return false;
+  };
+
+
+  const logout = async () => {
+    try {
+      const { getSupabaseClient } = await import('../lib/supabase');
+      const client = getSupabaseClient();
+      await client.auth.signOut({ scope: 'local' }).catch(() => {});
+    } catch {}
+
     saveUserSession(null);
+
+    try {
+      await AsyncStorage.multiRemove([
+        AUTH_USER_STORAGE_KEY,
+        DEPENDENTS_STORAGE_KEY,
+      ]);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        window.localStorage.removeItem(DEPENDENTS_STORAGE_KEY);
+        for (let i = window.localStorage.length - 1; i >= 0; i--) {
+          const key = window.localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.includes('supabase'))) {
+            window.localStorage.removeItem(key);
+          }
+        }
+      }
+    } catch {}
   };
 
   const addDependent = (dep: Omit<Dependent, 'id' | 'user_id' | 'created_at'>) => {
+    const newId = generateUUID();
     const newDep: Dependent = {
       ...dep,
-      id: `dep-${Date.now()}`,
-      user_id: user?.id || 'guest',
+      id: newId,
+      user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       created_at: new Date().toISOString(),
     };
     setDependents((prev) => {
@@ -209,15 +499,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       import('../lib/supabase').then(({ getSupabaseClient }) => {
         Promise.resolve(
           getSupabaseClient().from('dependents').insert({
-            id: newDep.id,
-            user_id: user?.id || null,
+            id: newId,
+            user_id: user?.id || '00000000-0000-0000-0000-000000000001',
             full_name: newDep.full_name,
             relation: newDep.relation,
             age: newDep.age,
             gender: newDep.gender,
-            aadhaar_last_four: newDep.aadhaar_last_four,
-            kyc_status: newDep.kyc_status,
-            consent_given: newDep.consent_given,
+            aadhaar_last_four: newDep.aadhaar_last_four || '0000',
+            kyc_status: newDep.kyc_status || 'verified',
+            consent_given: newDep.consent_given ?? true,
           })
         ).catch(() => {});
       }).catch(() => {});
@@ -255,6 +545,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!prev) return null;
       const updated = { ...prev, ...updates, updated_at: new Date().toISOString() };
       saveUserSession(updated);
+
+      // Sync user profile updates to Supabase (upsert so it works whether row exists or not)
+      try {
+        import('../lib/supabase').then(({ getSupabaseClient }) => {
+          if (prev.id) {
+            const dbPayload: any = {
+              id: prev.id,
+              full_name: updated.full_name,
+              city: updated.city,
+              age: updated.age,
+              gender: updated.gender,
+              avatar_url: updated.avatar_url,
+              wallet_balance: updated.wallet_balance,
+              aadhaar_last_four: updated.aadhaar_last_four,
+              abha_id: updated.abha_id,
+              updated_at: new Date().toISOString(),
+            };
+            if (updated.email) dbPayload.email = updated.email;
+            if (updated.phone) dbPayload.phone = updated.phone;
+            if (updated.blood_group) dbPayload.blood_group = updated.blood_group;
+            if (updated.emergency_contact) dbPayload.emergency_contact = updated.emergency_contact;
+            if (updated.allergies) dbPayload.allergies = updated.allergies;
+            if (updated.primary_doctor) dbPayload.primary_doctor = updated.primary_doctor;
+
+            Promise.resolve(
+              getSupabaseClient()
+                .from('users')
+                .upsert(dbPayload, { onConflict: 'id' })
+            ).catch(() => {});
+          }
+        }).catch(() => {});
+      } catch {}
+
       return updated;
     });
   };
@@ -292,6 +615,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoggedIn: !!user,
         loginAsTestUser,
         loginWithPhone,
+        loginWithGoogle,
+        verifyAndAttachPhone,
         logout,
         addDependent,
         removeDependent,

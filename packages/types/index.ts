@@ -7,7 +7,8 @@ export type UserRole = 'patient' | 'admin' | 'call_center_agent' | 'partner';
 
 export interface User {
   id: string;
-  phone: string;
+  phone?: string | null;
+  email?: string | null;
   full_name: string | null;
   age: number | null;
   gender: string | null;
@@ -18,6 +19,10 @@ export interface User {
   avatar_url?: string | null;
   aadhaar_last_four?: string | null;
   abha_id?: string | null;
+  blood_group?: string | null;
+  emergency_contact?: string | null;
+  allergies?: string | null;
+  primary_doctor?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,11 +37,32 @@ export interface Dependent {
   relation: DependentRelation;
   age: number;
   gender: string;
+  phone?: string | null;
   aadhaar_last_four?: string | null;
   kyc_status: KycStatus;
   consent_given: boolean;
   created_at: string;
   updated_at?: string;
+}
+
+export type AddressType = 'Home' | 'Work' | 'Other';
+
+export interface UserAddress {
+  id: string;
+  user_id?: string;
+  type: AddressType;
+  label?: string;
+  house_flat: string;
+  landmark_street: string;
+  city: string;
+  state?: string;
+  pincode: string;
+  latitude?: number;
+  longitude?: number;
+  is_default?: boolean;
+  contact_person?: string;
+  contact_phone?: string;
+  created_at?: string;
 }
 
 export interface Doctor {
@@ -110,7 +136,10 @@ export type BookingStatus =
   | 'CALLING' 
   | 'CONFIRMED' 
   | 'CANCELLED' 
-  | 'PAID';
+  | 'PAID'
+  | 'COMPLETED'
+  | 'SERVED'
+  | 'MISSED';
 
 export type CallStatus = 'pending' | 'calling' | 'connected' | 'completed' | 'missed';
 

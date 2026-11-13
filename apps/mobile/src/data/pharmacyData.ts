@@ -25,54 +25,7 @@ export interface HistoryItem {
   items: BillLine[];
 }
 
-export const INITIAL_HISTORY: HistoryItem[] = [
-  {
-    ref: 'RX-5730',
-    shop: 'Saket Care Pharmacy',
-    shopHi: 'साकेत केयर फार्मेसी',
-    shopAddress: 'Shop 4, Main Market, Saket, South Delhi',
-    shopPhone: '+91 98112 34567',
-    total: 306,
-    subtotal: 360,
-    discount: 54,
-    deliveryFee: 0,
-    mode: 'delivery',
-    paidInApp: true,
-    date: '19 Oct 2026, 04:30 PM',
-    status: 'delivered',
-    patientName: 'Myself (Rahul Sharma)',
-    items: [
-      {
-        id: 'm1',
-        name: 'Paracetamol 500 mg (10 tablets)',
-        nameHi: 'पैरासिटामोल 500 मि.ग्रा. (10 गोलियां)',
-        qty: 2,
-        price: 30,
-      },
-      {
-        id: 'm2',
-        name: 'Azithromycin 500 mg (3 tablets)',
-        nameHi: 'एज़िथ्रोमाइसिन 500 मि.ग्रा. (3 गोलियां)',
-        qty: 1,
-        price: 120,
-      },
-      {
-        id: 'm3',
-        name: 'Cetirizine 10 mg (10 tablets)',
-        nameHi: 'सिट्रीज़िन 10 मि.ग्रा. (10 गोलियां)',
-        qty: 1,
-        price: 40,
-      },
-      {
-        id: 'm4',
-        name: 'Vitamin D3 60000 IU (4 capsules)',
-        nameHi: 'विटामिन D3 60000 IU (4 कैप्सूल)',
-        qty: 1,
-        price: 140,
-      },
-    ],
-  },
-];
+export const INITIAL_HISTORY: HistoryItem[] = [];
 
 /**
  * Generates clean, print-ready HTML for tax invoice & receipt
@@ -119,8 +72,8 @@ export function generateInvoiceHtml(order: HistoryItem): string {
         <div>
           <strong>Billed By (Partner Pharmacy):</strong><br/>
           ${order.shop}<br/>
-          ${order.shopAddress || 'Saket, New Delhi 110017'}<br/>
-          Helpline: ${order.shopPhone || '+91 98112 34567'}
+          ${order.shopAddress || 'Surajpole Gate, Mohanbari, Jaipur - 302003'}<br/>
+          Helpline: ${order.shopPhone || '+91 82713 10911'}
         </div>
         <div style="text-align: right;">
           <strong>Patient & Delivery Details:</strong><br/>

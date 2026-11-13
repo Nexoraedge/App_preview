@@ -47,6 +47,7 @@ interface AdmissionBookingSheetProps {
   isSubmitting: boolean;
   onSubmit: () => void;
   confirmedBookingId: string | null;
+  onViewAppointments?: () => void;
 }
 
 export function AdmissionBookingSheet({
@@ -68,6 +69,7 @@ export function AdmissionBookingSheet({
   isSubmitting,
   onSubmit,
   confirmedBookingId,
+  onViewAppointments,
 }: AdmissionBookingSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -261,28 +263,55 @@ export function AdmissionBookingSheet({
                   : 'Our senior medical advisor will call you within 15 minutes to review hospital options, room availability, and help with insurance paperwork.'}
               </Text>
 
-              <TouchableOpacity
-                onPress={onClose}
-                style={{
-                  backgroundColor: '#2563EB',
-                  borderRadius: 12,
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                  marginTop: 20,
-                  width: '100%',
-                  alignItems: 'center',
-                }}
-              >
-                <Text
+              <View style={{ width: '100%', marginTop: 20, gap: 10 }}>
+                {onViewAppointments && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      onViewAppointments();
+                    }}
+                    style={{
+                      backgroundColor: '#2563EB',
+                      borderRadius: 12,
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      width: '100%',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 13,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {isHi ? 'मेरी अपॉइंटमेंट्स देखें →' : 'View My Bookings →'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={onClose}
                   style={{
-                    color: '#FFFFFF',
-                    fontSize: 13,
-                    fontWeight: '700',
+                    backgroundColor: onViewAppointments ? '#F1F5F9' : '#2563EB',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    width: '100%',
+                    alignItems: 'center',
                   }}
                 >
-                  {isHi ? 'पूर्ण' : 'Done'}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={{
+                      color: onViewAppointments ? '#475569' : '#FFFFFF',
+                      fontSize: 13,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {isHi ? 'पूर्ण' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             /* Booking Form */

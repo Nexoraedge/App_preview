@@ -33,6 +33,8 @@ export function InvoiceDetailsModal({
   const insets = useSafeAreaInsets();
   if (!order) return null;
 
+  const isAwaitingQuote = order.total === 0 || order.items.length === 0;
+
   return (
     <SheetFrame
       visible={!!order}
@@ -52,9 +54,9 @@ export function InvoiceDetailsModal({
         {/* Status Hero Card */}
         <View
           style={{
-            backgroundColor: '#F0FDF4',
+            backgroundColor: isAwaitingQuote ? '#EFF6FF' : '#F0FDF4',
             borderWidth: 1,
-            borderColor: '#BBF7D0',
+            borderColor: isAwaitingQuote ? '#BFDBFE' : '#BBF7D0',
             borderRadius: R.xl,
             padding: 16,
           }}
@@ -74,17 +76,23 @@ export function InvoiceDetailsModal({
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  backgroundColor: '#16A34A',
+                  backgroundColor: isAwaitingQuote ? '#2563EB' : '#16A34A',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Check size={16} color="#FFFFFF" strokeWidth={3} />
+                {isAwaitingQuote ? (
+                  <Clock size={16} color="#FFFFFF" strokeWidth={2.5} />
+                ) : (
+                  <Check size={16} color="#FFFFFF" strokeWidth={3} />
+                )}
               </View>
               <Text
-                style={{ fontSize: 16, fontWeight: '800', color: '#166534' }}
+                style={{ fontSize: 16, fontWeight: '800', color: isAwaitingQuote ? '#1D4ED8' : '#166534' }}
               >
-                {isHi ? 'ऑर्डर डिलीवर हो गया' : 'Order Delivered'}
+                {isAwaitingQuote
+                  ? (isHi ? 'पर्चा प्राप्त • सत्यापन जारी' : 'Prescription Under Review')
+                  : (isHi ? 'ऑर्डर डिलीवर हो गया' : 'Order Delivered')}
               </Text>
             </View>
             <View
@@ -94,11 +102,11 @@ export function InvoiceDetailsModal({
                 paddingVertical: 4,
                 borderRadius: R.pill,
                 borderWidth: 1,
-                borderColor: '#BBF7D0',
+                borderColor: isAwaitingQuote ? '#BFDBFE' : '#BBF7D0',
               }}
             >
               <Text
-                style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}
+                style={{ fontSize: 12, fontWeight: '800', color: isAwaitingQuote ? '#1D4ED8' : '#166534' }}
               >
                 #{order.ref}
               </Text>
@@ -113,11 +121,13 @@ export function InvoiceDetailsModal({
               lineHeight: 18,
             }}
           >
-            {isHi
-              ? `आपकी दवाइयां ${
-                  order.shopHi || order.shop
-                } द्वारा सफलतापूर्वक आपके पते पर पहुंचा दी गई हैं।`
-              : `Your medicines from ${order.shop} were safely delivered to your address.`}
+            {isAwaitingQuote
+              ? (isHi
+                  ? `${order.shopHi || order.shop} द्वारा आपका पर्चा प्राप्त हो गया है। फार्मासिस्ट दवाओं की उपलब्धता जांच कर डिजिटल बिल तैयार कर रहे हैं।`
+                  : `Your prescription slip has been received by ${order.shop}. The pharmacist is checking stocks and preparing your digital invoice.`)
+              : (isHi
+                  ? `आपकी दवाइयां ${order.shopHi || order.shop} द्वारा सफलतापूर्वक आपके पते पर पहुंचा दी गई हैं।`
+                  : `Your medicines from ${order.shop} were safely delivered to your address.`)}
           </Text>
 
           <View
@@ -128,30 +138,30 @@ export function InvoiceDetailsModal({
               marginTop: 12,
               paddingTop: 10,
               borderTopWidth: 1,
-              borderTopColor: '#DCFCE7',
+              borderTopColor: isAwaitingQuote ? '#DBEAFE' : '#DCFCE7',
             }}
           >
             <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
-              <Clock size={13} color="#15803D" />
+              <Clock size={13} color={isAwaitingQuote ? '#1D4ED8' : '#15803D'} />
               <Text
-                style={{ fontSize: 12, fontWeight: '600', color: '#15803D' }}
+                style={{ fontSize: 12, fontWeight: '600', color: isAwaitingQuote ? '#1D4ED8' : '#15803D' }}
               >
                 {order.date}
               </Text>
             </View>
-            <Text style={{ color: '#86EFAC' }}>•</Text>
+            <Text style={{ color: isAwaitingQuote ? '#93C5FD' : '#86EFAC' }}>•</Text>
             <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
               {order.mode === 'delivery' ? (
-                <Truck size={13} color="#15803D" />
+                <Truck size={13} color={isAwaitingQuote ? '#1D4ED8' : '#15803D'} />
               ) : (
-                <Store size={13} color="#15803D" />
+                <Store size={13} color={isAwaitingQuote ? '#1D4ED8' : '#15803D'} />
               )}
               <Text
-                style={{ fontSize: 12, fontWeight: '600', color: '#15803D' }}
+                style={{ fontSize: 12, fontWeight: '600', color: isAwaitingQuote ? '#1D4ED8' : '#15803D' }}
               >
                 {order.mode === 'delivery'
                   ? isHi
@@ -183,13 +193,13 @@ export function InvoiceDetailsModal({
               {order.shop}
             </Text>
             <Text style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
-              {order.shopAddress || 'Saket Main Market, New Delhi'}
+              {order.shopAddress || 'Jaipur Network Partner'}
             </Text>
           </View>
 
           <TouchableOpacity
             onPress={() =>
-              Linking.openURL(`tel:${order.shopPhone || '+919811234567'}`).catch(
+              Linking.openURL(`tel:${order.shopPhone || '+911412601122'}`).catch(
                 () => {}
               )
             }
@@ -232,31 +242,45 @@ export function InvoiceDetailsModal({
               marginBottom: 10,
             }}
           >
-            {isHi ? 'आइटम व दवाएं' : 'Medicines Billed'}
+            {isHi ? 'दवाओं का विवरण' : 'Medicines & Prescription'}
           </Text>
 
-          <View style={{ gap: 8 }}>
-            {order.items.map((it) => (
-              <View
-                key={it.id}
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                }}
-              >
-                <Text style={{ flex: 1, fontSize: 13, color: C.ink }}>
-                  {isHi && it.nameHi ? it.nameHi : it.name}
-                  {it.qty > 1 ? `  ×${it.qty}` : ''}
-                </Text>
-                <Text
-                  style={{ fontSize: 13, color: C.ink, fontWeight: '600' }}
+          {isAwaitingQuote ? (
+            <View style={{ paddingVertical: 12, alignItems: 'center', gap: 6 }}>
+              <Clock size={24} color="#2563EB" />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A', textAlign: 'center' }}>
+                {isHi ? 'पर्चे का सत्यापन जारी है' : 'Prescription Under Pharmacist Review'}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', lineHeight: 17 }}>
+                {isHi
+                  ? 'फार्मासिस्ट आपके पर्चे की जांच कर रहे हैं। दवाओं की उपलब्धता व बिल तैयार होते ही आपको सूचित किया जाएगा।'
+                  : 'The pharmacist has received your prescription slip and is matching stocks. The itemized bill will be ready shortly.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              {order.items.map((it) => (
+                <View
+                  key={it.id}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
                 >
-                  {inr(it.price * it.qty)}
-                </Text>
-              </View>
-            ))}
-          </View>
+                  <Text style={{ flex: 1, fontSize: 13, color: C.ink }}>
+                    {isHi && it.nameHi ? it.nameHi : it.name}
+                    {it.qty > 1 ? `  ×${it.qty}` : ''}
+                  </Text>
+                  <Text
+                    style={{ fontSize: 13, color: C.ink, fontWeight: '600' }}
+                  >
+                    {inr(it.price * it.qty)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View
             style={{
@@ -273,7 +297,7 @@ export function InvoiceDetailsModal({
               {isHi ? 'एमआरपी योग' : 'MRP Subtotal'}
             </Text>
             <Text style={{ fontSize: 13, color: C.ink }}>
-              {inr(order.subtotal)}
+              {isAwaitingQuote ? (isHi ? 'बिलिंग प्रतीक्षारत' : 'Pending Quote') : inr(order.subtotal)}
             </Text>
           </View>
 
@@ -288,7 +312,7 @@ export function InvoiceDetailsModal({
               {isHi ? 'आदित्यम नेटवर्क छूट' : 'Adityam Network Discount'}
             </Text>
             <Text style={{ fontSize: 13, color: '#16A34A', fontWeight: '600' }}>
-              − {inr(order.discount)}
+              {isAwaitingQuote ? (isHi ? 'बिल पर लागू होगी' : 'Applicable on Bill') : `− ${inr(order.discount)}`}
             </Text>
           </View>
 
@@ -305,17 +329,19 @@ export function InvoiceDetailsModal({
             <Text style={{ fontSize: 15, fontWeight: '800', color: C.ink }}>
               {isHi ? 'कुल भुगतान' : 'Total Paid'}
             </Text>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: C.ink }}>
-              {inr(order.total)}
+            <Text style={{ fontSize: 15, fontWeight: '800', color: isAwaitingQuote ? '#2563EB' : C.ink }}>
+              {isAwaitingQuote ? (isHi ? 'मूल्यांकन जारी' : 'Quote In Progress') : inr(order.total)}
             </Text>
           </View>
         </View>
 
         {/* Download Invoice Button */}
-        <PrimaryButton
-          label={isHi ? 'टैक्स इनवॉइस डाउनलोड करें' : 'Download Tax Invoice'}
-          onPress={() => onDownloadInvoice(order)}
-        />
+        {!isAwaitingQuote && (
+          <PrimaryButton
+            label={isHi ? 'टैक्स इनवॉइस डाउनलोड करें' : 'Download Tax Invoice'}
+            onPress={() => onDownloadInvoice(order)}
+          />
+        )}
       </ScrollView>
     </SheetFrame>
   );
