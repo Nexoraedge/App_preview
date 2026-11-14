@@ -335,6 +335,25 @@ export function CentreSelectionSheet({
               </View>
             </View>
 
+            {options.length > 0 && nearestDistance !== null && nearestDistance > 35 && (
+              <View
+                style={{
+                  marginTop: 10,
+                  backgroundColor: C.warnSoft,
+                  borderRadius: R.md,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: '#FDE68A',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: C.warn, lineHeight: 17 }}>
+                  {isHi
+                    ? '📍 आपकी वर्तमान लोकेशन जयपुर सेवा क्षेत्र (25 km) से बाहर है। आप जयपुर केंद्र पर विज़िट बुक कर सकते हैं या अपनी लोकेशन बदल सकते हैं।'
+                    : '📍 Your location is outside our 25 km Jaipur home-collection radius. Showing Jaipur partner centres for walk-in visits.'}
+                </Text>
+              </View>
+            )}
+
             {options.length > 0 && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                 {(
@@ -485,10 +504,16 @@ export function CentreSelectionSheet({
                           tone="good"
                         />
                       )}
-                      {centre.home && segment !== 'scan' && (
+                      {centre.home && segment !== 'scan' && centre.distanceKm <= 25 && (
                         <Chip
                           label={isHi ? 'घर पर सैंपल' : 'Home collection'}
                           icon={<HomeIcon size={11} color={C.sub} />}
+                        />
+                      )}
+                      {centre.home && segment !== 'scan' && centre.distanceKm > 25 && (
+                        <Chip
+                          label={isHi ? 'केवल सेंटर विज़िट (>25 km)' : 'Centre visit only (>25 km)'}
+                          tone="warn"
                         />
                       )}
                     </View>

@@ -18,6 +18,7 @@ import {
   Platform,
   RefreshControl,
   StatusBar as RNStatusBar,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,6 +96,7 @@ export interface EnrichedAppointment {
   doctorFee: number;
   paymentStatus: 'PAID' | 'CANCELLED';
   prescriptionUrl?: string;
+  assignedAgent?: string;
   isUpcoming: boolean;
   notes?: string;
   createdDate: string;
@@ -104,6 +106,7 @@ export interface EnrichedAppointment {
 const SEED_APPOINTMENTS: EnrichedAppointment[] = [];
 
 type TabType = 'UPCOMING' | 'PAST' | 'ALL';
+type ServiceFilterType = 'ALL' | ServiceType;
 
 export default function AppointmentsScreen() {
   const insets = useSafeAreaInsets();
@@ -113,6 +116,7 @@ export default function AppointmentsScreen() {
   const isHi = language === 'hi';
 
   const [activeTab, setActiveTab] = useState<TabType>('UPCOMING');
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [appointments, setAppointments] = useState<EnrichedAppointment[]>(SEED_APPOINTMENTS);
   const [selectedAppointment, setSelectedAppointment] = useState<EnrichedAppointment | null>(null);
@@ -139,11 +143,15 @@ export default function AppointmentsScreen() {
           const isMissed = b.status === 'MISSED';
           const slot = parseSlotDetails(b.slot_time, b.service_type, isHi);
 
-          // For fee display: IPD is cashless TPA coordination (0 consultation fee)
-          const fee =
-            b.service_type === 'IPD_ENQUIRY'
-              ? 0
-              : b.doctor_fee || (b.final_payable ? Number(b.final_payable) : 800);
+          // For fee display: IPD & Prescription uploads without finalized bills should show 0 (Quote Pending) rather than fallback 800
+          const isRxOrInquiry =
+            b.service_type === 'IPD_ENQUIRY' ||
+            b.service_type === 'PHARMACY_SCAN_PAY' ||
+            (b.booking_ref || '').includes('-RX-') ||
+            (b.booking_ref || '').includes('DOC-ADVICE');
+          const fee = isRxOrInquiry
+            ? Number(b.final_payable ?? b.bill_amount ?? b.doctor_fee ?? 0)
+            : Number(b.doctor_fee ?? b.final_payable ?? 800);
 
           return {
             id: b.id,
@@ -214,6 +222,8 @@ export default function AppointmentsScreen() {
                     : 'OPD Desk Room 101',
             doctorFee: fee,
             paymentStatus: (b.status === 'CANCELLED' ? 'CANCELLED' : 'PAID') as any,
+            prescriptionUrl: b.bill_image_url || undefined,
+            assignedAgent: b.assigned_agent || undefined,
             isUpcoming: isUpc,
             notes: b.notes || 'Hospital booking confirmed.',
             createdDate: new Date(b.created_at).toLocaleDateString(),
@@ -279,6 +289,10 @@ export default function AppointmentsScreen() {
       list = list.filter((a) => !a.isUpcoming);
     }
 
+    if (serviceFilter !== 'ALL') {
+      list = list.filter((a) => a.serviceType === serviceFilter);
+    }
+
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
     return list.filter(
@@ -292,10 +306,23 @@ export default function AppointmentsScreen() {
         a.bookingRef.toLowerCase().includes(q) ||
         a.patientName.toLowerCase().includes(q)
     );
-  }, [appointments, activeTab, searchQuery]);
+  }, [appointments, activeTab, serviceFilter, searchQuery]);
 
   const upcomingCount = useMemo(() => appointments.filter((a) => a.isUpcoming).length, [appointments]);
   const pastCount = useMemo(() => appointments.filter((a) => !a.isUpcoming).length, [appointments]);
+
+  const serviceCounts = useMemo(() => {
+    const tabScoped = appointments.filter((a) =>
+      activeTab === 'UPCOMING' ? a.isUpcoming : activeTab === 'PAST' ? !a.isUpcoming : true
+    );
+    return {
+      ALL: tabScoped.length,
+      OPD_CONCIERGE: tabScoped.filter((a) => a.serviceType === 'OPD_CONCIERGE').length,
+      INVESTIGATION: tabScoped.filter((a) => a.serviceType === 'INVESTIGATION').length,
+      PHARMACY_SCAN_PAY: tabScoped.filter((a) => a.serviceType === 'PHARMACY_SCAN_PAY').length,
+      IPD_ENQUIRY: tabScoped.filter((a) => a.serviceType === 'IPD_ENQUIRY').length,
+    };
+  }, [appointments, activeTab]);
 
   // Cancel Appointment Handler with permanent storage persistence
   const handleCancelAppointment = (apt: EnrichedAppointment) => {
@@ -670,6 +697,73 @@ export default function AppointmentsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* SERVICE CATEGORY FILTER PILLS */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingTop: 10, paddingBottom: 2 }}
+          >
+            {(
+              [
+                { id: 'ALL' as ServiceFilterType, label: isHi ? 'सभी सेवाएं' : 'All Services', count: serviceCounts.ALL },
+                { id: 'OPD_CONCIERGE' as ServiceFilterType, label: isHi ? 'ओपीडी डॉक्टर' : 'OPD Consult', count: serviceCounts.OPD_CONCIERGE },
+                { id: 'INVESTIGATION' as ServiceFilterType, label: isHi ? 'लैब व स्कैन' : 'Labs & Scans', count: serviceCounts.INVESTIGATION },
+                { id: 'PHARMACY_SCAN_PAY' as ServiceFilterType, label: isHi ? 'दवाएं (Pharmacy)' : 'Pharmacy', count: serviceCounts.PHARMACY_SCAN_PAY },
+                { id: 'IPD_ENQUIRY' as ServiceFilterType, label: isHi ? 'आईपीडी भर्ती' : 'Hospital IPD', count: serviceCounts.IPD_ENQUIRY },
+              ]
+            ).map((pill) => {
+              const active = serviceFilter === pill.id;
+              return (
+                <TouchableOpacity
+                  key={pill.id}
+                  onPress={() => setServiceFilter(pill.id)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6.5,
+                    borderRadius: 20,
+                    backgroundColor: active ? '#1E40AF' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: active ? '#1E40AF' : '#E2E8F0',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: active ? '700' : '600',
+                      color: active ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    {pill.label}
+                  </Text>
+                  {pill.count > 0 && (
+                    <View
+                      style={{
+                        backgroundColor: active ? 'rgba(255,255,255,0.22)' : '#F1F5F9',
+                        paddingHorizontal: 5.5,
+                        paddingVertical: 1,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '800',
+                          color: active ? '#FFFFFF' : '#475569',
+                        }}
+                      >
+                        {pill.count}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* SCROLLABLE APPOINTMENTS LIST */}
@@ -1018,6 +1112,10 @@ export default function AppointmentsScreen() {
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#7C3AED', marginTop: 2 }}>
                             {isHi ? 'कैशलेस टीपीए • सक्रिय' : 'Cashless TPA • Active'}
                           </Text>
+                        ) : apt.doctorFee === 0 && (apt.bookingRef.includes('-RX-') || apt.serviceType === 'PHARMACY_SCAN_PAY') ? (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706', marginTop: 2 }}>
+                            {isHi ? 'बिल कोटेशन प्रतीक्षित' : 'Quote Pending'}
+                          </Text>
                         ) : (
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669', marginTop: 2 }}>
                             {inr(apt.doctorFee)} {isHi ? '• भुगतान पूर्ण' : '• Paid'}
@@ -1025,6 +1123,117 @@ export default function AppointmentsScreen() {
                         )}
                       </View>
                     </View>
+
+                    {/* LIVE CARE COORDINATOR / AGENT CONNECT BANNER */}
+                    {isUpcoming &&
+                      (apt.bookingRef.includes('-RX-') ||
+                        apt.bookingRef.includes('DOC-ADVICE') ||
+                        apt.serviceType === 'IPD_ENQUIRY' ||
+                        (apt.serviceType === 'PHARMACY_SCAN_PAY' && apt.doctorFee === 0) ||
+                        Boolean(apt.assignedAgent)) && (
+                        <View
+                          style={{
+                            backgroundColor: '#EFF6FF',
+                            borderRadius: 12,
+                            padding: 10,
+                            marginTop: 10,
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 9,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 14,
+                              backgroundColor: '#DBEAFE',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <PhoneCall size={14} color="#1D4ED8" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#1E40AF' }}>
+                              {apt.assignedAgent
+                                ? isHi
+                                  ? `समन्वयक नियुक्त: ${apt.assignedAgent}`
+                                  : `Assigned Coordinator: ${apt.assignedAgent}`
+                                : isHi
+                                  ? 'केयर कोऑर्डिनेटर पर्चा जांच रहे हैं'
+                                  : 'Care Coordinator Reviewing Request'}
+                            </Text>
+                            <Text style={{ fontSize: 10.5, color: '#1D4ED8', marginTop: 1 }}>
+                              {isHi
+                                ? 'हमारे स्वास्थ्य एजेंट जल्द ही अंतिम बिल व समय की पुष्टि हेतु कॉल करेंगे।'
+                                : 'Our care desk agent will connect with you shortly to confirm details & bill.'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                    {/* UPLOADED PRESCRIPTION SLIP PREVIEW ON CARD */}
+                    {apt.prescriptionUrl && (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setSelectedAppointment(apt);
+                          setTicketModalVisible(true);
+                        }}
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 12,
+                          padding: 9,
+                          marginTop: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <Image
+                            source={{ uri: apt.prescriptionUrl }}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 8,
+                              backgroundColor: '#E2E8F0',
+                            }}
+                            resizeMode="cover"
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#0F172A' }}>
+                              {isHi ? 'अपलोड किया गया डॉक्टर पर्चा' : 'Uploaded Prescription Slip'}
+                            </Text>
+                            <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 1 }}>
+                              {isHi ? 'पूरा पर्चा देखने के लिए टैप करें' : 'Tap to preview full uploaded image'}
+                            </Text>
+                          </View>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: '#EFF6FF',
+                            paddingHorizontal: 8,
+                            paddingVertical: 5,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Eye size={12} color="#2563EB" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>
+                            {isHi ? 'देखें' : 'View'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
 
                     {/* REFUND STATUS STRIP FOR CANCELLED APPOINTMENTS */}
                     {isCancelled && (
@@ -1560,16 +1769,67 @@ export default function AppointmentsScreen() {
                     style={{
                       fontSize: 12.5,
                       fontWeight: '800',
-                      color: selectedAppointment?.serviceType === 'IPD_ENQUIRY' ? '#7C3AED' : '#059669',
+                      color:
+                        selectedAppointment?.serviceType === 'IPD_ENQUIRY'
+                          ? '#7C3AED'
+                          : selectedAppointment?.doctorFee === 0
+                            ? '#D97706'
+                            : '#059669',
                       textAlign: 'right',
                     }}
                   >
                     {selectedAppointment?.serviceType === 'IPD_ENQUIRY'
                       ? (isHi ? 'कैशलेस टीपीए समन्वय (निशुल्क)' : 'Cashless TPA Coordination (Free)')
-                      : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`}
+                      : selectedAppointment?.doctorFee === 0
+                        ? (isHi ? 'पर्चा समीक्षाधीन (एजेंट कॉल करेगा)' : 'Under Review (Agent Connecting)')
+                        : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`}
                   </Text>
                 </View>
               </View>
+
+              {/* Uploaded Prescription Image inside Modal */}
+              {selectedAppointment?.prescriptionUrl && (
+                <View
+                  style={{
+                    marginTop: 16,
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 16,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <FileText size={14} color="#2563EB" />
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+                        {isHi ? 'अपलोड किया गया पर्चा / स्लिप' : 'Uploaded Prescription / Doctor Slip'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (selectedAppointment.prescriptionUrl) {
+                          Linking.openURL(selectedAppointment.prescriptionUrl).catch(() => {});
+                        }
+                      }}
+                    >
+                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                        {isHi ? 'बड़ा करके देखें ↗' : 'Open Full ↗'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Image
+                    source={{ uri: selectedAppointment.prescriptionUrl }}
+                    style={{
+                      width: '100%',
+                      height: 190,
+                      borderRadius: 12,
+                      backgroundColor: '#E2E8F0',
+                    }}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
 
               {/* Pre-visit Guidance */}
               <View

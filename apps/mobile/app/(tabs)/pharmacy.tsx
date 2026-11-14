@@ -770,25 +770,58 @@ export default function PharmacyScreen() {
                   </Pressable>
                 </View>
 
-                {/* Location Notice if sample */}
+                {/* Out-of-radius / Location Notice */}
                 {locState !== 'asking' && isSample && (
                   <View
                     style={{
                       marginTop: 10,
                       backgroundColor: C.warnSoft,
                       borderRadius: R.md,
-                      padding: 11,
+                      padding: 12,
                       borderWidth: 1,
                       borderColor: '#FED7AA',
+                      gap: 8,
                     }}
                   >
                     <Text
-                      style={{ fontSize: 12, color: C.warn, lineHeight: 17 }}
+                      style={{ fontSize: 12, fontWeight: '700', color: C.warn, lineHeight: 17 }}
                     >
                       {isHi
-                        ? 'इस डेमो में आपकी लोकेशन के पास कोई फार्मेसी नहीं मिली, इसलिए अधिकृत नेटवर्क फार्मेसियां दिखाई जा रही हैं।'
-                        : 'Showing verified network partner pharmacies ready to fulfill your order.'}
+                        ? '📍 आपकी वर्तमान लोकेशन जयपुर डिलीवरी क्षेत्र (35 km) से बाहर है। नीचे हमारे अधिकृत जयपुर पार्टनर मेडिकल स्टोर दिखाए जा रहे हैं।'
+                        : '📍 Your current location is outside our 35 km Jaipur doorstep delivery radius. Showing our verified Jaipur partner pharmacies below.'}
                     </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      {mode === 'delivery' && (
+                        <Pressable
+                          onPress={() => setMode('pickup')}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#F59E0B',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#B45309' }}>
+                            {isHi ? 'दुकान से पिकअप चुनें' : 'Switch to Store Pickup'}
+                          </Text>
+                        </Pressable>
+                      )}
+                      <Pressable
+                        onPress={() => Linking.openURL('tel:+918271310911').catch(() => {})}
+                        style={{
+                          backgroundColor: '#B45309',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                          {isHi ? 'सहायता केंद्र कॉल करें' : 'Call Care Desk'}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
                 )}
 

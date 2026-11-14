@@ -78,8 +78,10 @@ export function LabBookingModal({
   const { members } = useFamily();
   const { activeAddress, currentLocationName } = useLocation();
 
-  // Mode: Home Sample Collection vs Diagnostic Centre Walk-in
-  const canDoHome = selectedCentre?.home && !selectedItems.some((i) => i.segment === 'scan');
+  // Mode: Home Sample Collection vs Diagnostic Centre Walk-in (Home collection active within 25 km radius)
+  const hasScanItems = selectedItems.some((i) => i.segment === 'scan');
+  const isWithinHomeRadius = (selectedCentre?.distanceKm ?? 0) <= 25;
+  const canDoHome = Boolean(selectedCentre?.home && isWithinHomeRadius && !hasScanItems);
   const [collectionMode, setCollectionMode] = useState<'HOME_COLLECTION' | 'CENTRE_VISIT'>('CENTRE_VISIT');
 
   const [selectedPatientId, setSelectedPatientId] = useState<string>('self');
@@ -439,6 +441,29 @@ export function LabBookingModal({
                   </View>
 
                   {/* 2. COLLECTION MODE SWITCHER */}
+                  {selectedCentre?.home && !hasScanItems && !isWithinHomeRadius && (
+                    <View
+                      style={{
+                        marginTop: 12,
+                        backgroundColor: '#FFFBEB',
+                        borderRadius: 12,
+                        padding: 10,
+                        borderWidth: 1,
+                        borderColor: '#FDE68A',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <MapPin size={15} color="#D97706" />
+                      <Text style={{ fontSize: 11.5, color: '#92400E', flex: 1, lineHeight: 16 }}>
+                        {isHi
+                          ? `आपकी लोकेशन जांच केंद्र से ${selectedCentre.distanceKm} km दूर है। होम सैंपल कलेक्शन 25 km के दायरे में उपलब्ध है — यह बुकिंग सेंटर विज़िट के रूप में होगी।`
+                          : `Your location is ${selectedCentre.distanceKm} km away. Free home sample collection is available within 25 km — this booking is set to Centre Walk-in.`}
+                      </Text>
+                    </View>
+                  )}
+
                   {canDoHome && (
                     <View style={{ marginTop: 14 }}>
                       <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
