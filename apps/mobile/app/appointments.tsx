@@ -1707,8 +1707,31 @@ export default function AppointmentsScreen() {
                           : `${isHi ? 'टोकन क्रमांक #' : 'Token #'}${selectedAppointment?.tokenNumber}`}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
-                    {isHi ? 'अस्पताल रिसेप्शन डेस्क पर यह QR कोड दिखाएं' : 'Scan at hospital reception for fast-track entry'}
+                    {selectedAppointment?.serviceType === 'PHARMACY_SCAN_PAY'
+                      ? isHi
+                        ? 'फार्मेसी काउंटर पर यह QR कोड या बुकिंग कोड दिखाएं'
+                        : 'Show this QR code or booking code at the pharmacy counter'
+                      : isHi
+                        ? 'अस्पताल रिसेप्शन डेस्क पर यह QR कोड दिखाएं'
+                        : 'Scan at hospital reception for fast-track entry'}
                   </Text>
+                  {selectedAppointment?.bookingRef && (
+                    <View
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#CBD5E1',
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A', letterSpacing: 0.6 }}>
+                        REF: {selectedAppointment.bookingRef}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
 

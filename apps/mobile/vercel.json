@@ -3,6 +3,25 @@
   "outputDirectory": "dist",
   "routes": [
     {
+      "src": "/admin(.*)",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      },
+      "continue": true
+    },
+    {
+      "src": "/partner(.*)",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    },
+    {
       "src": "/_expo/(.*)",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"

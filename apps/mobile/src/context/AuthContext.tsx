@@ -105,11 +105,15 @@ const syncAuthUserToDatabase = async (sessionUser: any, client: any, existingUse
     avatar_url: dbUser?.avatar_url || avatarUrl,
     role: dbUser?.role || 'patient',
     is_verified: dbUser ? Boolean(dbUser.is_verified) : Boolean(userPhone),
+    city: cleanCity || null,
+    wallet_balance:
+      dbUser && Number(dbUser.wallet_balance) !== 2500
+        ? Number(dbUser.wallet_balance || 0)
+        : 0,
     updated_at: new Date().toISOString(),
   };
   if (userEmail) fullPayload.email = userEmail;
   if (userPhone || dbUser?.phone) fullPayload.phone = userPhone || dbUser?.phone;
-  if (cleanCity) fullPayload.city = cleanCity;
   if (dbUser?.age) fullPayload.age = dbUser.age;
   if (dbUser?.gender) fullPayload.gender = dbUser.gender;
   if (dbUser?.blood_group && dbUser.blood_group !== 'O+ Positive') fullPayload.blood_group = dbUser.blood_group;
@@ -328,14 +332,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: generateUUID(),
       phone: formattedPhone,
       full_name: cleanName,
-      age: 29,
-      gender: 'Male',
-      city: 'Jaipur',
-      wallet_balance: 2500.00,
+      age: null,
+      gender: null,
+      city: '',
+      wallet_balance: 0,
       is_verified: true,
       role: 'patient',
       aadhaar_last_four: cleanAadhaar,
-      abha_id: `91-${cleanAadhaar.repeat(2).slice(0, 4)}-9011`,
+      abha_id: undefined,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

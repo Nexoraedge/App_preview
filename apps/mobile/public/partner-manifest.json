@@ -1,0 +1,25 @@
+{
+  "name": "Adityam Partner Portal",
+  "short_name": "Adityam Partner",
+  "description": "Pharmacy, Lab & Hospital Partner Desk with QR Check-In and Live Orders",
+  "start_url": "/partner",
+  "scope": "/partner",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#14362B",
+  "background_color": "#FAF8F2",
+  "icons": [
+    {
+      "src": "/partner-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/partner-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

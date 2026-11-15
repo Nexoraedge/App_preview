@@ -1,733 +1,758 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  PhoneCall,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Hospital as HospitalIcon,
-  MapPin,
+  LayoutDashboard,
+  CalendarCheck,
   FileText,
-  QrCode,
+  Building2,
+  FlaskConical,
+  Pill,
+  Users,
+  CreditCard,
+  Stethoscope,
+  Store,
   Activity,
+  Menu,
+  X,
   Search,
   RefreshCw,
-  User,
-  ShieldCheck,
-  Flame,
-  Volume2,
-  X,
-  Send,
-  Plus
+  Eye,
+  ArrowUpRight,
+  ExternalLink,
+  CheckCircle2,
+  Phone,
 } from 'lucide-react';
 import type { Booking, BookingStatus, ServiceType } from '@adityam/types';
-import { getSupabaseClient, SEED_BOOKINGS } from '@adityam/supabase';
+import { getSupabaseClient } from '@adityam/supabase';
 
-export default function CallCenterDashboard() {
-  const [bookings, setBookings] = useState<Booking[]>(SEED_BOOKINGS);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(SEED_BOOKINGS[0]);
-  const [activeTab, setActiveTab] = useState<'ALL' | ServiceType>('ALL');
+type AdminNavSection =
+  | 'dashboard'
+  | 'bookings'
+  | 'prescriptions'
+  | 'hospitals'
+  | 'labs'
+  | 'pharmacies'
+  | 'patients'
+  | 'finance'
+  | 'portal-hospital'
+  | 'portal-lab'
+  | 'portal-pharmacy';
+
+export default function AdminDashboardPage() {
+  const [activeSection, setActiveSection] = useState<AdminNavSection>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [networkCounts, setNetworkCounts] = useState({
+    hospitals: 0,
+    labs: 0,
+    pharmacies: 0,
+    patients: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState('');
+
+  const [serviceFilter, setServiceFilter] = useState<'ALL' | 'RX_ONLY' | ServiceType>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | BookingStatus>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCallingModalOpen, setIsCallingModalOpen] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [agentNote, setAgentNote] = useState('');
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [newAlertBadge, setNewAlertBadge] = useState<string | null>(null);
 
-  // Set up Supabase Realtime subscription
-  useEffect(() => {
-    const supabase = getSupabaseClient();
+  // Modal State
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [editStatus, setEditStatus] = useState<BookingStatus>('NEW');
+  const [editAgent, setEditAgent] = useState('');
+  const [editDoctorOrPanel, setEditDoctorOrPanel] = useState('');
+  const [editSlotTime, setEditSlotTime] = useState('');
+  const [editGrossBill, setEditGrossBill] = useState('');
+  const [editDiscount, setEditDiscount] = useState('');
+  const [editFinalPayable, setEditFinalPayable] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-    // Attempt real-time subscription
-    try {
-      const channel = supabase
-        .channel('public:bookings')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'bookings' },
-          (payload) => {
-            console.log('Realtime change received:', payload);
-            if (payload.eventType === 'INSERT') {
-              const newBooking = payload.new as Booking;
-              setBookings((prev) => [newBooking, ...prev]);
-              setNewAlertBadge(`New ${newBooking.service_type} from ${newBooking.patient_name}`);
-              setTimeout(() => setNewAlertBadge(null), 5000);
-            } else if (payload.eventType === 'UPDATE') {
-              const updated = payload.new as Booking;
-              setBookings((prev) =>
-                prev.map((b) => (b.id === updated.id ? updated : b))
-              );
-              if (selectedBooking?.id === updated.id) {
-                setSelectedBooking(updated);
-              }
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            setRealtimeConnected(true);
-          }
-        });
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } catch {
-      // Offline fallback: keep seed data active
-      setRealtimeConnected(false);
-    }
-  }, [selectedBooking]);
-
-  // Call timer simulation
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isCallActive) {
-      interval = setInterval(() => {
-        setCallTimer((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setCallTimer(0);
-    }
-    return () => clearInterval(interval);
-  }, [isCallActive]);
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleUpdateStatus = (bookingId: string, nextStatus: BookingStatus, callStatus: Booking['call_status']) => {
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === bookingId ? { ...b, status: nextStatus, call_status: callStatus } : b
-      )
-    );
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking((prev) =>
-        prev ? { ...prev, status: nextStatus, call_status: callStatus } : null
-      );
-    }
-
-    // Try sending update to Supabase
+  const loadDashboardData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const supabase = getSupabaseClient();
-      supabase
-        .from('bookings')
-        .update({ status: nextStatus, call_status: callStatus })
-        .eq('id', bookingId)
-        .then();
-    } catch {
-      // Ignored in offline mock mode
+      const [bookingsRes, hospRes, labRes, pharmRes, usersRes] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(250),
+        supabase.from('hospitals').select('id', { count: 'exact', head: true }),
+        supabase.from('lab_centres').select('id', { count: 'exact', head: true }),
+        supabase.from('pharmacies').select('id', { count: 'exact', head: true }),
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+      ]);
+
+      if (bookingsRes.data && Array.isArray(bookingsRes.data)) {
+        setBookings(bookingsRes.data as Booking[]);
+      }
+
+      setNetworkCounts({
+        hospitals: hospRes.count ?? 4,
+        labs: labRes.count ?? 5,
+        pharmacies: pharmRes.count ?? 6,
+        patients: usersRes.count ?? 1,
+      });
+
+      setLastSyncedAt(
+        new Date().toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+    } catch (err) {
+      console.warn('Error loading dashboard data:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
-  const handleTriggerExotelCall = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setIsCallingModalOpen(true);
-    setIsCallActive(true);
-    handleUpdateStatus(booking.id, 'CALLING', 'calling');
-  };
+  useEffect(() => {
+    loadDashboardData();
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel('next-admin-bookings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        () => loadDashboardData(true)
+      )
+      .subscribe((status) => {
+        setRealtimeConnected(status === 'SUBSCRIBED');
+      });
 
-  const handleEndCall = (outcome: 'CONFIRMED' | 'REJECTED' | 'CALLBACK') => {
-    setIsCallActive(false);
-    setIsCallingModalOpen(false);
-    if (!selectedBooking) return;
-
-    if (outcome === 'CONFIRMED') {
-      handleUpdateStatus(selectedBooking.id, 'CONFIRMED', 'completed');
-    } else if (outcome === 'REJECTED') {
-      handleUpdateStatus(selectedBooking.id, 'CANCELLED', 'completed');
-    } else {
-      handleUpdateStatus(selectedBooking.id, 'NEW', 'pending');
-    }
-  };
-
-  // Mock simulator to trigger incoming request from mobile app
-  const simulateIncomingPatientRequest = () => {
-    const randomHospital = ['SDMH Hospital Jaipur', 'Eternal Hospital Jaipur', 'SMS Hospital Jaipur'][Math.floor(Math.random() * 3)];
-    const randomNames = ['Aman Jain', 'Priya Deshmukh', 'Rajeev Kapoor', 'Ananya Gupta', 'Kavita Chawla'];
-    const randomPatient = randomNames[Math.floor(Math.random() * randomNames.length)];
-    const mockRef = `AN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newRequest: Booking = {
-      id: `mock-${Date.now()}`,
-      booking_ref: mockRef,
-      service_type: 'OPD_CONCIERGE',
-      patient_name: randomPatient,
-      patient_phone: `+91 98${Math.floor(10000000 + Math.random() * 90000000)}`,
-      hospital_name: randomHospital,
-      specialty_requested: 'General Medicine / Fever Clinic',
-      status: 'NEW',
-      call_status: 'pending',
-      notes: 'Urgent OPD Concierge booked via Mobile App. Distance: 2.4 km.',
-      created_at: new Date().toISOString(),
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, [loadDashboardData]);
 
-    setBookings((prev) => [newRequest, ...prev]);
-    setSelectedBooking(newRequest);
-    setNewAlertBadge(`🔔 NEW OPD Request: ${newRequest.patient_name} (${randomHospital})`);
-    setTimeout(() => setNewAlertBadge(null), 6000);
+  const isPrescriptionOrTriage = useCallback((b: Booking) => {
+    const ref = b.booking_ref || '';
+    return (
+      Boolean(b.bill_image_url) ||
+      ref.includes('-RX-') ||
+      ref.includes('DOC-ADVICE') ||
+      b.service_type === 'IPD_ENQUIRY' ||
+      b.service_type === 'PHARMACY_SCAN_PAY'
+    );
+  }, []);
+
+  const metrics = useMemo(() => {
+    const activeList = bookings.filter((b) => b.status !== 'CANCELLED');
+    const pendingRxCount = bookings.filter(
+      (b) =>
+        isPrescriptionOrTriage(b) &&
+        b.status !== 'CANCELLED' &&
+        b.status !== 'COMPLETED'
+    ).length;
+
+    const totalRevenue = activeList.reduce(
+      (sum, b) => sum + Number(b.final_payable ?? b.doctor_fee ?? 0),
+      0
+    );
+    const totalSavings = activeList.reduce(
+      (sum, b) => sum + Number(b.discount_amount ?? 0),
+      0
+    );
+
+    const todayStr = new Date().toDateString();
+    const todayBookings = bookings.filter(
+      (b) => new Date(b.created_at).toDateString() === todayStr
+    ).length;
+
+    return {
+      totalBookings: bookings.length,
+      todayBookings,
+      pendingRxCount,
+      totalRevenue,
+      totalSavings,
+      opdCount: bookings.filter((b) => b.service_type === 'OPD_CONCIERGE').length,
+      labCount: bookings.filter((b) => b.service_type === 'INVESTIGATION').length,
+      pharmacyCount: bookings.filter((b) => b.service_type === 'PHARMACY_SCAN_PAY').length,
+      ipdCount: bookings.filter((b) => b.service_type === 'IPD_ENQUIRY').length,
+    };
+  }, [bookings, isPrescriptionOrTriage]);
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      if (serviceFilter === 'RX_ONLY') {
+        if (!isPrescriptionOrTriage(b)) return false;
+      } else if (serviceFilter !== 'ALL' && b.service_type !== serviceFilter) {
+        return false;
+      }
+      if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        return (
+          (b.booking_ref || '').toLowerCase().includes(q) ||
+          (b.patient_name || '').toLowerCase().includes(q) ||
+          (b.patient_phone || '').toLowerCase().includes(q) ||
+          (b.hospital_name || '').toLowerCase().includes(q) ||
+          (b.doctor_name || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [bookings, serviceFilter, statusFilter, searchQuery, isPrescriptionOrTriage]);
+
+  const openInspector = (b: Booking) => {
+    setSelectedBooking(b);
+    setEditStatus(b.status);
+    setEditAgent(b.assigned_agent || '');
+    setEditDoctorOrPanel(b.doctor_name || '');
+    setEditSlotTime(b.slot_time || '');
+    setEditGrossBill(b.bill_amount ? String(b.bill_amount) : '');
+    setEditDiscount(b.discount_amount ? String(b.discount_amount) : '');
+    const payable = b.final_payable ?? b.doctor_fee ?? 0;
+    setEditFinalPayable(payable ? String(payable) : '');
+    setEditNotes(b.notes || '');
   };
 
-  const filteredBookings = bookings.filter((b) => {
-    const matchesTab = activeTab === 'ALL' || b.service_type === activeTab;
-    const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
-    const matchesSearch =
-      b.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.patient_phone.includes(searchQuery) ||
-      b.booking_ref.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.hospital_name && b.hospital_name.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesTab && matchesStatus && matchesSearch;
-  });
+  const handleSaveBookingChanges = async () => {
+    if (!selectedBooking) return;
+    setIsSaving(true);
+    try {
+      const grossNum = editGrossBill ? Number(editGrossBill) : 0;
+      const discountNum = editDiscount ? Number(editDiscount) : 0;
+      const payableNum = editFinalPayable
+        ? Number(editFinalPayable)
+        : Math.max(0, grossNum - discountNum);
 
-  const stats = {
-    newRequests: bookings.filter((b) => b.status === 'NEW').length,
-    activeCalling: bookings.filter((b) => b.status === 'CALLING').length,
-    confirmedToday: bookings.filter((b) => b.status === 'CONFIRMED' || b.status === 'PAID').length,
-    avgResponseTime: '38s',
+      const supabase = getSupabaseClient();
+      await supabase
+        .from('bookings')
+        .update({
+          status: editStatus,
+          assigned_agent: editAgent.trim() || null,
+          doctor_name: editDoctorOrPanel.trim() || selectedBooking.doctor_name,
+          slot_time: editSlotTime.trim() || selectedBooking.slot_time,
+          bill_amount: grossNum,
+          discount_amount: discountNum,
+          final_payable: payableNum,
+          doctor_fee: payableNum,
+          notes: editNotes.trim() || selectedBooking.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('booking_ref', selectedBooking.booking_ref);
+
+      await loadDashboardData(true);
+      setSelectedBooking(null);
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleSelectSection = (sec: AdminNavSection) => {
+    setActiveSection(sec);
+    setMobileMenuOpen(false);
+    if (sec === 'prescriptions') setServiceFilter('RX_ONLY');
+    else if (sec === 'bookings' || sec === 'dashboard') setServiceFilter('ALL');
+  };
+
+  const navGroups = [
+    {
+      title: 'Operations',
+      items: [
+        { id: 'dashboard' as AdminNavSection, label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'bookings' as AdminNavSection, label: 'Live Bookings', icon: CalendarCheck, badge: metrics.totalBookings },
+        { id: 'prescriptions' as AdminNavSection, label: 'Prescription Queue', icon: FileText, badge: metrics.pendingRxCount },
+      ],
+    },
+    {
+      title: 'Jaipur Catalog',
+      items: [
+        { id: 'hospitals' as AdminNavSection, label: 'Hospitals & Doctors', icon: Building2, badge: networkCounts.hospitals },
+        { id: 'labs' as AdminNavSection, label: 'Labs & Scans', icon: FlaskConical, badge: networkCounts.labs },
+        { id: 'pharmacies' as AdminNavSection, label: 'Pharmacies', icon: Pill, badge: networkCounts.pharmacies },
+      ],
+    },
+    {
+      title: 'Users & Finance',
+      items: [
+        { id: 'patients' as AdminNavSection, label: 'Patients & Families', icon: Users, badge: networkCounts.patients },
+        { id: 'finance' as AdminNavSection, label: 'Payments & Refunds', icon: CreditCard },
+      ],
+    },
+    {
+      title: 'Partner Portals',
+      items: [
+        { id: 'portal-hospital' as AdminNavSection, label: 'Hospital Portal', icon: Stethoscope },
+        { id: 'portal-lab' as AdminNavSection, label: 'Lab Portal', icon: Activity },
+        { id: 'portal-pharmacy' as AdminNavSection, label: 'Pharmacy Portal', icon: Store },
+      ],
+    },
+  ];
+
+  const renderSidebar = () => (
+    <div className="w-[248px] bg-[#14362B] text-[#FAF8F2] flex flex-col justify-between h-full border-r border-[#1D4A3B] shrink-0">
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-4 border-b border-[#1E4C3C] flex items-center justify-between">
+          <div>
+            <h1 className="font-bold text-base text-[#FAF8F2] leading-tight">Adityam Admin</h1>
+            <p className="text-[11px] font-semibold text-[#9DC0B1] mt-0.5">Jaipur Command Center</p>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg bg-[#1E4C3C] text-[#FAF8F2]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="mx-3 my-3 px-3 py-2 rounded-lg bg-[#1A4436] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${realtimeConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className="text-xs font-semibold text-[#E6F0EB]">Supabase Live</span>
+          </div>
+          <span className="text-[10px] font-bold text-[#86EFAC]">
+            {realtimeConnected ? 'SYNCED' : 'ACTIVE'}
+          </span>
+        </div>
+
+        <nav className="px-2.5 py-2 space-y-4">
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              <p className="px-2.5 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#7EA897]">
+                {group.title}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSelectSection(item.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] transition ${
+                        active
+                          ? 'bg-[#235946] text-white font-bold'
+                          : 'text-[#D9E8E1] font-medium hover:bg-[#1A4436]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 truncate">
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {typeof item.badge === 'number' && (
+                        <span
+                          className={`text-[10.5px] font-bold px-2 py-0.5 rounded-lg ${
+                            active ? 'bg-[#FAF8F2]/20 text-white' : 'bg-white/10 text-[#B7D4C7]'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      <div className="p-3 border-t border-[#1E4C3C] text-[11px] text-[#9DC0B1]">
+        <p className="font-semibold text-[#FAF8F2]">Adityam Niramayaa</p>
+        <p className="text-[10px] mt-0.5">Jaipur Region • Production v1.0</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex h-screen bg-[#F7F9FB] text-slate-800 overflow-hidden font-body">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 bg-[#1D2D50] text-white flex flex-col justify-between shrink-0 shadow-xl border-r border-[#15213C]">
-        <div>
-          {/* Logo Header */}
-          <div className="p-6 border-b border-white/10">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#3A7BD5] to-[#CFF7EA] flex items-center justify-center text-[#1D2D50] font-black shadow-lg">
-                AN
-              </div>
-              <div>
-                <h1 className="font-header font-bold text-lg tracking-tight text-white leading-none">
-                  Adityam Niramayaa
-                </h1>
-                <p className="text-[11px] font-medium text-[#CFF7EA] uppercase tracking-wider mt-1">
-                  Call-Center CRM v1.0
-                </p>
-              </div>
+    <div className="flex h-screen bg-[#FAF8F2] text-[#1A2421] overflow-hidden">
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block h-full shrink-0">{renderSidebar()}</div>
+
+      {/* Mobile Drawer Sidebar */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="relative z-10 h-full">{renderSidebar()}</div>
+          <div
+            className="flex-1 bg-[#0F1F18]/55"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-[#E6E1D5] px-4 lg:px-7 py-3.5 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-lg bg-[#F3EFE4] border border-[#E6E1D5] text-[#1A2421]"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-base lg:text-lg font-extrabold text-[#1A2421] truncate">
+                Dashboard Overview
+              </h2>
+              <p className="text-xs text-[#5C6B64] truncate">
+                Jaipur live bookings & prescription triage
+              </p>
             </div>
           </div>
 
-          {/* Realtime Live Indicator */}
-          <div className="mx-4 my-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CFF7EA] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#CFF7EA]"></span>
-              </span>
-              <span className="text-xs text-white/90 font-medium">Supabase Realtime</span>
-            </div>
-            <span className="text-[10px] bg-[#124D41] text-[#CFF7EA] px-2 py-0.5 rounded font-mono font-bold">
-              LIVE
-            </span>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1">
-            <button
-              onClick={() => setActiveTab('ALL')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'ALL'
-                ? 'bg-[#3A7BD5] text-white shadow-md'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              <div className="flex items-center space-x-3">
-                <Activity className="w-4 h-4" />
-                <span>All Live Feeds</span>
-              </div>
-              <span className="text-xs bg-black/20 px-2 py-0.5 rounded-full">
-                {bookings.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('OPD_CONCIERGE')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'OPD_CONCIERGE'
-                ? 'bg-[#3A7BD5] text-white shadow-md'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              <div className="flex items-center space-x-3">
-                <HospitalIcon className="w-4 h-4" />
-                <span>OPD Concierge</span>
-              </div>
-              <span className="text-xs bg-[#CFF7EA] text-[#124D41] px-2 py-0.5 rounded-full font-bold">
-                {bookings.filter((b) => b.service_type === 'OPD_CONCIERGE').length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('PHARMACY_SCAN_PAY')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'PHARMACY_SCAN_PAY'
-                ? 'bg-[#3A7BD5] text-white shadow-md'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              <div className="flex items-center space-x-3">
-                <QrCode className="w-4 h-4" />
-                <span>Pharmacy Scan & Pay</span>
-              </div>
-              <span className="text-xs bg-black/20 px-2 py-0.5 rounded-full">
-                {bookings.filter((b) => b.service_type === 'PHARMACY_SCAN_PAY').length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('IPD_ENQUIRY')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-semibold transition ${activeTab === 'IPD_ENQUIRY'
-                ? 'bg-[#3A7BD5] text-white shadow-md'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              <div className="flex items-center space-x-3">
-                <FileText className="w-4 h-4" />
-                <span>IPD Admissions</span>
-              </div>
-              <span className="text-xs bg-black/20 px-2 py-0.5 rounded-full">
-                {bookings.filter((b) => b.service_type === 'IPD_ENQUIRY').length}
-              </span>
-            </button>
-          </nav>
-        </div>
-
-        {/* Exotel Cloud Masked Calling Status */}
-        <div className="p-4 m-4 rounded-xl bg-white/5 border border-white/10">
-          <div className="flex items-center space-x-2 text-[#CFF7EA] mb-1">
-            <ShieldCheck className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-wide">Exotel Masked Gateway</span>
-          </div>
-          <p className="text-xs text-slate-300">
-            Virtual DID: <span className="font-mono text-white font-bold">+91 11 4000 8800</span>
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Patient phone numbers are shielded during agent calls.
-          </p>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="relative w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="hidden sm:flex items-center bg-[#FAF8F2] border border-[#E6E1D5] rounded-lg px-3 py-1.5 w-60">
+              <Search className="w-3.5 h-3.5 text-[#5C6B64] mr-2 shrink-0" />
               <input
                 type="text"
-                placeholder="Search patient, phone, booking ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#3A7BD5] transition"
+                placeholder="Search ref, patient, phone..."
+                className="bg-transparent text-xs text-[#1A2421] focus:outline-none w-full"
               />
             </div>
 
-            {/* Status Quick Filters */}
-            <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
-              {(['ALL', 'NEW', 'CALLING', 'CONFIRMED'] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-md font-medium transition ${statusFilter === status
-                    ? 'bg-white text-[#1D2D50] shadow-sm font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Action Center & Test Surge Generator */}
-          <div className="flex items-center space-x-3">
             <button
-              onClick={simulateIncomingPatientRequest}
-              className="flex items-center space-x-2 bg-gradient-to-r from-[#124D41] to-[#1B6C5C] text-white hover:opacity-95 px-3.5 py-2 rounded-lg text-xs font-bold shadow-sm transition active:scale-95"
+              onClick={() => {
+                setIsRefreshing(true);
+                loadDashboardData(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#EBF5F0] text-[#1B5E43] border border-[#C6E2D4] text-xs font-bold hover:bg-[#DFEFE7] transition"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Simulate Patient Request</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
-
-            <div className="h-6 w-px bg-slate-200"></div>
-
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-[#1D2D50] text-[#CFF7EA] flex items-center justify-center font-bold text-xs">
-                OP
-              </div>
-              <div className="text-left text-xs">
-                <p className="font-bold text-slate-900 leading-tight">Agent Simran</p>
-                <p className="text-[10px] text-emerald-600 font-semibold">Available for Calls</p>
-              </div>
-            </div>
           </div>
         </header>
 
-        {/* Real-Time Live Notification Banner */}
-        {newAlertBadge && (
-          <div className="bg-[#124D41] text-[#CFF7EA] px-6 py-2.5 flex items-center justify-between text-xs font-semibold animate-pulse shadow-md">
-            <div className="flex items-center space-x-2">
-              <Volume2 className="w-4 h-4 animate-bounce" />
-              <span>{newAlertBadge}</span>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-7 space-y-5">
+          {/* 4 Clean KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-white p-4 rounded-xl border border-[#E6E1D5]">
+              <p className="text-[11px] font-bold uppercase text-[#5C6B64]">Total Bookings</p>
+              <p className="text-2xl font-black text-[#1A2421] mt-1.5">{metrics.totalBookings}</p>
+              <p className="text-xs font-semibold text-[#1B5E43] mt-1.5">
+                {metrics.todayBookings} booked today
+              </p>
             </div>
-            <span className="text-[11px] underline cursor-pointer">Dispatch Now</span>
-          </div>
-        )}
 
-        {/* KPI Metric Cards */}
-        <section className="p-6 pb-2 grid grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Incoming In Queue
-              </p>
-              <p className="text-2xl font-black text-rose-600 font-heading mt-1">
-                {stats.newRequests}
+            <div
+              onClick={() => setServiceFilter(serviceFilter === 'RX_ONLY' ? 'ALL' : 'RX_ONLY')}
+              className={`p-4 rounded-xl border cursor-pointer transition ${
+                serviceFilter === 'RX_ONLY'
+                  ? 'bg-[#FEF7E6] border-[#F3DBA8]'
+                  : 'bg-white border-[#E6E1D5]'
+              }`}
+            >
+              <p className="text-[11px] font-bold uppercase text-[#5C6B64]">Rx & Triage Queue</p>
+              <p className="text-2xl font-black text-[#9A5B13] mt-1.5">{metrics.pendingRxCount}</p>
+              <p className="text-xs font-semibold text-[#9A5B13] mt-1.5">
+                Tap to filter slips
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Exotel Calling Now
+            <div className="bg-white p-4 rounded-xl border border-[#E6E1D5]">
+              <p className="text-[11px] font-bold uppercase text-[#5C6B64]">Paid Volume</p>
+              <p className="text-2xl font-black text-[#1B5E43] mt-1.5">
+                ₹{metrics.totalRevenue.toLocaleString('en-IN')}
               </p>
-              <p className="text-2xl font-black text-[#3A7BD5] font-heading mt-1">
-                {stats.activeCalling}
+              <p className="text-xs font-semibold text-[#5C6B64] mt-1.5">
+                ₹{metrics.totalSavings.toLocaleString('en-IN')} patient savings
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#3A7BD5] flex items-center justify-center">
-              <PhoneCall className="w-5 h-5 animate-pulse" />
-            </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Confirmed Today
+            <div className="bg-white p-4 rounded-xl border border-[#E6E1D5]">
+              <p className="text-[11px] font-bold uppercase text-[#5C6B64]">Jaipur Network</p>
+              <p className="text-2xl font-black text-[#1A2421] mt-1.5">
+                {networkCounts.hospitals + networkCounts.labs + networkCounts.pharmacies}
               </p>
-              <p className="text-2xl font-black text-[#124D41] font-heading mt-1">
-                {stats.confirmedToday}
+              <p className="text-xs font-semibold text-[#5C6B64] mt-1.5 truncate">
+                {networkCounts.hospitals} Hosp · {networkCounts.labs} Labs · {networkCounts.pharmacies} Pharm
               </p>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-[#CFF7EA]/50 text-[#124D41] flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Avg Dispatch Time
-              </p>
-              <p className="text-2xl font-black text-[#1D2D50] font-heading mt-1">
-                {stats.avgResponseTime}
-              </p>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-slate-100 text-[#1D2D50] flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
+          {/* 4 Pillar Strip */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {(
+              [
+                { id: 'OPD_CONCIERGE' as ServiceType, title: 'OPD Consults', count: metrics.opdCount },
+                { id: 'INVESTIGATION' as ServiceType, title: 'Labs & Scans', count: metrics.labCount },
+                { id: 'PHARMACY_SCAN_PAY' as ServiceType, title: 'Pharmacy Orders', count: metrics.pharmacyCount },
+                { id: 'IPD_ENQUIRY' as ServiceType, title: 'IPD Admissions', count: metrics.ipdCount },
+              ]
+            ).map((pillar) => {
+              const active = serviceFilter === pillar.id;
+              return (
+                <button
+                  key={pillar.id}
+                  onClick={() => setServiceFilter(active ? 'ALL' : pillar.id)}
+                  className={`flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition ${
+                    active
+                      ? 'bg-[#EBF5F0] border-[#1B5E43]'
+                      : 'bg-white border-[#E6E1D5] hover:border-[#C6E2D4]'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-[#1A2421] truncate">{pillar.title}</span>
+                  <span className="text-base font-black text-[#1B5E43] ml-2">{pillar.count}</span>
+                </button>
+              );
+            })}
           </div>
-        </section>
 
-        {/* Master-Detail Split Workspace */}
-        <div className="flex-1 flex overflow-hidden p-6 pt-4 gap-6">
-          {/* Left: Real-time Request Stream */}
-          <div className="w-5/12 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Flame className="w-4 h-4 text-rose-500" />
-                <h2 className="font-bold text-sm text-slate-900">
-                  Live Dispatch Stream ({filteredBookings.length})
-                </h2>
+          {/* Bookings Table */}
+          <div className="bg-white rounded-2xl border border-[#E6E1D5] overflow-hidden">
+            <div className="p-4 border-b border-[#E6E1D5] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm lg:text-base font-extrabold text-[#1A2421]">
+                  Live Requests & Prescription Queue ({filteredBookings.length})
+                </h3>
+                <p className="text-xs text-[#5C6B64] mt-0.5">
+                  Select any row to inspect uploaded slips, assign coordinator, or set bill
+                  {lastSyncedAt ? ` · Synced ${lastSyncedAt}` : ''}
+                </p>
               </div>
-              <span className="text-[11px] text-slate-500">Auto-updating</span>
+
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { id: 'ALL', label: 'All' },
+                    { id: 'RX_ONLY', label: 'Uploaded Rx' },
+                    { id: 'OPD_CONCIERGE', label: 'OPD' },
+                    { id: 'INVESTIGATION', label: 'Labs' },
+                    { id: 'PHARMACY_SCAN_PAY', label: 'Pharmacy' },
+                    { id: 'IPD_ENQUIRY', label: 'IPD' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setServiceFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
+                      serviceFilter === tab.id
+                        ? 'bg-[#14362B] text-white'
+                        : 'bg-[#F3EFE4] text-[#1A2421]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
-              {filteredBookings.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  <Activity className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-xs font-semibold">No booking requests matching filter</p>
-                </div>
-              ) : (
-                filteredBookings.map((booking) => {
-                  const isSelected = selectedBooking?.id === booking.id;
-                  return (
-                    <div
-                      key={booking.id}
-                      onClick={() => setSelectedBooking(booking)}
-                      className={`p-3.5 rounded-lg cursor-pointer transition relative mb-1.5 ${isSelected
-                        ? 'bg-blue-50/80 border border-[#3A7BD5]/40 shadow-sm'
-                        : 'hover:bg-slate-50 border border-transparent'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-mono text-[11px] font-bold text-slate-500">
-                          {booking.booking_ref}
-                        </span>
-                        <span
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${booking.status === 'NEW'
-                            ? 'bg-rose-100 text-rose-700 animate-pulse'
-                            : booking.status === 'CALLING'
-                              ? 'bg-amber-100 text-amber-800'
-                              : booking.status === 'CONFIRMED' || booking.status === 'PAID'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                        >
-                          {booking.status}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-slate-900">
-                          {booking.patient_name}
-                        </h3>
-                        <span className="text-xs font-mono font-medium text-slate-500">
-                          {booking.patient_phone}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-600 flex items-center space-x-1 mt-1 truncate">
-                        <HospitalIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{booking.hospital_name || 'Partner Health Network'}</span>
-                      </p>
-
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <span className="font-medium text-[#1D2D50] bg-slate-100 px-2 py-0.5 rounded">
-                          {booking.service_type.replace('_', ' ')}
-                        </span>
-                        <span className="text-slate-400 font-mono">
-                          {new Date(booking.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Right: Detailed Patient Concierge Desk */}
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-            {selectedBooking ? (
-              <div className="flex-1 flex flex-col overflow-y-auto">
-                {/* Lead Header */}
-                <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-[#F7F9FB] to-white flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-mono text-xs font-bold text-slate-500">
-                        {selectedBooking.booking_ref}
-                      </span>
-                      <span className="text-xs bg-[#CFF7EA] text-[#124D41] font-bold px-2 py-0.5 rounded-full">
-                        {selectedBooking.service_type}
-                      </span>
-                    </div>
-                    <h2 className="text-2xl font-heading font-black text-[#1D2D50] mt-1">
-                      {selectedBooking.patient_name}
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Contact: <span className="font-mono font-semibold text-slate-800">{selectedBooking.patient_phone}</span>
-                    </p>
-                  </div>
-
-                  {/* Exotel Call CTA */}
-                  <div>
-                    <button
-                      onClick={() => handleTriggerExotelCall(selectedBooking)}
-                      className="flex items-center space-x-2 bg-[#3A7BD5] hover:bg-[#2967BE] text-white px-5 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 transition active:scale-95"
-                    >
-                      <PhoneCall className="w-4 h-4" />
-                      <span>Initiate Masked Call (Exotel)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Details Body */}
-                <div className="p-6 space-y-6 flex-1">
-                  {/* Hospital Info Box */}
-                  <div className="bg-[#F7F9FB] p-5 rounded-xl border border-slate-200">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                      Requested Partner Facility
-                    </h4>
-                    <div className="flex items-start space-x-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#1D2D50] text-[#CFF7EA] flex items-center justify-center shrink-0">
-                        <HospitalIcon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-base text-slate-900">
-                          {selectedBooking.hospital_name || 'Adityam Health Partner'}
-                        </p>
-                        {selectedBooking.specialty_requested && (
-                          <p className="text-xs font-medium text-[#3A7BD5] mt-0.5">
-                            Specialty: {selectedBooking.specialty_requested}
-                          </p>
-                        )}
-                        <p className="text-xs text-slate-500 mt-1 flex items-center space-x-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Delhi NCR Geospatial Hub • Within 5 km</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pharmacy Bill Details if Scan & Pay */}
-                  {selectedBooking.service_type === 'PHARMACY_SCAN_PAY' && (
-                    <div className="p-5 rounded-xl border border-emerald-200 bg-emerald-50/40">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-[#124D41] uppercase tracking-wider">
-                          Pharmacy Scan & Pay Verification
-                        </h4>
-                        <span className="text-xs font-bold bg-[#CFF7EA] text-[#124D41] px-2 py-0.5 rounded">
-                          25% Platform Discount
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div className="p-3 bg-white rounded-lg border border-slate-200">
-                          <p className="text-[10px] text-slate-500">Gross Bill</p>
-                          <p className="font-bold text-slate-900">₹{selectedBooking.bill_amount || 1600}</p>
-                        </div>
-                        <div className="p-3 bg-white rounded-lg border border-emerald-200">
-                          <p className="text-[10px] text-emerald-700">App Savings (25%)</p>
-                          <p className="font-bold text-emerald-700">-₹{selectedBooking.discount_amount || 400}</p>
-                        </div>
-                        <div className="p-3 bg-white rounded-lg border border-blue-200">
-                          <p className="text-[10px] text-blue-700">Final Patient Paid</p>
-                          <p className="font-black text-blue-700">₹{selectedBooking.final_payable || 1200}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Call Notes & Dispatch Resolution */}
-                  <div className="space-y-3">
-                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Concierge Call Notes & Hospital Confirmation
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={agentNote || selectedBooking.notes || ''}
-                      onChange={(e) => setAgentNote(e.target.value)}
-                      placeholder="Enter consultation time slot confirmed with hospital, doctor name, or patient remarks..."
-                      className="w-full p-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3A7BD5]"
-                    />
-                  </div>
-
-                  {/* Status Action Workflow Buttons */}
-                  <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleUpdateStatus(selectedBooking.id, 'CONFIRMED', 'completed')}
-                        className="flex items-center space-x-1.5 bg-[#124D41] hover:bg-[#1B6C5C] text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm"
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#FAF8F2] border-b border-[#E6E1D5] text-[10.5px] font-extrabold uppercase text-[#5C6B64]">
+                    <th className="py-2.5 px-4">Ref</th>
+                    <th className="py-2.5 px-4">Patient</th>
+                    <th className="py-2.5 px-4">Service</th>
+                    <th className="py-2.5 px-4">Facility & Details</th>
+                    <th className="py-2.5 px-4">Slip</th>
+                    <th className="py-2.5 px-4">Amount</th>
+                    <th className="py-2.5 px-4">Status</th>
+                    <th className="py-2.5 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1EFE8] text-xs">
+                  {filteredBookings.map((b) => {
+                    const feeVal = Number(b.final_payable ?? b.doctor_fee ?? 0);
+                    return (
+                      <tr
+                        key={b.id || b.booking_ref}
+                        onClick={() => openInspector(b)}
+                        className="hover:bg-[#FAF8F2] cursor-pointer transition"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Confirm Slot with Hospital</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleUpdateStatus(selectedBooking.id, 'CANCELLED', 'completed')}
-                        className="px-4 py-2.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition"
-                      >
-                        Cancel Request
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => alert(`WhatsApp confirmation sent to ${selectedBooking.patient_phone}!`)}
-                      className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-lg text-xs font-bold transition"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Send WhatsApp Pass</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
-                <HospitalIcon className="w-12 h-12 stroke-1 mb-3 text-slate-300" />
-                <p className="font-semibold text-sm">Select an incoming request from the dispatch stream</p>
-                <p className="text-xs text-slate-400 mt-1">Real-time bookings will appear instantly as users submit them in the app.</p>
-              </div>
-            )}
+                        <td className="py-3 px-4 font-bold text-[#1A2421]">#{b.booking_ref}</td>
+                        <td className="py-3 px-4">
+                          <p className="font-bold text-[#1A2421]">{b.patient_name}</p>
+                          <p className="text-[#5C6B64]">{b.patient_phone}</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-1 rounded bg-[#F3EFE4] text-[#1A2421] font-bold text-[11px]">
+                            {b.service_type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="font-bold text-[#1A2421]">{b.hospital_name}</p>
+                          <p className="text-[#5C6B64]">{b.doctor_name} · {b.slot_time}</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          {b.bill_image_url ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#EBF5F0] text-[#1B5E43] font-bold text-[11px]">
+                              <Eye className="w-3 h-3" /> Slip
+                            </span>
+                          ) : (
+                            <span className="text-[#9CA3AF]">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-bold">
+                          {b.service_type === 'IPD_ENQUIRY' ? (
+                            <span className="text-[#1B5E43]">Cashless TPA</span>
+                          ) : feeVal > 0 ? (
+                            <span className="text-[#1B5E43]">₹{feeVal.toLocaleString('en-IN')}</span>
+                          ) : (
+                            <span className="text-[#9A5B13]">Quote Pending</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-1 rounded bg-[#EBF5F0] text-[#1B5E43] font-bold text-[11px]">
+                            {b.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#E6E1D5] bg-[#FAF8F2] font-bold text-[#1A2421]">
+                            Manage <ArrowUpRight className="w-3 h-3" />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </main>
       </div>
 
-      {/* Exotel Masked Call Simulator Modal */}
-      {isCallingModalOpen && selectedBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1D2D50] text-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-5 h-5 text-[#CFF7EA]" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[#CFF7EA]">
-                  Exotel Masked Telephony Engine
-                </span>
+      {/* Inspector Modal */}
+      {selectedBooking && (
+        <div className="fixed inset-0 z-50 bg-[#14362B]/55 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto border border-[#E6E1D5]">
+            <div className="bg-[#14362B] px-5 py-4 flex items-center justify-between text-[#FAF8F2]">
+              <div>
+                <p className="text-[10px] font-bold uppercase text-[#9DC0B1]">Booking & Prescription Triage</p>
+                <h3 className="text-base font-extrabold">
+                  #{selectedBooking.booking_ref} · {selectedBooking.patient_name}
+                </h3>
               </div>
               <button
-                onClick={() => setIsCallingModalOpen(false)}
-                className="text-white/60 hover:text-white"
+                onClick={() => setSelectedBooking(null)}
+                className="p-1.5 rounded-lg bg-white/15 text-white"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="text-center py-6">
-              <div className="relative inline-block mx-auto mb-4">
-                <div className="w-20 h-20 rounded-full bg-[#3A7BD5] flex items-center justify-center text-white mx-auto shadow-lg shadow-blue-500/30">
-                  <PhoneCall className="w-8 h-8 animate-bounce" />
+            <div className="p-5 space-y-4">
+              {selectedBooking.bill_image_url && (
+                <div className="bg-[#EBF5F0] border border-[#C6E2D4] rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#14362B]">Uploaded Prescription / Slip</span>
+                    <a
+                      href={selectedBooking.bill_image_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#1B5E43] text-white text-[11px] font-bold"
+                    >
+                      Open Full <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <img
+                    src={selectedBooking.bill_image_url}
+                    alt="Uploaded prescription"
+                    className="w-full max-h-56 object-contain rounded-lg bg-white"
+                  />
                 </div>
-                <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-400 border-2 border-[#1D2D50]"></span>
+              )}
+
+              <div>
+                <p className="text-[11px] font-bold uppercase text-[#5C6B64] mb-1.5">Status</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(['NEW', 'CALLING', 'CONFIRMED', 'PAID', 'COMPLETED', 'MISSED', 'CANCELLED'] as BookingStatus[]).map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setEditStatus(st)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                        editStatus === st
+                          ? 'bg-[#1B5E43] text-white border-[#1B5E43]'
+                          : 'bg-[#FAF8F2] text-[#1A2421] border-[#E6E1D5]'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <h3 className="text-xl font-heading font-black text-white">
-                {selectedBooking.patient_name}
-              </h3>
-              <p className="font-mono text-sm text-[#CFF7EA] mt-1">
-                Virtual Routing: +91 11 4000 8800 ➔ Patient
-              </p>
-
-              <div className="my-6 inline-block bg-white/10 px-4 py-2 rounded-full font-mono text-sm font-bold text-white">
-                ⏱ {formatTimer(callTimer)} • Line Encrypted
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#5C6B64] mb-1">Assigned Coordinator</label>
+                  <input
+                    value={editAgent}
+                    onChange={(e) => setEditAgent(e.target.value)}
+                    placeholder="e.g. Simran Sharma"
+                    className="w-full px-3 py-2 rounded-lg bg-[#FAF8F2] border border-[#E6E1D5] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#5C6B64] mb-1">Confirmed Slot</label>
+                  <input
+                    value={editSlotTime}
+                    onChange={(e) => setEditSlotTime(e.target.value)}
+                    placeholder="e.g. Tomorrow, 08:00 AM"
+                    className="w-full px-3 py-2 rounded-lg bg-[#FAF8F2] border border-[#E6E1D5] text-xs"
+                  />
+                </div>
               </div>
 
-              <div className="bg-white/5 rounded-xl p-3 text-left text-xs space-y-1 mb-6 border border-white/10">
-                <p className="text-white/70">
-                  <span className="font-bold text-white">Hospital Requested:</span> {selectedBooking.hospital_name}
-                </p>
-                <p className="text-white/70">
-                  <span className="font-bold text-white">Specialty:</span> {selectedBooking.specialty_requested || 'General Consultation'}
-                </p>
-                <p className="text-[#CFF7EA] font-semibold mt-1">
-                  Agent Script: "Namaste! Calling from Adityam Niramayaa concierge to confirm your priority OPD slot."
-                </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#5C6B64] mb-1">Gross Bill (₹)</label>
+                  <input
+                    type="number"
+                    value={editGrossBill}
+                    onChange={(e) => setEditGrossBill(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-[#FAF8F2] border border-[#E6E1D5] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#5C6B64] mb-1">Discount (₹)</label>
+                  <input
+                    type="number"
+                    value={editDiscount}
+                    onChange={(e) => setEditDiscount(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-[#FAF8F2] border border-[#E6E1D5] text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#1B5E43] mb-1">Final Payable (₹)</label>
+                  <input
+                    type="number"
+                    value={editFinalPayable}
+                    onChange={(e) => setEditFinalPayable(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-[#EBF5F0] border border-[#C6E2D4] text-xs font-bold text-[#14362B]"
+                  />
+                </div>
               </div>
 
-              {/* Call End Buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleEndCall('CONFIRMED')}
-                  className="w-full bg-[#124D41] hover:bg-[#1B6C5C] text-white py-3 rounded-xl font-bold text-xs transition"
-                >
-                  ✓ Slot Confirmed
-                </button>
-                <button
-                  onClick={() => handleEndCall('REJECTED')}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl font-bold text-xs transition"
-                >
-                  ✕ Patient Declined
-                </button>
+              <div className="flex items-center justify-between pt-2">
+                {selectedBooking.patient_phone ? (
+                  <a
+                    href={`tel:${selectedBooking.patient_phone}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#EBF5F0] text-[#1B5E43] border border-[#C6E2D4] text-xs font-bold"
+                  >
+                    <Phone className="w-3.5 h-3.5" /> Call
+                  </a>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedBooking(null)}
+                    className="px-4 py-2 rounded-lg bg-[#F3EFE4] text-[#5C6B64] text-xs font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveBookingChanges}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1B5E43] text-white text-xs font-bold"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {isSaving ? 'Saving...' : 'Save & Sync'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

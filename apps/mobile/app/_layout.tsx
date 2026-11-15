@@ -140,6 +140,20 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen
+                  name="admin"
+                  options={{
+                    title: 'Admin Console | Adityam Niramayaa',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="partner"
+                  options={{
+                    title: 'Partner Portal | Adityam Niramayaa',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
                   name="+not-found"
                   options={{
                     title: 'Oops! Page Not Found',

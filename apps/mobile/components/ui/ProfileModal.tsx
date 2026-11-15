@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import {
   Languages,
   Calendar,
-  ShieldCheck,
   Wallet,
   Settings,
   LogOut,
