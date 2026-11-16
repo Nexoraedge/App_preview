@@ -109,7 +109,6 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
   // Login form & server lockout state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [lockSeconds, setLockSeconds] = useState(0);
@@ -286,33 +285,6 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
       listener?.subscription?.unsubscribe();
     };
   }, [checkSession, resolveAdminRole]);
-
-  const handleGoogleSignIn = async () => {
-    setIsSubmitting(true);
-    setAuthError(null);
-    try {
-      const supabase = getSupabaseClient();
-      const redirectTo =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? `${window.location.origin}/admin`
-          : 'adityam://google-auth';
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo },
-      });
-      if (error) {
-        setAuthError(error.message);
-        return;
-      }
-      if (Platform.OS === 'web' && data?.url && typeof window !== 'undefined') {
-        window.location.assign(data.url);
-      }
-    } catch (err: any) {
-      setAuthError(err?.message || 'Unable to start Google sign-in.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleEmailSignIn = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -684,121 +656,76 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
                 </View>
               ) : null}
 
-              {/* Primary Google OAuth Login (Founder & Google-linked Staff) */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>
+                  Admin / Staff Email
+                </Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="staff@adityamniramayaa.com"
+                  placeholderTextColor="#9CA3AF"
+                  style={{
+                    backgroundColor: THEME.bg,
+                    borderWidth: 1,
+                    borderColor: THEME.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13.5,
+                    color: THEME.ink,
+                  }}
+                />
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>
+                  Password
+                </Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  placeholder="Enter password"
+                  placeholderTextColor="#9CA3AF"
+                  onSubmitEditing={handleEmailSignIn}
+                  style={{
+                    backgroundColor: THEME.bg,
+                    borderWidth: 1,
+                    borderColor: THEME.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13.5,
+                    color: THEME.ink,
+                  }}
+                />
+              </View>
+
               <TouchableOpacity
-                onPress={handleGoogleSignIn}
+                onPress={handleEmailSignIn}
                 disabled={isSubmitting || lockSeconds > 0}
-                activeOpacity={0.85}
                 style={{
-                  backgroundColor: THEME.green,
-                  paddingVertical: 13,
-                  borderRadius: 11,
-                  flexDirection: 'row',
+                  backgroundColor: lockSeconds > 0 ? '#9CA3AF' : THEME.green,
+                  paddingVertical: 12,
+                  borderRadius: 10,
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
+                  marginTop: 4,
                 }}
               >
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    backgroundColor: '#FFFFFF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 12.5, fontWeight: '900', color: THEME.greenDark }}>G</Text>
-                </View>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
-                  {isSubmitting ? 'Redirecting to Google...' : 'Continue with Google'}
+                  {isSubmitting
+                    ? 'Verifying...'
+                    : lockSeconds > 0
+                    ? `Locked (${formatCountdown(lockSeconds)})`
+                    : 'Sign In to Command Center'}
                 </Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setShowPasswordLogin((v) => !v)}
-                style={{ alignItems: 'center', paddingVertical: 4 }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.muted }}>
-                  {showPasswordLogin ? 'Hide Email & Password Login ▲' : 'Staff Email & Password Login ▼'}
-                </Text>
-              </TouchableOpacity>
-
-              {showPasswordLogin && (
-                <>
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>
-                      Staff / Admin Email
-                    </Text>
-                    <TextInput
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                      placeholder="staff@adityamniramayaa.com"
-                      placeholderTextColor="#9CA3AF"
-                      style={{
-                        backgroundColor: THEME.bg,
-                        borderWidth: 1,
-                        borderColor: THEME.border,
-                        borderRadius: 10,
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        fontSize: 13.5,
-                        color: THEME.ink,
-                      }}
-                    />
-                  </View>
-
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>
-                      Password
-                    </Text>
-                    <TextInput
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      placeholder="Enter password"
-                      placeholderTextColor="#9CA3AF"
-                      onSubmitEditing={handleEmailSignIn}
-                      style={{
-                        backgroundColor: THEME.bg,
-                        borderWidth: 1,
-                        borderColor: THEME.border,
-                        borderRadius: 10,
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        fontSize: 13.5,
-                        color: THEME.ink,
-                      }}
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={handleEmailSignIn}
-                    disabled={isSubmitting || lockSeconds > 0}
-                    style={{
-                      backgroundColor: lockSeconds > 0 ? '#9CA3AF' : THEME.greenDark,
-                      paddingVertical: 12,
-                      borderRadius: 10,
-                      alignItems: 'center',
-                      marginTop: 4,
-                    }}
-                  >
-                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
-                      {isSubmitting
-                        ? 'Verifying...'
-                        : lockSeconds > 0
-                        ? `Locked (${formatCountdown(lockSeconds)})`
-                        : 'Sign In with Email & Password'}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
 
               <Text style={{ fontSize: 11, color: THEME.muted, textAlign: 'center', lineHeight: 16 }}>
-                Protected by server-side rate limiting, 30-min idle lock & optional 2FA.
+                Protected by server-side rate limiting & 30-min idle lock.
               </Text>
             </>
           )}

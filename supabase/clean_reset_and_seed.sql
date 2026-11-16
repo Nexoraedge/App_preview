@@ -5,17 +5,31 @@
 -- NOTE: public.users is NOT deleted so your Google Admin & Staff accounts stay intact.
 -- ==============================================================================
 
--- 1. Wipe all demo transactional & audit data
-DELETE FROM public.refund_requests;
-DELETE FROM public.hospital_payouts;
-DELETE FROM public.lab_payouts;
-DELETE FROM public.pharmacy_payouts;
-DELETE FROM public.doctor_payouts;
-DELETE FROM public.crm_logs;
-DELETE FROM public.partner_enquiries;
-DELETE FROM public.admin_audit_logs;
-DELETE FROM public.staff_login_attempts;
-DELETE FROM public.bookings;
+-- 1. Wipe all demo transactional & audit data (safely skips tables not yet created)
+DO $$
+DECLARE
+  tbl TEXT;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'public.refund_requests',
+    'public.hospital_payouts',
+    'public.lab_payouts',
+    'public.pharmacy_payouts',
+    'public.doctor_payouts',
+    'public.crm_logs',
+    'public.crm_activity_logs',
+    'public.partner_enquiries',
+    'public.admin_audit_logs',
+    'public.staff_login_attempts',
+    'public.admin_login_attempts',
+    'public.bookings'
+  ]
+  LOOP
+    IF to_regclass(tbl) IS NOT NULL THEN
+      EXECUTE 'DELETE FROM ' || tbl;
+    END IF;
+  END LOOP;
+END $$;
 
 -- 2. Wipe old demo catalog
 DELETE FROM public.doctors;
@@ -24,6 +38,74 @@ DELETE FROM public.hospitals;
 DELETE FROM public.pharmacies;
 DELETE FROM public.lab_centre_prices;
 DELETE FROM public.lab_centres;
+
+-- 2.5 Ensure all updated schema columns exist (safe if earlier migrations were skipped)
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS secondary_contact_number VARCHAR(30);
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(30);
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS commission_percentage INTEGER DEFAULT 10;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS opd_hours VARCHAR(120) DEFAULT 'Mon-Sat, 9 AM - 8 PM';
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS is_24x7 BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS total_beds INTEGER DEFAULT 100;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS icu_beds INTEGER DEFAULT 20;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS ot_count INTEGER DEFAULT 4;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS labs_offered TEXT[] DEFAULT ARRAY['Pathology & Blood Tests', 'Digital X-Ray'];
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS ipd_services_offered TEXT[] DEFAULT ARRAY['General Surgery', 'Orthopedics', 'Cashless TPA'];
+ALTER TABLE public.hospitals ADD COLUMN IF NOT EXISTS insurance_partners TEXT[] DEFAULT ARRAY['Star Health', 'HDFC Ergo', 'ICICI Lombard', 'RGHS'];
+
+ALTER TABLE public.hospital_branches ADD COLUMN IF NOT EXISTS secondary_contact_number VARCHAR(30);
+ALTER TABLE public.hospital_branches ADD COLUMN IF NOT EXISTS opd_hours VARCHAR(120) DEFAULT 'Mon-Sat, 9 AM - 8 PM';
+ALTER TABLE public.hospital_branches ADD COLUMN IF NOT EXISTS is_24x7 BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE public.doctors ALTER COLUMN hospital_id DROP NOT NULL;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS is_solo BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS slug VARCHAR(255);
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS clinic_name VARCHAR(255);
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS clinic_address TEXT;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS city VARCHAR(100) DEFAULT 'Jaipur';
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS pincode VARCHAR(20);
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS discount_percentage INTEGER DEFAULT 15;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS commission_percentage INTEGER DEFAULT 10;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS services_offered TEXT[] DEFAULT ARRAY['OPD Consultation', 'Follow-up'];
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS is_available_today BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS secondary_phone VARCHAR(30);
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS drug_license_number VARCHAR(100);
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS gst_number VARCHAR(50);
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS is_24x7 BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS delivery_radius_km INTEGER DEFAULT 5;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS delivery_time_mins INTEGER DEFAULT 35;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS min_order_free_delivery INTEGER DEFAULT 299;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS commission_percentage INTEGER DEFAULT 10;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.pharmacies ADD COLUMN IF NOT EXISTS about TEXT;
+
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS secondary_phone VARCHAR(30);
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS nabl_certified BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS is_24x7 BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS home_collection_radius_km INTEGER DEFAULT 10;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS home_collection_fee INTEGER DEFAULT 0;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS free_home_collection_above INTEGER DEFAULT 499;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS home_collection_slots TEXT DEFAULT '6:30 AM - 11:00 AM, 4:00 PM - 7:30 PM';
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS report_turnaround_hrs INTEGER DEFAULT 12;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS discount_percentage INTEGER DEFAULT 20;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS commission_percentage INTEGER DEFAULT 12;
+ALTER TABLE public.lab_centres ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS verification_code VARCHAR(12);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS checked_in_by VARCHAR(150);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS partner_notes TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS partner_entity_id VARCHAR(100);
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS partner_type VARCHAR(30);
 
 -- 3. Seed 2 Focused Partner Hospitals (with full timings, beds, IPD & insurance)
 INSERT INTO public.hospitals (
@@ -162,13 +244,13 @@ INSERT INTO public.doctors (
   ARRAY['Hindi', 'English'], true, false
 );
 
--- 6. Seed 2 Partner Pharmacies (1 24x7 Store + 1 Daytime Store)
+-- 6. Seed 1 Registered Partner Pharmacy (linked to xitone5819@jysnk.com)
 INSERT INTO public.pharmacies (
   id, name, name_hi, slug, area, area_hi, latitude, longitude,
   rating, reviews, delivery, pickup, app_discount_pct, commission_percentage,
   shop_address, shop_phone, secondary_phone, drug_license_number, gst_number,
   is_24x7, delivery_radius_km, delivery_time_mins, min_order_free_delivery,
-  weekly_schedule, city, state, pincode, is_active, is_featured
+  weekly_schedule, about, city, state, pincode, is_active, is_featured
 ) VALUES
 (
   'jp1',
@@ -182,21 +264,8 @@ INSERT INTO public.pharmacies (
   '+91-98290-40001', '+91-141-2601122', 'RJ-JPR-2024-8812', '08AABCS1234F1Z5',
   true, 8, 35, 299,
   '{"mon":{"open":true,"start":"00:00","end":"23:59"},"tue":{"open":true,"start":"00:00","end":"23:59"},"wed":{"open":true,"start":"00:00","end":"23:59"},"thu":{"open":true,"start":"00:00","end":"23:59"},"fri":{"open":true,"start":"00:00","end":"23:59"},"sat":{"open":true,"start":"00:00","end":"23:59"},"sun":{"open":true,"start":"00:00","end":"23:59"}}'::jsonb,
+  'Authorized 24x7 Jan Aushadhi & Ethical Medicines partner near Surajpole Gate. Same-day delivery & priority counter pickup.',
   'Jaipur', 'Rajasthan', '302003', true, true
-),
-(
-  'jp4',
-  'Apollo Pharmacy - MI Road',
-  'अपोलो फार्मेसी - एमआई रोड',
-  'apollo-pharmacy-mi-road',
-  'MI Road, Near Panch Batti, Jaipur', 'एमआई रोड, पांच बत्ती के पास, जयपुर',
-  26.9175, 75.8120,
-  4.7, 430, true, true, 15, 10,
-  'Panch Batti, Mirza Ismail Road, Jaipur - 302001',
-  '+91-98290-40002', '+91-141-2375500', 'RJ-JPR-2023-4421', '08AAACA5521K1Z9',
-  false, 6, 40, 399,
-  '{"mon":{"open":true,"start":"08:00","end":"22:30"},"tue":{"open":true,"start":"08:00","end":"22:30"},"wed":{"open":true,"start":"08:00","end":"22:30"},"thu":{"open":true,"start":"08:00","end":"22:30"},"fri":{"open":true,"start":"08:00","end":"22:30"},"sat":{"open":true,"start":"08:00","end":"22:30"},"sun":{"open":true,"start":"09:00","end":"21:00"}}'::jsonb,
-  'Jaipur', 'Rajasthan', '302001', true, true
 );
 
 -- 7. Seed 2 Diagnostic Lab & Scan Centres

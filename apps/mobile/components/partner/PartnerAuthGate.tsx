@@ -29,6 +29,7 @@ const THEME = {
 };
 
 const ALLOWED_PARTNER_ROLES = new Set([
+  'partner',
   'pharmacy_partner',
   'lab_partner',
   'hospital_partner',
@@ -105,49 +106,9 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
-
   useEffect(() => {
     loadSession();
-    try {
-      const supabase = getSupabaseClient();
-      const { data: listener } = supabase.auth.onAuthStateChange(() => {
-        loadSession();
-      });
-      return () => {
-        listener?.subscription?.unsubscribe();
-      };
-    } catch {
-      return undefined;
-    }
   }, [loadSession]);
-
-  const handleGoogleSignIn = async () => {
-    setSubmitting(true);
-    setErrorMsg(null);
-    try {
-      const supabase = getSupabaseClient();
-      const redirectTo =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? `${window.location.origin}/partner`
-          : 'adityam://google-auth';
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo },
-      });
-      if (error) {
-        setErrorMsg(error.message);
-        return;
-      }
-      if (Platform.OS === 'web' && data?.url && typeof window !== 'undefined') {
-        window.location.assign(data.url);
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Google sign-in failed.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleSignIn = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -323,8 +284,56 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
               </View>
             )}
 
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>
+                Partner Email
+              </Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="pharmacy@adityamniramayaa.com"
+                placeholderTextColor="#9CA3AF"
+                style={{
+                  backgroundColor: THEME.bg,
+                  borderWidth: 1,
+                  borderColor: THEME.border,
+                  borderRadius: 10,
+                  paddingHorizontal: 13,
+                  paddingVertical: 11,
+                  fontSize: 14,
+                  color: THEME.ink,
+                }}
+              />
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>
+                Password
+              </Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="Enter password"
+                placeholderTextColor="#9CA3AF"
+                onSubmitEditing={handleSignIn}
+                style={{
+                  backgroundColor: THEME.bg,
+                  borderWidth: 1,
+                  borderColor: THEME.border,
+                  borderRadius: 10,
+                  paddingHorizontal: 13,
+                  paddingVertical: 11,
+                  fontSize: 14,
+                  color: THEME.ink,
+                }}
+              />
+            </View>
+
             <TouchableOpacity
-              onPress={handleGoogleSignIn}
+              onPress={handleSignIn}
               disabled={submitting}
               activeOpacity={0.85}
               style={{
@@ -334,107 +343,15 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 10,
+                gap: 8,
+                marginTop: 4,
               }}
             >
-              <View
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 11,
-                  backgroundColor: '#FFFFFF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontSize: 12.5, fontWeight: '900', color: THEME.greenDark }}>G</Text>
-              </View>
+              <Lock size={16} color="#FFFFFF" />
               <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
-                {submitting ? 'Redirecting to Google...' : 'Continue with Google'}
+                {submitting ? 'Signing in...' : 'Sign In to Partner Desk'}
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowPasswordLogin((v) => !v)}
-              style={{ alignItems: 'center', paddingVertical: 2 }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.muted }}>
-                {showPasswordLogin ? 'Hide Email & Password Login ▲' : 'Partner Email & Password Login ▼'}
-              </Text>
-            </TouchableOpacity>
-
-            {showPasswordLogin && (
-              <>
-                <View style={{ gap: 6 }}>
-                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>
-                    Partner Email
-                  </Text>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    placeholder="pharmacy@adityamniramayaa.com"
-                    placeholderTextColor="#9CA3AF"
-                    style={{
-                      backgroundColor: THEME.bg,
-                      borderWidth: 1,
-                      borderColor: THEME.border,
-                      borderRadius: 10,
-                      paddingHorizontal: 13,
-                      paddingVertical: 11,
-                      fontSize: 14,
-                      color: THEME.ink,
-                    }}
-                  />
-                </View>
-
-                <View style={{ gap: 6 }}>
-                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>
-                    Password
-                  </Text>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    placeholder="Enter password"
-                    placeholderTextColor="#9CA3AF"
-                    onSubmitEditing={handleSignIn}
-                    style={{
-                      backgroundColor: THEME.bg,
-                      borderWidth: 1,
-                      borderColor: THEME.border,
-                      borderRadius: 10,
-                      paddingHorizontal: 13,
-                      paddingVertical: 11,
-                      fontSize: 14,
-                      color: THEME.ink,
-                    }}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleSignIn}
-                  disabled={submitting}
-                  activeOpacity={0.85}
-                  style={{
-                    backgroundColor: THEME.greenDark,
-                    borderRadius: 12,
-                    paddingVertical: 13,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    marginTop: 4,
-                  }}
-                >
-                  <Lock size={16} color="#FFFFFF" />
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
-                    {submitting ? 'Signing in...' : 'Sign In with Email & Password'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
 
             <View
               style={{

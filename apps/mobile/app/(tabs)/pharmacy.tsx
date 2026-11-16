@@ -8,6 +8,7 @@ import {
   ScrollView,
   Pressable,
   TouchableOpacity,
+  TextInput,
   Alert,
   Linking,
   Platform,
@@ -118,6 +119,7 @@ export default function PharmacyScreen() {
   const [paidInApp, setPaidInApp] = useState<boolean | null>(null);
   const [reqRef, setReqRef] = useState('');
   const [code, setCode] = useState('');
+  const [patientNote, setPatientNote] = useState('');
   const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
   const [selectedOrder, setSelectedOrder] = useState<HistoryItem | null>(null);
   const [memberSheet, setMemberSheet] = useState(false);
@@ -191,31 +193,37 @@ export default function PharmacyScreen() {
 
   const { data: dbPharmacies } = usePharmacies();
 
-  // Combine database pharmacies with comprehensive city partner network
-  const livePharmacies: Pharmacy[] = useMemo(() => {
-    const list: Pharmacy[] = [...PHARMACIES];
-    if (dbPharmacies && dbPharmacies.length > 0) {
-      dbPharmacies.forEach((p: any) => {
-        if (!list.some((existing) => existing.id === p.id)) {
-          list.push({
-            id: p.id,
-            name: p.name,
-            nameHi: p.name_hi ?? p.name,
-            area: p.area,
-            areaHi: p.area_hi ?? p.area,
-            lat: Number(p.latitude ?? p.lat ?? 28.5355),
-            lng: Number(p.longitude ?? p.lng ?? 77.21),
-            sampleKm: Number(p.distance_km ?? 1.2),
-            rating: Number(p.rating ?? 4.5),
-            reviews: Number(p.reviews ?? 100),
-            delivery: Boolean(p.delivery),
-            pickup: Boolean(p.pickup),
-            appDiscountPct: Number(p.app_discount_pct ?? 15),
-          });
-        }
-      });
+  // Auto-switch to Counter Pickup if selected pharmacy has disabled Home Delivery
+  useEffect(() => {
+    if (!dbPharmacies || !shopId) return;
+    const found = dbPharmacies.find((p: any) => p.id === shopId);
+    if (found && found.delivery === false && mode === 'delivery') {
+      setMode('pickup');
     }
-    return list;
+  }, [dbPharmacies, shopId, mode]);
+
+  // Prefer live Supabase pharmacies (only active stores); fall back to static list only if offline/empty
+  const livePharmacies: Pharmacy[] = useMemo(() => {
+    if (dbPharmacies && dbPharmacies.length > 0) {
+      return dbPharmacies
+        .filter((p: any) => p.is_active !== false)
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          nameHi: p.name_hi ?? p.name,
+          area: p.area,
+          areaHi: p.area_hi ?? p.area,
+          lat: Number(p.latitude ?? p.lat ?? 26.9205),
+          lng: Number(p.longitude ?? p.lng ?? 75.845),
+          sampleKm: Number(p.distance_km ?? 1.2),
+          rating: Number(p.rating ?? 4.5),
+          reviews: Number(p.reviews ?? 100),
+          delivery: Boolean(p.delivery),
+          pickup: Boolean(p.pickup),
+          appDiscountPct: Number(p.app_discount_pct ?? 15),
+        }));
+    }
+    return [...PHARMACIES];
   }, [dbPharmacies]);
 
   // Priority coordinate resolution: Active Saved Address > LocationContext Coords > GPS > Regional Fallback
@@ -396,6 +404,7 @@ export default function PharmacyScreen() {
       user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       patient_name: forName || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
       patient_phone: (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999') ? user.phone : '',
+      hospital_id: shop.id,
       hospital_name: shop.name,
       branch_name: shop.area,
       doctor_name: 'Adityam Partner Pharmacy',
@@ -404,11 +413,12 @@ export default function PharmacyScreen() {
       specialty_requested: 'Pharmacy & Medicines',
       status: 'PAID',
       call_status: 'connected',
+      verification_code: verifyCode,
       bill_amount: 0,
       discount_amount: 0,
       final_payable: 0,
       bill_image_url: uploadedImageUrl || images[0] || null,
-      notes: `Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Verification PIN: ${verifyCode}. Mode: ${mode}.${
+      notes: `${patientNote.trim() ? `Customer Note: ${patientNote.trim()}. ` : ''}Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Verification PIN: ${verifyCode}. Mode: ${mode}.${
         mode === 'delivery'
           ? ` Delivery Address: ${
               activeAddress
@@ -423,6 +433,7 @@ export default function PharmacyScreen() {
     };
 
     await saveNewBooking(newBooking).catch(() => {});
+    setPatientNote('');
     triggerBrowserNotification(
       'Prescription Sent to Pharmacy',
       `Order #${orderRef} dispatched to ${shop.name}. Mode: ${mode === 'delivery' ? 'Home Delivery' : 'Pickup'}`
@@ -837,6 +848,71 @@ export default function PharmacyScreen() {
                       onSelect={(id) => setShopId(id)}
                     />
                   ))}
+                </View>
+
+                {/* Instructions / Notes for Pharmacist */}
+                <View
+                  style={{
+                    marginTop: 14,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: R.md,
+                    padding: 13,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                    gap: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
+                    {isHi ? 'फार्मेसी के लिए निर्देश (वैकल्पिक)' : 'Instructions for Pharmacist (Optional)'}
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {(isHi
+                      ? ['1 सप्ताह की दवा दें', '1 महीने की दवा दें', 'जेनेरिक विकल्प चलेगा', 'पैक करने से पहले कॉल करें']
+                      : ['Need medicine for 1 week', 'Need medicine for 1 month', 'Generic substitute OK', 'Call before packing']
+                    ).map((chip) => (
+                      <Pressable
+                        key={chip}
+                        onPress={() =>
+                          setPatientNote((prev) =>
+                            prev.trim() ? (prev.includes(chip) ? prev : `${prev.trim()}, ${chip}`) : chip
+                          )
+                        }
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 99,
+                          backgroundColor: '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.ink }}>{chip}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                  <TextInput
+                    value={patientNote}
+                    onChangeText={setPatientNote}
+                    multiline
+                    placeholder={
+                      isHi
+                        ? 'जैसे: केवल टैबलेट नं. 1 और 2 दें, 10 दिन के लिए...'
+                        : 'e.g. Give only medicine #1 & #2 for 1 week, call if out of stock...'
+                    }
+                    placeholderTextColor="#94A3B8"
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      borderRadius: 10,
+                      paddingHorizontal: 11,
+                      paddingVertical: 9,
+                      fontSize: 13,
+                      color: C.ink,
+                      minHeight: 54,
+                      textAlignVertical: 'top',
+                    }}
+                  />
                 </View>
               </View>
             </ScrollView>

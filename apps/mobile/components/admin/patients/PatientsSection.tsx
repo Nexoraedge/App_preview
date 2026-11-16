@@ -129,7 +129,9 @@ export function PatientsSection({ bookings }: PatientsSectionProps) {
           .order('is_default', { ascending: false }),
       ]);
 
-      const uList = (uRes.data || []) as PatientUser[];
+      const uList = ((uRes.data || []) as PatientUser[]).filter(
+        (u) => !u.role || String(u.role).toLowerCase() === 'patient'
+      );
       setUsers(uList);
       setDependents((dRes.data || []) as PatientDependent[]);
       setAddresses((aRes.data || []) as PatientAddress[]);

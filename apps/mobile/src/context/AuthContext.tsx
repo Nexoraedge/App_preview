@@ -95,6 +95,22 @@ const syncAuthUserToDatabase = async (sessionUser: any, client: any, existingUse
     if (data) dbUser = data;
   } catch {}
 
+  // Block Admin, Staff, and Partner accounts from signing into the Patient App
+  const appMode = String(process.env.EXPO_PUBLIC_APP_MODE || '').toLowerCase();
+  const isStaffPortalPath =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/partner'));
+  if (appMode !== 'admin' && appMode !== 'partner' && !isStaffPortalPath) {
+    const existingRole = String(dbUser?.role || 'patient').toLowerCase();
+    if (existingRole !== 'patient') {
+      await client.auth.signOut().catch(() => {});
+      throw new Error(
+        'This email belongs to an Admin, Staff, or Partner account and cannot log in to the Patient App.'
+      );
+    }
+  }
+
   const isDemo = userId === '00000000-0000-0000-0000-000000000001';
   const cleanCity = dbUser?.city && (isDemo || dbUser.city !== 'Delhi NCR') ? dbUser.city : '';
 
@@ -260,9 +276,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         client.auth.getSession().then(async ({ data: { session } }) => {
           if (session?.user) {
-            const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
-            setUser(syncedUser);
-            saveUserSession(syncedUser);
+            try {
+              const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
+              setUser(syncedUser);
+              saveUserSession(syncedUser);
+            } catch (err: any) {
+              setUser(null);
+              if (Platform.OS === 'web' && typeof window !== 'undefined' && err?.message) {
+                window.alert(err.message);
+              }
+            }
           }
         }).catch(() => {});
 
@@ -272,9 +295,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
           if (session?.user) {
-            const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
-            setUser(syncedUser);
-            saveUserSession(syncedUser);
+            try {
+              const syncedUser = await syncAuthUserToDatabase(session.user, client, user);
+              setUser(syncedUser);
+              saveUserSession(syncedUser);
+            } catch (err: any) {
+              setUser(null);
+              if (Platform.OS === 'web' && typeof window !== 'undefined' && err?.message) {
+                window.alert(err.message);
+              }
+            }
           }
         });
       }).catch(() => {});

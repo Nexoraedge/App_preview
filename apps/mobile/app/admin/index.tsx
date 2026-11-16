@@ -189,7 +189,7 @@ export default function AdminDashboardScreen() {
         supabase.from('hospitals').select('id', { count: 'exact', head: true }),
         supabase.from('lab_centres').select('id', { count: 'exact', head: true }),
         supabase.from('pharmacies').select('id', { count: 'exact', head: true }),
-        supabase.from('users').select('id, created_at'),
+        supabase.from('users').select('id, created_at, role'),
         supabase
           .from('partner_enquiries')
           .select('id', { count: 'exact', head: true })
@@ -220,7 +220,9 @@ export default function AdminDashboardScreen() {
       );
       setBookings(sortedList);
 
-      const userRows = Array.isArray(usersRes.data) ? usersRes.data : [];
+      const userRows = (Array.isArray(usersRes.data) ? usersRes.data : []).filter(
+        (u: any) => !u.role || String(u.role).toLowerCase() === 'patient'
+      );
       const userCreatedDates = userRows
         .map((u: any) => u.created_at)
         .filter((d: any): d is string => Boolean(d));
