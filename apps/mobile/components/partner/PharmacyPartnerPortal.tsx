@@ -1879,8 +1879,8 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                         </View>
                       ) : null}
 
-                      {/* Step 2: Shown ONLY after patient pays (PAID) or when COMPLETED/CANCELLED */}
-                      {(isPaid || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELLED') && (
+                      {/* Step 2: Shown ONLY after patient pays (PAID) AND quote was sent (hasSentQuote), or when COMPLETED/CANCELLED */}
+                      {((isPaid && hasSentQuote) || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELLED') && (
                         <View
                           style={{
                             backgroundColor: THEME.surface,

@@ -122,3 +122,57 @@ export function playPartnerOrderAlarm(
     // Ignore audio context restrictions before user interaction
   }
 }
+
+/**
+ * Plays a pleasant ascending 4-note chime when the pharmacy sends an itemized bill
+ * to the patient app, plus browser Notification / mobile Vibration.
+ */
+export function playPatientBillChime(
+  title = 'Medicine Bill Ready!',
+  body = 'Your pharmacy has sent your itemized bill. Tap to review and pay.'
+) {
+  try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        const playNote = (freq: number, startOffset: number, duration: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + startOffset);
+          gain.gain.setValueAtTime(0.001, now + startOffset);
+          gain.gain.exponentialRampToValueAtTime(0.24, now + startOffset + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + startOffset);
+          osc.stop(now + startOffset + duration);
+        };
+
+        // Pleasant C-major ascending chime (C5 -> E5 -> G5 -> C6)
+        playNote(523.25, 0, 0.22);
+        playNote(659.25, 0.14, 0.22);
+        playNote(783.99, 0.28, 0.24);
+        playNote(1046.5, 0.42, 0.45);
+
+        setTimeout(() => {
+          ctx.close().catch(() => {});
+        }, 1100);
+      }
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body });
+      }
+    } else {
+      Vibration.vibrate([0, 180, 90, 240]);
+    }
+  } catch {
+    // Ignore audio context restrictions before user interaction
+  }
+}

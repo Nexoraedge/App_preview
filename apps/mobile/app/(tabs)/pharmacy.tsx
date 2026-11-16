@@ -42,13 +42,15 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useLocation } from '../../src/context/LocationContext';
 import { saveNewBooking, getLocalBookings, subscribeBookings, subscribeCloudBookings } from '../../src/services/bookingStorage';
 import { triggerBrowserNotification } from '../../src/services/notificationService';
-import { uploadPrescriptionSlip } from '../../src/lib/supabase';
+import { playPatientBillChime } from '../../src/services/adminAlerts';
+import { getSupabaseClient, uploadPrescriptionSlip } from '../../src/lib/supabase';
 import {
   PHARMACIES,
   SAMPLE_BILL,
   distanceKm,
   getPharmacyName,
   getPharmacyArea,
+  type BillLine,
   type RequestStatus,
   type Pharmacy,
 } from '../../src/data/pharmacySample';
@@ -126,7 +128,34 @@ export default function PharmacyScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [profileVisible, setProfileVisible] = useState(false);
   const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
+  const [liveTrackedBooking, setLiveTrackedBooking] = useState<any | null>(null);
   const askedLoc = useRef(false);
+  const billSoundPlayedRef = useRef<string | null>(null);
+
+  const syncTrackedBooking = (matched: any) => {
+    if (!matched) return;
+    setLiveTrackedBooking(matched);
+    const hasBill =
+      Number(matched.bill_amount || 0) > 0 &&
+      matched.status !== 'NEW' &&
+      matched.status !== 'CALLING';
+
+    if (matched.status === 'COMPLETED' || matched.status === 'PAID') {
+      setPaidInApp(true);
+      setStatus('ready');
+    } else if (hasBill && matched.status === 'CONFIRMED') {
+      setStatus('quoted');
+      if (billSoundPlayedRef.current !== matched.booking_ref) {
+        billSoundPlayedRef.current = matched.booking_ref;
+        playPatientBillChime(
+          isHi ? 'फार्मेसी से बिल प्राप्त हुआ!' : 'Medicine Bill Ready!',
+          isHi
+            ? `${matched.hospital_name || 'फार्मेसी'} ने ₹${matched.final_payable} का बिल भेजा है।`
+            : `${matched.hospital_name || 'Pharmacy'} sent a bill of ₹${matched.final_payable}. Review & pay.`
+        );
+      }
+    }
+  };
 
   // Load real pharmacy orders for logged-in user (clean state for fresh accounts)
   useEffect(() => {
@@ -141,6 +170,11 @@ export default function PharmacyScreen() {
               ? b.user_id === '00000000-0000-0000-0000-000000000001' || !b.user_id
               : user?.id && b.user_id === user.id)
         );
+
+        if (reqRef) {
+          const tracked = pharmacyBookings.find((b) => b.booking_ref === reqRef);
+          if (tracked) syncTrackedBooking(tracked);
+        }
 
         if (pharmacyBookings.length > 0) {
           const items: HistoryItem[] = pharmacyBookings.map((b) => {
@@ -273,6 +307,47 @@ export default function PharmacyScreen() {
     return () => unsub();
   }, [user?.id]);
 
+  // Live poll + Supabase channel for active order tracking so bill appears immediately with chime
+  useEffect(() => {
+    if (stage !== 'track' || !reqRef) return;
+    let cancelled = false;
+    const supabase = getSupabaseClient();
+
+    const fetchLatestOrder = async () => {
+      try {
+        const { data } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('booking_ref', reqRef)
+          .maybeSingle();
+        if (!cancelled && data) {
+          syncTrackedBooking(data);
+        }
+      } catch {}
+    };
+
+    fetchLatestOrder();
+    const timer = setInterval(fetchLatestOrder, 3000);
+    const ch = supabase
+      .channel(`patient-rx-${reqRef}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `booking_ref=eq.${reqRef}` },
+        (payload: any) => {
+          if (!cancelled && payload?.new) {
+            syncTrackedBooking(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      supabase.removeChannel(ch);
+    };
+  }, [stage, reqRef]);
+
   // Calculate live real-time distance and filter pharmacies within active city radius
   const { shops, isSample } = useMemo(() => {
     const listWithDistance = livePharmacies.map((p) => {
@@ -376,7 +451,9 @@ export default function PharmacyScreen() {
     const verifyCode = String(Math.floor(1000 + Math.random() * 9000));
     setReqRef(orderRef);
     setCode(verifyCode);
-    setPaidInApp(true);
+    setPaidInApp(null);
+    setLiveTrackedBooking(null);
+    billSoundPlayedRef.current = null;
     setStatus('reviewing');
     setStage('track');
 
@@ -407,9 +484,9 @@ export default function PharmacyScreen() {
       branch_name: shop.area,
       doctor_name: 'Adityam Partner Pharmacy',
       doctor_fee: 0,
-      slot_time: mode === 'delivery' ? 'Home Delivery (45 mins)' : 'Counter Pickup',
+      slot_time: mode === 'delivery' ? 'Home Delivery' : 'Counter Pickup',
       specialty_requested: 'Pharmacy & Medicines',
-      status: 'PAID',
+      status: 'NEW',
       call_status: 'connected',
       verification_code: verifyCode,
       bill_amount: 0,
@@ -438,14 +515,32 @@ export default function PharmacyScreen() {
     );
   };
 
-  const payInApp = () => {
+  const payInApp = async () => {
     setPaidInApp(true);
-    setStatus('paid');
+    setStatus('ready');
+    if (reqRef) {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase
+          .from('bookings')
+          .update({ status: 'PAID', updated_at: new Date().toISOString() })
+          .eq('booking_ref', reqRef);
+      } catch {}
+    }
   };
 
-  const payAtShop = () => {
+  const payAtShop = async () => {
     setPaidInApp(false);
     setStatus('ready');
+    if (reqRef) {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase
+          .from('bookings')
+          .update({ status: 'PAID', updated_at: new Date().toISOString() })
+          .eq('booking_ref', reqRef);
+      } catch {}
+    }
   };
 
   const finish = () => {
@@ -453,6 +548,8 @@ export default function PharmacyScreen() {
     setShopId(null);
     setStatus('sent');
     setPaidInApp(null);
+    setLiveTrackedBooking(null);
+    billSoundPlayedRef.current = null;
     setStage('home');
   };
 
@@ -1111,19 +1208,51 @@ export default function PharmacyScreen() {
                 )}
 
                 {/* Modular Itemized Bill Card */}
-                {status === 'quoted' && shop && (
-                  <PharmacyBillCard
-                    items={SAMPLE_BILL}
-                    shop={shop}
-                    subtotal={subtotal}
-                    discount={discount}
-                    total={total}
-                    mode={mode}
-                    isHi={isHi}
-                    onPayInApp={payInApp}
-                    onPayAtShop={payAtShop}
-                  />
-                )}
+                {status === 'quoted' && shop && (() => {
+                  const realGross = Number(liveTrackedBooking?.bill_amount || 0);
+                  const realDisc = Number(liveTrackedBooking?.discount_amount || 0);
+                  const realTotal = Number(liveTrackedBooking?.final_payable || Math.max(0, realGross - realDisc));
+                  const docText = String(liveTrackedBooking?.doctor_name || '').trim();
+                  const parsedLines: BillLine[] = [];
+                  if (docText && docText !== 'Adityam Partner Pharmacy') {
+                    docText.split(',').map((s) => s.trim()).filter(Boolean).forEach((part, idx) => {
+                      const m = part.match(/^(.+?)\s*\(([^)]+)\)\s*₹\s*([0-9.]+)$/);
+                      if (m) {
+                        parsedLines.push({
+                          id: `rx-${idx}`,
+                          name: m[1].trim(),
+                          nameHi: m[1].trim(),
+                          qty: Number(m[2]) || 1,
+                          price: Number(m[3]) || 0,
+                        });
+                      }
+                    });
+                  }
+                  const billItems: BillLine[] = parsedLines.length > 0
+                    ? parsedLines
+                    : [
+                        {
+                          id: 'rx-1',
+                          name: 'Prescription Medicine Order',
+                          nameHi: 'पर्चे अनुसार औषधियां',
+                          qty: 1,
+                          price: realGross > 0 ? realGross : subtotal,
+                        },
+                      ];
+                  return (
+                    <PharmacyBillCard
+                      items={billItems}
+                      shop={shop}
+                      subtotal={realGross > 0 ? realGross : subtotal}
+                      discount={realGross > 0 ? realDisc : discount}
+                      total={realGross > 0 ? realTotal : total}
+                      mode={mode}
+                      isHi={isHi}
+                      onPayInApp={payInApp}
+                      onPayAtShop={payAtShop}
+                    />
+                  );
+                })()}
 
                 {/* Ready Code Verification Card */}
                 {status === 'ready' && (
