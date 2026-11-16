@@ -366,7 +366,7 @@ export default function AdminDashboardScreen() {
     setEditDiscount(b.discount_amount ? String(b.discount_amount) : '');
     const payable = b.final_payable ?? b.doctor_fee ?? 0;
     setEditFinalPayable(payable ? String(payable) : '');
-    setEditNotes(b.notes || '');
+    setEditNotes(String((b as any).partner_notes || ''));
   };
 
   const handleSaveBookingChanges = async () => {
@@ -389,9 +389,9 @@ export default function AdminDashboardScreen() {
         discount_amount: discountNum,
         final_payable: payableNum,
         doctor_fee: payableNum,
-        notes: editNotes.trim() || selectedBooking.notes,
         updated_at: new Date().toISOString(),
       };
+      (updatedBooking as any).partner_notes = editNotes.trim() || null;
 
       const supabase = getSupabaseClient();
       await supabase
@@ -405,7 +405,7 @@ export default function AdminDashboardScreen() {
           discount_amount: updatedBooking.discount_amount,
           final_payable: updatedBooking.final_payable,
           doctor_fee: updatedBooking.doctor_fee,
-          notes: updatedBooking.notes,
+          partner_notes: editNotes.trim() || null,
           updated_at: updatedBooking.updated_at,
         })
         .eq('booking_ref', selectedBooking.booking_ref);
@@ -1227,10 +1227,31 @@ export default function AdminDashboardScreen() {
                 </View>
               </View>
 
-              {/* Notes */}
+              {/* Customer Note (Read-Only) */}
+              {selectedBooking?.notes ? (
+                <View
+                  style={{
+                    backgroundColor: '#FEF7E6',
+                    borderRadius: 10,
+                    padding: 11,
+                    borderWidth: 1,
+                    borderColor: '#F3DBA8',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#9A5B13', textTransform: 'uppercase' }}>
+                    Customer Note & Booking Details
+                  </Text>
+                  <Text style={{ fontSize: 12, color: THEME.ink, lineHeight: 17 }}>
+                    {selectedBooking.notes}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Coordinator Notes (Separate Internal Column) */}
               <View>
                 <Text style={{ fontSize: 11, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                  Coordinator Notes
+                  Coordinator Notes (Internal)
                 </Text>
                 <TextInput
                   value={editNotes}

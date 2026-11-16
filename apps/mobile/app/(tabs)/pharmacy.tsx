@@ -165,7 +165,7 @@ export default function PharmacyScreen() {
                 minute: '2-digit',
               }),
               status: hasRealBill ? (b.status === 'PAID' ? 'delivered' : 'ready') : 'ready',
-              patientName: b.patient_name || 'Myself',
+              patientName: b.patient_name || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
               items: [
                 {
                   id: 'rx-1',
@@ -317,13 +317,11 @@ export default function PharmacyScreen() {
   const maxPct = Math.max(...livePharmacies.map((p) => p.appDiscountPct));
   const forName = fam?.active
     ? fam.active.relation === 'Self'
-      ? isHi
-        ? 'स्वयं (Myself)'
-        : 'Myself'
+      ? user?.full_name || fam.active.name || (isHi ? 'रोगी' : 'Patient')
       : isHi
       ? fam.active.nameHi || fam.active.name
       : fam.active.name
-    : null;
+    : user?.full_name || null;
 
   const addImages = (uris: string[]) =>
     setImages((prev) => [...prev, ...uris].slice(0, MAX_PAGES));
@@ -1237,9 +1235,7 @@ export default function PharmacyScreen() {
                         }}
                       >
                         {m.relation === 'Self'
-                          ? isHi
-                            ? 'स्वयं (Myself)'
-                            : 'Myself'
+                          ? user?.full_name || m.name || (isHi ? 'स्वयं' : 'Self')
                           : memberName}
                       </Text>
                       <Text

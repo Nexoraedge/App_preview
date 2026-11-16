@@ -221,12 +221,15 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     isDemoUser ? DEMO_REVIEWER_ADDRESSES[0] : null
   );
   const [currentLocationName, setCurrentLocationName] = useState<string>(
-    isDemoUser ? 'Surajpole Gate, Jaipur' : initialHub.name
+    isDemoUser ? 'Surajpole Gate, Jaipur' : user?.city ? user.city : 'Select Location'
   );
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>({
-    latitude: isDemoUser ? 26.9205 : initialHub.latitude,
-    longitude: isDemoUser ? 75.8450 : initialHub.longitude,
-  });
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(
+    isDemoUser
+      ? { latitude: 26.9205, longitude: 75.845 }
+      : user?.city
+      ? { latitude: initialHub.latitude, longitude: initialHub.longitude }
+      : null
+  );
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
   const [isPickerModalOpen, setIsPickerModalOpen] = useState<boolean>(false);
 

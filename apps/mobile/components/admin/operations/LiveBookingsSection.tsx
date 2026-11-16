@@ -121,6 +121,7 @@ export function LiveBookingsSection({
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | '7D' | '30D'>('ALL');
   const [followUpFilter, setFollowUpFilter] = useState<'ALL' | 'MISSED' | 'UPCOMING' | 'NONE'>('ALL');
   const [showStatusGuide, setShowStatusGuide] = useState(false);
+  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
   const [crmTarget, setCrmTarget] = useState<Booking | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<25 | 50>(25);
@@ -543,6 +544,40 @@ export function LiveBookingsSection({
             </View>
 
             <TouchableOpacity
+              onPress={() => setShowFiltersDropdown((prev) => !prev)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                paddingHorizontal: 11,
+                paddingVertical: 8,
+                borderRadius: 9,
+                backgroundColor:
+                  showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
+                    ? THEME.greenDark
+                    : THEME.surfaceAlt,
+                borderWidth: 1,
+                borderColor:
+                  showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
+                    ? THEME.greenDark
+                    : THEME.border,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color:
+                    showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
+                      ? '#FFFFFF'
+                      : THEME.ink,
+                }}
+              >
+                {showFiltersDropdown ? 'Filters ▲' : 'Filters ▼'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               onPress={() => setShowStatusGuide((prev) => !prev)}
               style={{
                 flexDirection: 'row',
@@ -606,6 +641,7 @@ export function LiveBookingsSection({
           </View>
         )}
 
+        {showFiltersDropdown && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {(
@@ -731,6 +767,7 @@ export function LiveBookingsSection({
             })}
           </ScrollView>
         </View>
+        )}
       </View>
 
       {/* Bookings List */}

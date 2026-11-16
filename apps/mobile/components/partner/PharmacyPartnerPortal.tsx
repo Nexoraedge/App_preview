@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useRouter } from 'expo-router';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -26,7 +27,9 @@ import {
   FileImage,
   LayoutDashboard,
   LogOut,
+  Maximize2,
   MessageCircle,
+  Minimize2,
   PackageCheck,
   Phone,
   QrCode,
@@ -175,7 +178,8 @@ function normalizePhone(phone?: string | null): string {
   return digits;
 }
 
-export function PharmacyPartnerPortal() {
+export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: string } = {}) {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
   const isTablet = width >= 640 && width < 960;
@@ -220,6 +224,10 @@ export function PharmacyPartnerPortal() {
   const [quoteGrossInput, setQuoteGrossInput] = useState('');
   const [quoteDiscountPct, setQuoteDiscountPct] = useState('15');
   const [isSavingQuote, setIsSavingQuote] = useState(false);
+  const [quoteSavedMsg, setQuoteSavedMsg] = useState<string | null>(null);
+  const [quoteConfirmOpen, setQuoteConfirmOpen] = useState(false);
+  const [isEditingSentQuote, setIsEditingSentQuote] = useState(false);
+  const [deliveryEtaInput, setDeliveryEtaInput] = useState('');
 
   // Reject / Out-of-Stock Modal State
   const [rejectTarget, setRejectTarget] = useState<BookingWithPartner | null>(null);
@@ -255,8 +263,10 @@ export function PharmacyPartnerPortal() {
     patient: string;
   } | null>(null);
 
-  // Rx Image Preview Modal
+  // Rx Image Preview Modal + Order Detail Inspector Modal
   const [rxPreviewUrl, setRxPreviewUrl] = useState<string | null>(null);
+  const [rxFullScreen, setRxFullScreen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<BookingWithPartner | null>(null);
 
   // Register PWA Manifest + Service Worker on Web
   useEffect(() => {
@@ -641,12 +651,66 @@ export function PharmacyPartnerPortal() {
     }
   };
 
-  const handleSaveQuote = async () => {
-    if (!quoteTarget) return;
+  const parseItemizedMedicines = (text?: string | null): { name: string; qty: string; price: string }[] => {
+    if (!text) return [];
+    const cleaned = text.replace(/^Quote:\s*/i, '').split('|')[0]?.trim() || '';
+    if (!cleaned || cleaned === 'Adityam Partner Pharmacy') return [];
+    const parts = cleaned.split(',').map((s) => s.trim()).filter(Boolean);
+    const parsed: { name: string; qty: string; price: string }[] = [];
+    for (const p of parts) {
+      const m = p.match(/^(.+?)\s*\(([^)]+)\)\s*₹\s*([0-9.]+)$/);
+      if (m) {
+        parsed.push({ name: m[1].trim(), qty: m[2].trim(), price: m[3].trim() });
+      }
+    }
+    return parsed;
+  };
+
+  const restoreQuoteStateForOrder = (o: BookingWithPartner) => {
+    const fromDoc = parseItemizedMedicines(o.doctor_name);
+    const restored = fromDoc.length > 0 ? fromDoc : parseItemizedMedicines(o.partner_notes);
+    setQuoteItems(restored.length > 0 ? restored : [{ name: '', qty: '1', price: '' }]);
+    setQuoteGrossInput(o.bill_amount && Number(o.bill_amount) > 0 ? String(o.bill_amount) : '');
+    setQuoteDiscountPct(String(currentPharmacy?.app_discount_pct ?? 20));
+    setQuoteSavedMsg(null);
+    setIsEditingSentQuote(false);
+    setQuoteConfirmOpen(false);
+    setDeliveryEtaInput('');
+  };
+
+  const openOrderWorkspace = (o: BookingWithPartner) => {
+    setSelectedOrder(o);
+    restoreQuoteStateForOrder(o);
+    if (o.booking_ref && initialOrderRef !== o.booking_ref) {
+      router.push(`/partner/orders/${encodeURIComponent(o.booking_ref)}` as any);
+    }
+  };
+
+  useEffect(() => {
+    if (!initialOrderRef || orders.length === 0) return;
+    if (selectedOrder?.booking_ref === initialOrderRef) return;
+    const match = orders.find((o) => o.booking_ref === initialOrderRef);
+    if (match) {
+      setSelectedOrder(match);
+      restoreQuoteStateForOrder(match);
+    }
+  }, [initialOrderRef, orders, selectedOrder?.booking_ref, currentPharmacy?.app_discount_pct]);
+
+  const handleNavTabPress = (tabId: PartnerTab) => {
+    setSelectedOrder(null);
+    setActiveTab(tabId);
+    if (initialOrderRef) {
+      router.replace('/partner' as any);
+    }
+  };
+
+  const handleSaveQuote = async (overrideTarget?: BookingWithPartner) => {
+    const target = overrideTarget || quoteTarget || selectedOrder;
+    if (!target) return;
     const validItems = quoteItems.filter((it) => it.name.trim() && Number(it.price) > 0);
     const itemsSum = validItems.reduce((sum, it) => sum + Number(it.price || 0), 0);
     const gross = itemsSum > 0 ? itemsSum : Number(quoteGrossInput);
-    const discPct = Math.min(80, Math.max(0, Number(quoteDiscountPct || 0)));
+    const discPct = Math.min(80, Math.max(0, Number(currentPharmacy?.app_discount_pct ?? quoteDiscountPct ?? 0)));
     if (!Number.isFinite(gross) || gross <= 0) return;
 
     const discountAmount = Math.round((gross * discPct) / 100);
@@ -654,9 +718,16 @@ export function PharmacyPartnerPortal() {
     const itemSummary =
       validItems.length > 0
         ? validItems.map((it) => `${it.name.trim()} (${it.qty || '1'}) ₹${it.price}`).join(', ')
-        : quoteTarget.doctor_name;
+        : target.doctor_name;
+    const nextStatus =
+      target.status === 'NEW' || target.status === 'CALLING' ? 'CONFIRMED' : target.status;
+    const nextNotes =
+      validItems.length > 0
+        ? `Quote: ${itemSummary} | Net ₹${finalPayable}`
+        : target.partner_notes || null;
 
     setIsSavingQuote(true);
+    setQuoteSavedMsg(null);
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -666,17 +737,11 @@ export function PharmacyPartnerPortal() {
           discount_amount: discountAmount,
           final_payable: finalPayable,
           doctor_name: itemSummary,
-          partner_notes:
-            validItems.length > 0
-              ? `Quote: ${itemSummary} | Net ₹${finalPayable}`
-              : quoteTarget.partner_notes || null,
-          status:
-            quoteTarget.status === 'NEW' || quoteTarget.status === 'CALLING'
-              ? 'CONFIRMED'
-              : quoteTarget.status,
+          partner_notes: nextNotes,
+          status: nextStatus,
           updated_at: new Date().toISOString(),
         })
-        .eq('booking_ref', quoteTarget.booking_ref);
+        .eq('booking_ref', target.booking_ref);
 
       if (error) throw error;
 
@@ -688,12 +753,26 @@ export function PharmacyPartnerPortal() {
           sourcePanel: 'PARTNER_PORTAL',
           action: 'PARTNER_QUOTE_SUBMITTED',
           entityType: 'booking',
-          entityId: quoteTarget.booking_ref,
+          entityId: target.booking_ref,
           details: { gross, discountAmount, finalPayable, itemSummary },
         });
       }
 
       setQuoteTarget(null);
+      setQuoteConfirmOpen(false);
+      setIsEditingSentQuote(false);
+      if (selectedOrder && selectedOrder.booking_ref === target.booking_ref) {
+        setSelectedOrder({
+          ...selectedOrder,
+          bill_amount: gross,
+          discount_amount: discountAmount,
+          final_payable: finalPayable,
+          doctor_name: itemSummary,
+          partner_notes: nextNotes,
+          status: nextStatus,
+        });
+        setQuoteSavedMsg(`Quote sent! Patient payable is ${formatInr(finalPayable)} (${discPct}% off).`);
+      }
       await loadPartnerData();
     } catch {
       // handled silently
@@ -702,17 +781,37 @@ export function PharmacyPartnerPortal() {
     }
   };
 
-  const handleDeliveryStage = async (o: BookingWithPartner, stageLabel: 'Packing Medicines' | 'Out for Delivery') => {
+  const handleUnlockCounterPay = async (o: BookingWithPartner) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'PAID',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('booking_ref', o.booking_ref);
+      if (error) throw error;
+      if (selectedOrder && selectedOrder.booking_ref === o.booking_ref) {
+        setSelectedOrder({ ...selectedOrder, status: 'PAID' });
+      }
+      await loadPartnerData();
+    } catch {}
+  };
+
+  const handleDeliveryStage = async (o: BookingWithPartner, stageLabel: string) => {
     try {
       const supabase = getSupabaseClient();
       await supabase
         .from('bookings')
         .update({
           slot_time: stageLabel,
-          partner_notes: `${stageLabel} (${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})`,
           updated_at: new Date().toISOString(),
         })
         .eq('booking_ref', o.booking_ref);
+      if (selectedOrder && selectedOrder.booking_ref === o.booking_ref) {
+        setSelectedOrder({ ...selectedOrder, slot_time: stageLabel });
+      }
       await loadPartnerData();
     } catch {}
   };
@@ -939,7 +1038,7 @@ export function PharmacyPartnerPortal() {
                 return (
                   <TouchableOpacity
                     key={tab.id}
-                    onPress={() => setActiveTab(tab.id)}
+                    onPress={() => handleNavTabPress(tab.id)}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1237,6 +1336,759 @@ export function PharmacyPartnerPortal() {
             <View style={{ padding: 48, alignItems: 'center' }}>
               <ActivityIndicator size="large" color={THEME.green} />
             </View>
+          ) : selectedOrder ? (
+            /* Full-Page Order Slug Workspace (Side-by-Side Rx + Easy Quotation + Progress Stepper) */
+            <View style={{ gap: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedOrder(null);
+                    if (initialOrderRef) {
+                      router.replace('/partner' as any);
+                    }
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 9,
+                    backgroundColor: THEME.surface,
+                    borderWidth: 1,
+                    borderColor: THEME.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: THEME.ink }}>← Back to Orders</Text>
+                </TouchableOpacity>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>
+                    #{selectedOrder.booking_ref}
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: selectedOrder.status === 'COMPLETED' ? THEME.greenSoft : THEME.amberBg,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderRadius: 99,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '800',
+                        color: selectedOrder.status === 'COMPLETED' ? THEME.green : THEME.amberText,
+                      }}
+                    >
+                      {selectedOrder.status}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Side-by-Side on Desktop, Stacked on Mobile */}
+              <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14, alignItems: 'flex-start' }}>
+                {/* Left Column: Embedded Rx Image + Customer Details & Note */}
+                <View style={{ flex: 1, width: '100%', gap: 12 }}>
+                  {selectedOrder.bill_image_url ? (
+                    <View
+                      style={{
+                        backgroundColor: THEME.surface,
+                        borderRadius: 14,
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: THEME.border,
+                        gap: 8,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: THEME.ink }}>
+                          Uploaded Prescription
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setRxFullScreen(true);
+                            setRxPreviewUrl(selectedOrder.bill_image_url || null);
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 7,
+                            backgroundColor: THEME.greenSoft,
+                            borderWidth: 1,
+                            borderColor: THEME.greenBorder,
+                          }}
+                        >
+                          <Maximize2 size={12} color={THEME.greenDark} />
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: THEME.greenDark }}>
+                            Full Screen
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => {
+                          setRxFullScreen(true);
+                          setRxPreviewUrl(selectedOrder.bill_image_url || null);
+                        }}
+                      >
+                        <Image
+                          source={{ uri: selectedOrder.bill_image_url }}
+                          style={{ width: '100%', height: 290, borderRadius: 10, backgroundColor: '#F3F4F6' }}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  <View
+                    style={{
+                      backgroundColor: THEME.surface,
+                      borderRadius: 14,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: THEME.border,
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>
+                      {selectedOrder.patient_name} · {selectedOrder.patient_phone || 'N/A'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: THEME.muted }}>
+                      {selectedOrder.slot_time || 'Pickup / Delivery'}
+                      {selectedOrder.verification_code ? ` · PIN: ${selectedOrder.verification_code}` : ''}
+                    </Text>
+
+                    {selectedOrder.notes ? (
+                      <View
+                        style={{
+                          backgroundColor: THEME.amberBg,
+                          borderRadius: 10,
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: THEME.amberBorder,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.amberText }}>
+                          CUSTOMER NOTE & DELIVERY DETAILS
+                        </Text>
+                        <Text style={{ fontSize: 12, color: THEME.ink, marginTop: 2, lineHeight: 17 }}>
+                          {selectedOrder.notes}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
+                      {selectedOrder.patient_phone ? (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(`tel:${selectedOrder.patient_phone}`)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            backgroundColor: THEME.surfaceAlt,
+                            borderWidth: 1,
+                            borderColor: THEME.border,
+                          }}
+                        >
+                          <Phone size={13} color={THEME.ink} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>Call Patient</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {normalizePhone(selectedOrder.patient_phone) ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            Linking.openURL(
+                              `https://wa.me/${normalizePhone(selectedOrder.patient_phone)}?text=${encodeURIComponent(
+                                `Namaste ${selectedOrder.patient_name}, ${currentPharmacy?.name || 'Pharmacy'} here regarding your Adityam order #${selectedOrder.booking_ref}.`
+                              )}`
+                            )
+                          }
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            backgroundColor: THEME.greenSoft,
+                            borderWidth: 1,
+                            borderColor: THEME.greenBorder,
+                          }}
+                        >
+                          <MessageCircle size={13} color={THEME.greenDark} />
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenDark }}>
+                            WhatsApp Chat
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Right Column: 2-Stage Order Flow (Step 1 Quote -> Payment -> Step 2 Fulfillment) */}
+                {(() => {
+                  const hasSentQuote =
+                    Number(selectedOrder.bill_amount || 0) > 0 &&
+                    selectedOrder.status !== 'NEW' &&
+                    selectedOrder.status !== 'CALLING';
+                  const showStep1Form =
+                    selectedOrder.status !== 'COMPLETED' &&
+                    selectedOrder.status !== 'CANCELLED' &&
+                    (!hasSentQuote || isEditingSentQuote);
+                  const isPaid = selectedOrder.status === 'PAID';
+                  const isPickupOrder =
+                    (selectedOrder.slot_time || '').toLowerCase().includes('pickup') ||
+                    (selectedOrder.notes || '').toLowerCase().includes('mode: pickup');
+                  const savedMeds = parseItemizedMedicines(selectedOrder.doctor_name);
+                  const etaOptions = isPickupOrder
+                    ? ['Pickup Ready Now', 'Pickup Ready (10 mins)', 'Pickup Ready (15 mins)', 'Pickup Ready (30 mins)']
+                    : ['Home Delivery (15 mins)', 'Home Delivery (30 mins)', 'Home Delivery (45 mins)', 'Home Delivery (1 hr)'];
+
+                  return (
+                    <View style={{ flex: 1, width: '100%', gap: 12 }}>
+                      {showStep1Form ? (
+                        <View
+                          style={{
+                            backgroundColor: THEME.surface,
+                            borderRadius: 14,
+                            padding: 15,
+                            borderWidth: 1,
+                            borderColor: THEME.border,
+                            gap: 10,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 14.5, fontWeight: '800', color: THEME.ink }}>
+                              Step 1 · Medicine Quotation
+                            </Text>
+                            <View
+                              style={{
+                                backgroundColor: THEME.greenSoft,
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 99,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.greenDark }}>
+                                {currentPharmacy?.app_discount_pct ?? 20}% OFF (Locked)
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{ gap: 6 }}>
+                            {quoteItems.map((item, idx) => (
+                              <View key={idx} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                <TextInput
+                                  value={item.name}
+                                  onChangeText={(txt) =>
+                                    setQuoteItems((prev) => prev.map((r, i) => (i === idx ? { ...r, name: txt } : r)))
+                                  }
+                                  placeholder="Medicine name"
+                                  placeholderTextColor="#9CA3AF"
+                                  style={{
+                                    flex: 2,
+                                    backgroundColor: THEME.bg,
+                                    borderWidth: 1,
+                                    borderColor: THEME.border,
+                                    borderRadius: 8,
+                                    paddingHorizontal: 9,
+                                    paddingVertical: 8,
+                                    fontSize: 12.5,
+                                    color: THEME.ink,
+                                  }}
+                                />
+                                <TextInput
+                                  value={item.qty}
+                                  onChangeText={(txt) =>
+                                    setQuoteItems((prev) => prev.map((r, i) => (i === idx ? { ...r, qty: txt } : r)))
+                                  }
+                                  placeholder="Qty"
+                                  placeholderTextColor="#9CA3AF"
+                                  style={{
+                                    width: 52,
+                                    backgroundColor: THEME.bg,
+                                    borderWidth: 1,
+                                    borderColor: THEME.border,
+                                    borderRadius: 8,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 8,
+                                    fontSize: 12.5,
+                                    color: THEME.ink,
+                                  }}
+                                />
+                                <TextInput
+                                  value={item.price}
+                                  onChangeText={(txt) =>
+                                    setQuoteItems((prev) => prev.map((r, i) => (i === idx ? { ...r, price: txt } : r)))
+                                  }
+                                  keyboardType="numeric"
+                                  placeholder="₹ MRP"
+                                  placeholderTextColor="#9CA3AF"
+                                  style={{
+                                    width: 76,
+                                    backgroundColor: THEME.bg,
+                                    borderWidth: 1,
+                                    borderColor: THEME.border,
+                                    borderRadius: 8,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 8,
+                                    fontSize: 12.5,
+                                    color: THEME.ink,
+                                  }}
+                                />
+                              </View>
+                            ))}
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => setQuoteItems((prev) => [...prev, { name: '', qty: '1', price: '' }])}
+                            style={{ alignSelf: 'flex-start' }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.green }}>
+                              + Add Another Medicine
+                            </Text>
+                          </TouchableOpacity>
+
+                          <View style={{ gap: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: THEME.muted }}>
+                              {quoteItemsTotal > 0 ? 'Auto-Summed Gross MRP (₹)' : 'Or Enter Total Gross MRP (₹)'}
+                            </Text>
+                            <TextInput
+                              value={quoteItemsTotal > 0 ? String(quoteItemsTotal) : quoteGrossInput}
+                              onChangeText={setQuoteGrossInput}
+                              editable={quoteItemsTotal <= 0}
+                              keyboardType="numeric"
+                              placeholder="e.g. 650"
+                              style={{
+                                backgroundColor: quoteItemsTotal > 0 ? THEME.surfaceAlt : THEME.bg,
+                                borderWidth: 1,
+                                borderColor: THEME.border,
+                                borderRadius: 9,
+                                paddingHorizontal: 12,
+                                paddingVertical: 9,
+                                fontSize: 14,
+                                color: THEME.ink,
+                              }}
+                            />
+                          </View>
+
+                          {quotePreviewGross > 0 && (
+                            <View
+                              style={{
+                                backgroundColor: THEME.greenSoft,
+                                borderRadius: 10,
+                                padding: 10,
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <Text style={{ fontSize: 12, color: THEME.greenDark, fontWeight: '700' }}>
+                                Patient Payable ({formatInr(quotePreviewDisc)} off):
+                              </Text>
+                              <Text style={{ fontSize: 14, color: THEME.greenDark, fontWeight: '900' }}>
+                                {formatInr(quotePreviewNet)}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {isEditingSentQuote && (
+                              <TouchableOpacity
+                                onPress={() => setIsEditingSentQuote(false)}
+                                style={{
+                                  flex: 1,
+                                  backgroundColor: THEME.surfaceAlt,
+                                  borderWidth: 1,
+                                  borderColor: THEME.border,
+                                  borderRadius: 10,
+                                  paddingVertical: 12,
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }}>
+                                  Cancel
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                              onPress={() => {
+                                if (quotePreviewGross > 0) {
+                                  setQuoteConfirmOpen(true);
+                                }
+                              }}
+                              disabled={isSavingQuote || quotePreviewGross <= 0}
+                              style={{
+                                flex: 2,
+                                backgroundColor: quotePreviewGross > 0 ? THEME.green : '#9CA3AF',
+                                borderRadius: 10,
+                                paddingVertical: 12,
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
+                                {isSavingQuote ? 'Sending Quote...' : 'Send Quote & Confirm Order'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ) : hasSentQuote ? (
+                        <View
+                          style={{
+                            backgroundColor: THEME.surface,
+                            borderRadius: 14,
+                            padding: 15,
+                            borderWidth: 1,
+                            borderColor: THEME.greenBorder,
+                            gap: 10,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.greenDark }}>
+                              ✓ Step 1 Complete · Quote Sent
+                            </Text>
+                            {selectedOrder.status !== 'COMPLETED' && selectedOrder.status !== 'CANCELLED' && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  restoreQuoteStateForOrder(selectedOrder);
+                                  setIsEditingSentQuote(true);
+                                }}
+                                style={{
+                                  backgroundColor: THEME.surfaceAlt,
+                                  borderWidth: 1,
+                                  borderColor: THEME.border,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5,
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.ink }}>
+                                  Edit Quote
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {savedMeds.length > 0 && (
+                            <View
+                              style={{
+                                backgroundColor: THEME.bg,
+                                borderRadius: 10,
+                                padding: 10,
+                                gap: 5,
+                                borderWidth: 1,
+                                borderColor: THEME.border,
+                              }}
+                            >
+                              {savedMeds.map((m, i) => (
+                                <View
+                                  key={i}
+                                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                                >
+                                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.ink }}>
+                                    {m.name} × {m.qty}
+                                  </Text>
+                                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.ink }}>
+                                    ₹{m.price}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+
+                          <View
+                            style={{
+                              backgroundColor: THEME.greenSoft,
+                              borderRadius: 10,
+                              padding: 10,
+                              gap: 4,
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                              <Text style={{ fontSize: 12, color: THEME.muted }}>Gross MRP</Text>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>
+                                {formatInr(Number(selectedOrder.bill_amount || 0))}
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                              <Text style={{ fontSize: 12, color: THEME.greenDark }}>Discount</Text>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenDark }}>
+                                - {formatInr(Number(selectedOrder.discount_amount || 0))}
+                              </Text>
+                            </View>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                borderTopWidth: 1,
+                                borderTopColor: THEME.greenBorder,
+                                paddingTop: 5,
+                                marginTop: 2,
+                              }}
+                            >
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: THEME.greenDark }}>
+                                {isPaid || selectedOrder.status === 'COMPLETED' ? 'Total Paid' : 'Patient Payable'}
+                              </Text>
+                              <Text style={{ fontSize: 14, fontWeight: '900', color: THEME.greenDark }}>
+                                {formatInr(Number(selectedOrder.final_payable || 0))}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {selectedOrder.status === 'CONFIRMED' && (
+                            <View
+                              style={{
+                                backgroundColor: THEME.amberBg,
+                                borderWidth: 1,
+                                borderColor: THEME.amberBorder,
+                                borderRadius: 10,
+                                padding: 11,
+                                gap: 8,
+                              }}
+                            >
+                              <Text style={{ fontSize: 12.5, fontWeight: '800', color: THEME.amberText }}>
+                                Awaiting Patient Payment
+                              </Text>
+                              <Text style={{ fontSize: 11.5, color: THEME.amberText, lineHeight: 16 }}>
+                                Step 2 (Packing, Delivery Time & Dispense) will unlock automatically once the patient completes payment in the app.
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => handleUnlockCounterPay(selectedOrder)}
+                                style={{
+                                  backgroundColor: '#FFFFFF',
+                                  borderWidth: 1,
+                                  borderColor: THEME.amberBorder,
+                                  borderRadius: 8,
+                                  paddingVertical: 8,
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.amberText }}>
+                                  Paying at Counter / COD → Unlock Step 2
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      ) : null}
+
+                      {/* Step 2: Shown ONLY after patient pays (PAID) or when COMPLETED/CANCELLED */}
+                      {(isPaid || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELLED') && (
+                        <View
+                          style={{
+                            backgroundColor: THEME.surface,
+                            borderRadius: 14,
+                            padding: 15,
+                            borderWidth: 1,
+                            borderColor: THEME.border,
+                            gap: 10,
+                          }}
+                        >
+                          <Text style={{ fontSize: 14.5, fontWeight: '800', color: THEME.ink }}>
+                            Step 2 · Packing, {isPickupOrder ? 'Pickup Ready Time' : 'Delivery ETA'} & Dispense
+                          </Text>
+
+                          {isPaid ? (
+                            <View style={{ gap: 10 }}>
+                              <View style={{ gap: 6 }}>
+                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.muted }}>
+                                  {isPickupOrder ? 'Set Counter Pickup Ready Time' : 'Set Home Delivery ETA'}
+                                </Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                  {etaOptions.map((opt) => {
+                                    const active = selectedOrder.slot_time === opt;
+                                    return (
+                                      <TouchableOpacity
+                                        key={opt}
+                                        onPress={() => handleDeliveryStage(selectedOrder, opt)}
+                                        style={{
+                                          paddingHorizontal: 10,
+                                          paddingVertical: 7,
+                                          borderRadius: 8,
+                                          backgroundColor: active ? THEME.greenSoft : THEME.surfaceAlt,
+                                          borderWidth: 1,
+                                          borderColor: active ? THEME.green : THEME.border,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 11.5,
+                                            fontWeight: '700',
+                                            color: active ? THEME.greenDark : THEME.ink,
+                                          }}
+                                        >
+                                          {active ? `✓ ${opt}` : opt}
+                                        </Text>
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+                                  <TextInput
+                                    value={deliveryEtaInput}
+                                    onChangeText={setDeliveryEtaInput}
+                                    placeholder={isPickupOrder ? 'Custom ready time (e.g. Ready at 5:30 PM)' : 'Custom ETA (e.g. Delivery in 2 hrs)'}
+                                    placeholderTextColor="#9CA3AF"
+                                    style={{
+                                      flex: 1,
+                                      backgroundColor: THEME.bg,
+                                      borderWidth: 1,
+                                      borderColor: THEME.border,
+                                      borderRadius: 8,
+                                      paddingHorizontal: 10,
+                                      paddingVertical: 7,
+                                      fontSize: 12,
+                                      color: THEME.ink,
+                                    }}
+                                  />
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      if (deliveryEtaInput.trim()) {
+                                        handleDeliveryStage(selectedOrder, deliveryEtaInput.trim());
+                                        setDeliveryEtaInput('');
+                                      }
+                                    }}
+                                    style={{
+                                      backgroundColor: THEME.greenSoft,
+                                      borderWidth: 1,
+                                      borderColor: THEME.greenBorder,
+                                      borderRadius: 8,
+                                      paddingHorizontal: 12,
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.greenDark }}>
+                                      Set
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+
+                              <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TouchableOpacity
+                                  onPress={() => handleDeliveryStage(selectedOrder, 'Packing Medicines')}
+                                  style={{
+                                    flex: 1,
+                                    paddingVertical: 10,
+                                    borderRadius: 9,
+                                    backgroundColor:
+                                      selectedOrder.slot_time === 'Packing Medicines' ? THEME.greenSoft : THEME.surfaceAlt,
+                                    borderWidth: 1,
+                                    borderColor:
+                                      selectedOrder.slot_time === 'Packing Medicines' ? THEME.green : THEME.border,
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.ink }}>
+                                    {selectedOrder.slot_time === 'Packing Medicines' ? '✓ Packing' : 'Mark Packing'}
+                                  </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    handleDeliveryStage(
+                                      selectedOrder,
+                                      isPickupOrder ? 'Ready for Pickup' : 'Out for Delivery'
+                                    )
+                                  }
+                                  style={{
+                                    flex: 1,
+                                    paddingVertical: 10,
+                                    borderRadius: 9,
+                                    backgroundColor:
+                                      selectedOrder.slot_time === 'Out for Delivery' ||
+                                      selectedOrder.slot_time === 'Ready for Pickup'
+                                        ? THEME.amberBg
+                                        : THEME.surfaceAlt,
+                                    borderWidth: 1,
+                                    borderColor:
+                                      selectedOrder.slot_time === 'Out for Delivery' ||
+                                      selectedOrder.slot_time === 'Ready for Pickup'
+                                        ? '#D97706'
+                                        : THEME.border,
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.amberText }}>
+                                    {selectedOrder.slot_time === 'Out for Delivery' ||
+                                    selectedOrder.slot_time === 'Ready for Pickup'
+                                      ? `✓ ${selectedOrder.slot_time}`
+                                      : isPickupOrder
+                                        ? 'Ready for Pickup'
+                                        : 'Out for Delivery'}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const target = selectedOrder;
+                                  setSelectedOrder(null);
+                                  setActiveTab('scanner');
+                                  setManualCodeInput(target.verification_code || target.booking_ref);
+                                  setVerifiedBooking(target);
+                                  setLookupError(null);
+                                  setCheckInSuccessMsg(null);
+                                }}
+                                style={{
+                                  backgroundColor: THEME.greenDark,
+                                  borderRadius: 10,
+                                  paddingVertical: 12,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                }}
+                              >
+                                <PackageCheck size={16} color="#FFFFFF" />
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                                  Verify QR / Code & Mark Dispensed
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const target = selectedOrder;
+                                  setSelectedOrder(null);
+                                  setRejectTarget(target);
+                                  setRejectReason('');
+                                }}
+                                style={{
+                                  paddingVertical: 10,
+                                  borderRadius: 9,
+                                  backgroundColor: THEME.redBg,
+                                  borderWidth: 1,
+                                  borderColor: THEME.redBorder,
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.redText }}>
+                                  Out of Stock / Cancel Order
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.green }}>
+                              Order is {selectedOrder.status}
+                              {selectedOrder.checked_in_at
+                                ? ` (${new Date(selectedOrder.checked_in_at).toLocaleString('en-IN')})`
+                                : ''}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+            </View>
           ) : activeTab === 'dashboard' ? (
             <View style={{ gap: 16 }}>
               {/* Store Welcome / Status Greeting Banner */}
@@ -1485,6 +2337,11 @@ export function PharmacyPartnerPortal() {
                           <Text style={{ fontSize: 11.5, color: THEME.muted, marginTop: 2 }}>
                             {o.patient_phone} · {o.slot_time || 'Store Pickup / Delivery'}
                           </Text>
+                          {o.notes ? (
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: THEME.amberText, marginTop: 3 }} numberOfLines={2}>
+                              {o.notes.split('Prescription request sent')[0]?.trim() || o.notes}
+                            </Text>
+                          ) : null}
                         </View>
                         <View style={{ flexDirection: 'row', gap: 7 }}>
                           {o.bill_image_url && (
@@ -1505,11 +2362,7 @@ export function PharmacyPartnerPortal() {
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity
-                            onPress={() => {
-                              setQuoteTarget(o);
-                              setQuoteGrossInput(String(o.bill_amount || ''));
-                              setQuoteDiscountPct(String(currentPharmacy?.app_discount_pct ?? 15));
-                            }}
+                            onPress={() => openOrderWorkspace(o)}
                             style={{
                               paddingHorizontal: 12,
                               paddingVertical: 7,
@@ -1518,7 +2371,7 @@ export function PharmacyPartnerPortal() {
                             }}
                           >
                             <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' }}>
-                              Send Quote
+                              View Order
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -1734,45 +2587,35 @@ export function PharmacyPartnerPortal() {
                 </View>
               ) : (
                 <>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {pagedOrders.map((o) => {
                   const payable = Number(o.final_payable ?? o.bill_amount ?? 0);
                   const waPhone = normalizePhone(o.patient_phone);
                   const isDone = o.status === 'COMPLETED';
                   const isCancelled = o.status === 'CANCELLED';
+                  const customNote = o.notes?.includes('Customer Note:')
+                    ? o.notes.split('Prescription request sent')[0]?.replace('Customer Note:', '').trim()
+                    : null;
                   return (
                     <View
                       key={o.id}
                       style={{
+                        width: isDesktop ? '48.8%' : '100%',
                         backgroundColor: THEME.surface,
                         borderRadius: 14,
-                        padding: 15,
+                        padding: 14,
                         borderWidth: 1,
                         borderColor: isDone ? THEME.greenBorder : THEME.border,
                         gap: 10,
+                        justifyContent: 'space-between',
                       }}
                     >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                             <Text style={{ fontSize: 13.5, fontWeight: '800', color: THEME.ink }}>
                               #{o.booking_ref}
                             </Text>
-                            {o.verification_code && (
-                              <View
-                                style={{
-                                  backgroundColor: THEME.surfaceAlt,
-                                  borderWidth: 1,
-                                  borderColor: THEME.border,
-                                  paddingHorizontal: 7,
-                                  paddingVertical: 2,
-                                  borderRadius: 6,
-                                }}
-                              >
-                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.ink }}>
-                                  CODE: {o.verification_code}
-                                </Text>
-                              </View>
-                            )}
                             <View
                               style={{
                                 backgroundColor: isDone
@@ -1800,56 +2643,95 @@ export function PharmacyPartnerPortal() {
                               </Text>
                             </View>
                           </View>
-                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: THEME.ink, marginTop: 4 }}>
-                            {o.patient_name} · {o.patient_phone}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>
-                            {o.slot_time || 'Store Pickup / Delivery'}
-                            {o.checked_in_at
-                              ? ` · Dispensed ${new Date(o.checked_in_at).toLocaleTimeString('en-IN', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}`
-                              : ''}
-                          </Text>
-                          {o.notes ? (
-                            <Text style={{ fontSize: 11.5, color: THEME.muted, marginTop: 3 }} numberOfLines={2}>
-                              {o.notes}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: payable > 0 ? THEME.greenDark : THEME.amberText }}>
+                          <Text style={{ fontSize: 15, fontWeight: '800', color: payable > 0 ? THEME.greenDark : THEME.amberText }}>
                             {payable > 0 ? formatInr(payable) : 'Needs Quote'}
                           </Text>
-                          {Number(o.discount_amount || 0) > 0 && (
-                            <Text style={{ fontSize: 10.5, color: THEME.green, fontWeight: '700' }}>
-                              Saved {formatInr(o.discount_amount)}
-                            </Text>
-                          )}
                         </View>
+
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }}>
+                          {o.patient_name} · {o.patient_phone}
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: THEME.muted }}>
+                          {o.slot_time || 'Store Pickup / Delivery'}
+                          {o.verification_code ? ` · PIN: ${o.verification_code}` : ''}
+                        </Text>
+
+                        {customNote ? (
+                          <View
+                            style={{
+                              backgroundColor: THEME.amberBg,
+                              borderRadius: 8,
+                              paddingHorizontal: 9,
+                              paddingVertical: 6,
+                              borderWidth: 1,
+                              borderColor: THEME.amberBorder,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.amberText }} numberOfLines={2}>
+                              Note: {customNote}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
 
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-                        {o.patient_phone ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingTop: 2 }}>
+                        <TouchableOpacity
+                          onPress={() => openOrderWorkspace(o)}
+                          style={{
+                            flex: 1,
+                            minWidth: 96,
+                            paddingHorizontal: 10,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            backgroundColor: THEME.greenDark,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' }}>
+                            Open Order
+                          </Text>
+                        </TouchableOpacity>
+
+                        {o.bill_image_url ? (
                           <TouchableOpacity
-                            onPress={() => Linking.openURL(`tel:${o.patient_phone}`)}
+                            onPress={() => {
+                              setRxFullScreen(false);
+                              setRxPreviewUrl(o.bill_image_url || null);
+                            }}
                             style={{
                               flexDirection: 'row',
                               alignItems: 'center',
                               gap: 4,
                               paddingHorizontal: 10,
-                              paddingVertical: 7,
+                              paddingVertical: 8,
                               borderRadius: 8,
-                              backgroundColor: THEME.surfaceAlt,
+                              backgroundColor: THEME.amberBg,
                               borderWidth: 1,
-                              borderColor: THEME.border,
+                              borderColor: THEME.amberBorder,
                             }}
                           >
-                            <Phone size={12} color={THEME.ink} />
-                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.ink }}>Call</Text>
+                            <FileImage size={12} color={THEME.amberText} />
+                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.amberText }}>View Rx</Text>
                           </TouchableOpacity>
                         ) : null}
+
+                        {!isDone && !isCancelled && (
+                          <TouchableOpacity
+                            onPress={() => openOrderWorkspace(o)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 8,
+                              borderRadius: 8,
+                              backgroundColor: THEME.greenSoft,
+                              borderWidth: 1,
+                              borderColor: THEME.greenBorder,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.greenDark }}>
+                              {payable > 0 ? 'Edit Quote' : 'Send Quote'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
 
                         {waPhone ? (
                           <TouchableOpacity
@@ -1861,144 +2743,22 @@ export function PharmacyPartnerPortal() {
                               )
                             }
                             style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 10,
-                              paddingVertical: 7,
+                              paddingHorizontal: 9,
+                              paddingVertical: 8,
                               borderRadius: 8,
-                              backgroundColor: THEME.greenSoft,
+                              backgroundColor: THEME.surfaceAlt,
                               borderWidth: 1,
-                              borderColor: THEME.greenBorder,
+                              borderColor: THEME.border,
                             }}
                           >
-                            <MessageCircle size={12} color={THEME.greenDark} />
-                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.greenDark }}>WhatsApp</Text>
+                            <MessageCircle size={13} color={THEME.green} />
                           </TouchableOpacity>
                         ) : null}
-
-                        {o.bill_image_url ? (
-                          <TouchableOpacity
-                            onPress={() => setRxPreviewUrl(o.bill_image_url || null)}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 10,
-                              paddingVertical: 7,
-                              borderRadius: 8,
-                              backgroundColor: THEME.amberBg,
-                              borderWidth: 1,
-                              borderColor: THEME.amberBorder,
-                            }}
-                          >
-                            <FileImage size={12} color={THEME.amberText} />
-                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.amberText }}>View Rx</Text>
-                          </TouchableOpacity>
-                        ) : null}
-
-                        {!isDone && !isCancelled && (
-                          <>
-                            <TouchableOpacity
-                              onPress={() => {
-                                setQuoteTarget(o);
-                                setQuoteGrossInput(String(o.bill_amount || ''));
-                                setQuoteDiscountPct(String(currentPharmacy?.app_discount_pct ?? 15));
-                              }}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                backgroundColor: '#EEF4FF',
-                                borderWidth: 1,
-                                borderColor: '#C7D9FA',
-                              }}
-                            >
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4ED8' }}>
-                                {payable > 0 ? 'Edit Quote' : 'Send Quote'}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleDeliveryStage(o, 'Packing Medicines')}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                backgroundColor: THEME.surfaceAlt,
-                                borderWidth: 1,
-                                borderColor: THEME.border,
-                              }}
-                            >
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.ink }}>
-                                Packing
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleDeliveryStage(o, 'Out for Delivery')}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                backgroundColor: THEME.amberBg,
-                                borderWidth: 1,
-                                borderColor: THEME.amberBorder,
-                              }}
-                            >
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.amberText }}>
-                                Out for Delivery
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => {
-                                setActiveTab('scanner');
-                                setManualCodeInput(o.verification_code || o.booking_ref);
-                                setVerifiedBooking(o);
-                                setLookupError(null);
-                                setCheckInSuccessMsg(null);
-                              }}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                paddingHorizontal: 11,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                backgroundColor: THEME.green,
-                              }}
-                            >
-                              <PackageCheck size={12} color="#FFFFFF" />
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
-                                Verify & Dispense
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => {
-                                setRejectTarget(o);
-                                setRejectReason('');
-                              }}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                backgroundColor: THEME.redBg,
-                                borderWidth: 1,
-                                borderColor: THEME.redBorder,
-                              }}
-                            >
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.redText }}>
-                                Out of Stock
-                              </Text>
-                            </TouchableOpacity>
-                          </>
-                        )}
                       </View>
                     </View>
                   );
                 })}
+                </View>
                 {/* Pagination Controls */}
                 {filteredOrders.length > ORDER_PAGE_SIZE && (
                   <View
@@ -3008,7 +3768,7 @@ export function PharmacyPartnerPortal() {
             return (
               <TouchableOpacity
                 key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
+                onPress={() => handleNavTabPress(tab.id)}
                 style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 }}
               >
                 <Icon size={19} color={active ? THEME.green : THEME.muted} />
@@ -3186,7 +3946,7 @@ export function PharmacyPartnerPortal() {
               </View>
             )}
             <TouchableOpacity
-              onPress={handleSaveQuote}
+              onPress={() => handleSaveQuote()}
               disabled={isSavingQuote}
               style={{
                 backgroundColor: THEME.green,
@@ -3272,21 +4032,22 @@ export function PharmacyPartnerPortal() {
         </View>
       </Modal>
 
-      {/* Prescription Image Preview Modal */}
+      {/* Prescription Image Preview Modal with Full-Screen Zoom */}
       <Modal visible={Boolean(rxPreviewUrl)} transparent animationType="fade">
         <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.75)',
+            backgroundColor: 'rgba(0,0,0,0.85)',
             justifyContent: 'center',
             alignItems: 'center',
-            padding: 16,
+            padding: rxFullScreen ? 8 : 16,
           }}
         >
           <View
             style={{
               width: '100%',
-              maxWidth: 540,
+              maxWidth: rxFullScreen ? '98%' : 580,
+              height: rxFullScreen ? '94%' : undefined,
               backgroundColor: THEME.surface,
               borderRadius: 16,
               padding: 14,
@@ -3294,24 +4055,60 @@ export function PharmacyPartnerPortal() {
             }}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>Uploaded Prescription</Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>
+                Uploaded Prescription
+              </Text>
               <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                {rxPreviewUrl && (
-                  <TouchableOpacity onPress={() => Linking.openURL(rxPreviewUrl)}>
-                    <ExternalLink size={16} color={THEME.green} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => setRxPreviewUrl(null)}>
-                  <X size={18} color={THEME.ink} />
+                <TouchableOpacity
+                  onPress={() => setRxFullScreen((v) => !v)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: THEME.greenSoft,
+                    borderWidth: 1,
+                    borderColor: THEME.greenBorder,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                  }}
+                >
+                  {rxFullScreen ? (
+                    <Minimize2 size={14} color={THEME.greenDark} />
+                  ) : (
+                    <Maximize2 size={14} color={THEME.greenDark} />
+                  )}
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.greenDark }}>
+                    {rxFullScreen ? 'Normal Size' : 'Full Screen'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setRxPreviewUrl(null);
+                    setRxFullScreen(false);
+                  }}
+                >
+                  <X size={20} color={THEME.ink} />
                 </TouchableOpacity>
               </View>
             </View>
             {rxPreviewUrl && (
-              <Image
-                source={{ uri: rxPreviewUrl }}
-                style={{ width: '100%', height: 380, borderRadius: 10, backgroundColor: '#F3F4F6' }}
-                resizeMode="contain"
-              />
+              <TouchableOpacity
+                activeOpacity={0.95}
+                onPress={() => setRxFullScreen((v) => !v)}
+                style={{ flex: rxFullScreen ? 1 : undefined }}
+              >
+                <Image
+                  source={{ uri: rxPreviewUrl }}
+                  style={{
+                    width: '100%',
+                    height: rxFullScreen ? '100%' : 420,
+                    borderRadius: 10,
+                    backgroundColor: '#F3F4F6',
+                  }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -3420,6 +4217,115 @@ export function PharmacyPartnerPortal() {
                     : pendingStoreOpen
                     ? 'Yes, Open Store'
                     : 'Yes, Close Store'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Quote Send Confirmation Modal */}
+      <Modal
+        visible={quoteConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQuoteConfirmOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.52)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              backgroundColor: THEME.surface,
+              borderRadius: 16,
+              padding: 20,
+              gap: 12,
+              borderWidth: 1,
+              borderColor: THEME.border,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '800', color: THEME.ink }}>
+              Are you sure you want to send this quote?
+            </Text>
+            <Text style={{ fontSize: 12.5, color: THEME.muted, lineHeight: 18 }}>
+              Once sent, the patient will receive the itemized bill on their app to complete payment.
+            </Text>
+            <View
+              style={{
+                backgroundColor: THEME.greenSoft,
+                borderRadius: 10,
+                padding: 12,
+                gap: 4,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: THEME.muted }}>Gross MRP</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.ink }}>
+                  {formatInr(quotePreviewGross)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: THEME.greenDark }}>Partner Discount</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.greenDark }}>
+                  - {formatInr(quotePreviewDisc)}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  borderTopWidth: 1,
+                  borderTopColor: THEME.greenBorder,
+                  paddingTop: 6,
+                  marginTop: 2,
+                }}
+              >
+                <Text style={{ fontSize: 13.5, fontWeight: '800', color: THEME.greenDark }}>
+                  Patient Payable
+                </Text>
+                <Text style={{ fontSize: 15, fontWeight: '900', color: THEME.greenDark }}>
+                  {formatInr(quotePreviewNet)}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={() => setQuoteConfirmOpen(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  backgroundColor: THEME.surfaceAlt,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (selectedOrder) {
+                    handleSaveQuote(selectedOrder);
+                  }
+                }}
+                disabled={isSavingQuote}
+                style={{
+                  flex: 1.3,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  backgroundColor: THEME.green,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                  {isSavingQuote ? 'Sending...' : 'Yes, Send Quote'}
                 </Text>
               </TouchableOpacity>
             </View>

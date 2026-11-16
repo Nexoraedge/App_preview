@@ -34,6 +34,9 @@ export function InvoiceDetailsModal({
   if (!order) return null;
 
   const isAwaitingQuote = order.total === 0 || order.items.length === 0;
+  const isDelivered = order.status === 'delivered' || order.status === 'picked_up';
+  const isOutForDelivery = order.status === 'out_for_delivery';
+  const isBlueTheme = isAwaitingQuote || !isDelivered;
 
   return (
     <SheetFrame
@@ -76,23 +79,29 @@ export function InvoiceDetailsModal({
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  backgroundColor: isAwaitingQuote ? '#2563EB' : '#16A34A',
+                  backgroundColor: isBlueTheme ? '#2563EB' : '#16A34A',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                {isAwaitingQuote ? (
+                {isBlueTheme ? (
                   <Clock size={16} color="#FFFFFF" strokeWidth={2.5} />
                 ) : (
                   <Check size={16} color="#FFFFFF" strokeWidth={3} />
                 )}
               </View>
               <Text
-                style={{ fontSize: 16, fontWeight: '800', color: isAwaitingQuote ? '#1D4ED8' : '#166534' }}
+                style={{ fontSize: 16, fontWeight: '800', color: isBlueTheme ? '#1D4ED8' : '#166534' }}
               >
                 {isAwaitingQuote
                   ? (isHi ? 'पर्चा प्राप्त • सत्यापन जारी' : 'Prescription Under Review')
-                  : (isHi ? 'ऑर्डर डिलीवर हो गया' : 'Order Delivered')}
+                  : isDelivered
+                    ? (isHi ? 'ऑर्डर डिलीवर हो गया' : order.status === 'picked_up' ? 'Order Picked Up' : 'Order Delivered')
+                    : isOutForDelivery
+                      ? (isHi ? 'डिलीवरी के लिए निकला' : 'Out for Delivery')
+                      : order.paidInApp
+                        ? (isHi ? 'ऑर्डर कन्फर्म • भुगतान प्राप्त' : 'Order Confirmed • Paid')
+                        : (isHi ? 'बिल तैयार • भुगतान शेष' : 'Bill Quoted • Awaiting Payment')}
               </Text>
             </View>
             <View
@@ -102,11 +111,11 @@ export function InvoiceDetailsModal({
                 paddingVertical: 4,
                 borderRadius: R.pill,
                 borderWidth: 1,
-                borderColor: isAwaitingQuote ? '#BFDBFE' : '#BBF7D0',
+                borderColor: isBlueTheme ? '#BFDBFE' : '#BBF7D0',
               }}
             >
               <Text
-                style={{ fontSize: 12, fontWeight: '800', color: isAwaitingQuote ? '#1D4ED8' : '#166534' }}
+                style={{ fontSize: 12, fontWeight: '800', color: isBlueTheme ? '#1D4ED8' : '#166534' }}
               >
                 #{order.ref}
               </Text>
@@ -125,9 +134,21 @@ export function InvoiceDetailsModal({
               ? (isHi
                   ? `${order.shopHi || order.shop} द्वारा आपका पर्चा प्राप्त हो गया है। फार्मासिस्ट दवाओं की उपलब्धता जांच कर डिजिटल बिल तैयार कर रहे हैं।`
                   : `Your prescription slip has been received by ${order.shop}. The pharmacist is checking stocks and preparing your digital invoice.`)
-              : (isHi
-                  ? `आपकी दवाइयां ${order.shopHi || order.shop} द्वारा सफलतापूर्वक आपके पते पर पहुंचा दी गई हैं।`
-                  : `Your medicines from ${order.shop} were safely delivered to your address.`)}
+              : isDelivered
+                ? (isHi
+                    ? `आपकी दवाइयां ${order.shopHi || order.shop} द्वारा सफलतापूर्वक पहुंचा दी गई हैं।`
+                    : `Your medicines from ${order.shop} were safely delivered.`)
+                : isOutForDelivery
+                  ? (isHi
+                      ? `${order.shopHi || order.shop} से आपकी दवाइयां डिलीवरी के लिए निकल चुकी हैं।`
+                      : `Your medicines from ${order.shop} are out for delivery.`)
+                  : order.paidInApp
+                    ? (isHi
+                        ? `${order.shopHi || order.shop} ने आपका भुगतान प्राप्त कर लिया है और दवाइयां पैक की जा रही हैं।`
+                        : `${order.shop} has received your payment and is packing your medicines.`)
+                    : (isHi
+                        ? `${order.shopHi || order.shop} ने आपका डिजिटल बिल तैयार कर दिया है। पैकिंग शुरू करने के लिए भुगतान पूरा करें।`
+                        : `${order.shop} has prepared your bill. Complete payment to start packing & dispatch.`)}
           </Text>
 
           <View
@@ -138,15 +159,15 @@ export function InvoiceDetailsModal({
               marginTop: 12,
               paddingTop: 10,
               borderTopWidth: 1,
-              borderTopColor: isAwaitingQuote ? '#DBEAFE' : '#DCFCE7',
+              borderTopColor: isBlueTheme ? '#DBEAFE' : '#DCFCE7',
             }}
           >
             <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
-              <Clock size={13} color={isAwaitingQuote ? '#1D4ED8' : '#15803D'} />
+              <Clock size={13} color={isBlueTheme ? '#1D4ED8' : '#15803D'} />
               <Text
-                style={{ fontSize: 12, fontWeight: '600', color: isAwaitingQuote ? '#1D4ED8' : '#15803D' }}
+                style={{ fontSize: 12, fontWeight: '600', color: isBlueTheme ? '#1D4ED8' : '#15803D' }}
               >
                 {order.date}
               </Text>

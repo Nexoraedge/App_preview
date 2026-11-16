@@ -84,6 +84,19 @@ export function CrmActivityModal({
   const [purpose, setPurpose] = useState<string>('Follow-Up');
   const [summary, setSummary] = useState('');
   const [followUpIso, setFollowUpIso] = useState<string | null>(currentFollowUpAt || null);
+  const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customTime, setCustomTime] = useState('16:00');
+
+  const applyCustomDateTime = (dStr: string, tStr: string) => {
+    setCustomDate(dStr);
+    setCustomTime(tStr);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dStr.trim()) && /^\d{2}:\d{2}$/.test(tStr.trim())) {
+      const parsed = new Date(`${dStr.trim()}T${tStr.trim()}:00`);
+      if (!Number.isNaN(parsed.getTime())) {
+        setFollowUpIso(parsed.toISOString());
+      }
+    }
+  };
 
   const loadLogs = useCallback(async () => {
     if (!visible || !entityId) return;
@@ -409,6 +422,52 @@ export function CrmActivityModal({
                     <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>Clear</Text>
                   </TouchableOpacity>
                 )}
+              </View>
+
+              {/* Custom Date & Time Picker */}
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <View style={{ flex: 1.2, gap: 4 }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.muted }}>
+                    Date (YYYY-MM-DD)
+                  </Text>
+                  <TextInput
+                    value={customDate}
+                    onChangeText={(txt) => applyCustomDateTime(txt, customTime)}
+                    placeholder="2026-11-17"
+                    placeholderTextColor="#9CA3AF"
+                    style={{
+                      backgroundColor: THEME.bg,
+                      borderWidth: 1,
+                      borderColor: THEME.border,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      fontSize: 12.5,
+                      color: THEME.ink,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.muted }}>
+                    Time (HH:MM)
+                  </Text>
+                  <TextInput
+                    value={customTime}
+                    onChangeText={(txt) => applyCustomDateTime(customDate, txt)}
+                    placeholder="16:30"
+                    placeholderTextColor="#9CA3AF"
+                    style={{
+                      backgroundColor: THEME.bg,
+                      borderWidth: 1,
+                      borderColor: THEME.border,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      fontSize: 12.5,
+                      color: THEME.ink,
+                    }}
+                  />
+                </View>
               </View>
             </View>
 
