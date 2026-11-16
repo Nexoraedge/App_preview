@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import {
   ShieldCheck,
   ArrowLeft,
@@ -42,6 +42,10 @@ import { requestOtp, verifyPhoneOtp } from '../src/lib/supabase';
 const RESEND_SECONDS = 30;
 
 export default function LoginScreen() {
+  const appMode = String(process.env.EXPO_PUBLIC_APP_MODE || '').toLowerCase();
+  if (appMode === 'admin') return <Redirect href="/admin" />;
+  if (appMode === 'partner') return <Redirect href="/partner" />;
+
   const router = useRouter();
   const { user, loginWithPhone, loginWithGoogle } = useAuth();
   const { language } = useLanguage() as any;
