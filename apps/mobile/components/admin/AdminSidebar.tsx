@@ -385,24 +385,26 @@ export function AdminSidebar({
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={onOpenPatientApp}
-          activeOpacity={0.85}
-          style={{
-            backgroundColor: '#1A4436',
-            paddingVertical: 9,
-            paddingHorizontal: 12,
-            borderRadius: 8,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#FAF8F2' }}>
-            Open Patient App
-          </Text>
-          <ExternalLink size={13} color="#9DC0B1" />
-        </TouchableOpacity>
+        {String(process.env.EXPO_PUBLIC_APP_MODE || '').toLowerCase() !== 'admin' && (
+          <TouchableOpacity
+            onPress={onOpenPatientApp}
+            activeOpacity={0.85}
+            style={{
+              backgroundColor: '#1A4436',
+              paddingVertical: 9,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#FAF8F2' }}>
+              Open Patient App
+            </Text>
+            <ExternalLink size={13} color="#9DC0B1" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
