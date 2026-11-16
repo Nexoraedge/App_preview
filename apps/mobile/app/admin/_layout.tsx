@@ -1,8 +1,13 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { AdminAuthGate } from '../../components/admin/AdminAuthGate';
 
 export default function AdminLayout() {
+  const appMode = String(process.env.EXPO_PUBLIC_APP_MODE || '').toLowerCase();
+  if (appMode === 'patient' || appMode === 'partner') {
+    return <Redirect href="/" />;
+  }
+
   return (
     <AdminAuthGate>
       <Stack

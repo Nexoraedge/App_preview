@@ -5,7 +5,7 @@
 //   seen, signed in     -> /(tabs) (home)
 import React, { useEffect, useState } from 'react';
 import { View, Platform, Image as RNImage } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimatedSplash } from '../components/launch/AnimatedSplash';
@@ -50,6 +50,16 @@ const getInitialSeen = (): boolean | null => {
 };
 
 export default function Gate() {
+  const appMode = String(process.env.EXPO_PUBLIC_APP_MODE || '').toLowerCase();
+  if (appMode === 'admin') {
+    SplashScreen.hideAsync().catch(() => {});
+    return <Redirect href="/admin" />;
+  }
+  if (appMode === 'partner') {
+    SplashScreen.hideAsync().catch(() => {});
+    return <Redirect href="/partner" />;
+  }
+
   const router = useRouter();
   const auth = useAuth();
   const { language } = useLanguage() as any;
