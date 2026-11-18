@@ -50,6 +50,7 @@ import { logAdminAudit } from '../../src/services/adminAudit';
 import {
   playAdminAlertChime,
   playPartnerOrderAlarm,
+  playPatientBillChime,
   requestDesktopNotificationPermission,
 } from '../../src/services/adminAlerts';
 
@@ -100,8 +101,8 @@ const DEFAULT_WEEK_SCHEDULE: Record<DayKey, DayScheduleRow> = {
   sun: { open: true, start: '09:00', end: '21:00', hasBreak: false, start2: '17:00', end2: '21:00' },
 };
 type PartnerTab = 'dashboard' | 'orders' | 'scanner' | 'payouts' | 'settings';
-type OrderFilter = 'ALL' | 'NEEDS_QUOTE' | 'READY' | 'UNPAID' | 'COMPLETED' | 'LOST';
-type OrderDateFilter = 'ALL' | 'TODAY' | '7D' | 'THIS_MONTH' | 'LAST_MONTH';
+type OrderFilter = 'ACTIVE' | 'NEEDS_QUOTE' | 'PAID_DELIVER' | 'UNPAID' | 'COMPLETED' | 'LOST' | 'ALL';
+type OrderDateFilter = 'ALL' | 'TODAY' | '7D' | 'THIS_MONTH' | 'LAST_MONTH' | 'CUSTOM';
 
 interface PharmacyInfo {
   id: string;
@@ -178,14 +179,20 @@ function normalizePhone(phone?: string | null): string {
   return digits;
 }
 
-export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: string } = {}) {
+export function PharmacyPartnerPortal({
+  initialOrderRef,
+  initialTab,
+}: {
+  initialOrderRef?: string;
+  initialTab?: PartnerTab;
+} = {}) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
   const isTablet = width >= 640 && width < 960;
   const { partnerUser, signOutPartner } = usePartnerAuth();
 
-  const [activeTab, setActiveTab] = useState<PartnerTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<PartnerTab>(initialTab || 'dashboard');
   const [pharmacies, setPharmacies] = useState<PharmacyInfo[]>([]);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(
     partnerUser?.partnerEntityId || null
@@ -193,8 +200,8 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
   const [orders, setOrders] = useState<BookingWithPartner[]>([]);
   const [payouts, setPayouts] = useState<PharmacyPayoutRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [orderFilter, setOrderFilter] = useState<OrderFilter>('ALL');
-  const [orderDateFilter, setOrderDateFilter] = useState<OrderDateFilter>('ALL');
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>('ACTIVE');
+  const [orderDateFilter, setOrderDateFilter] = useState<OrderDateFilter>('7D');
   const [searchQuery, setSearchQuery] = useState('');
   const [orderPage, setOrderPage] = useState(1);
   const ORDER_PAGE_SIZE = 20;
@@ -228,6 +235,11 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
   const [quoteConfirmOpen, setQuoteConfirmOpen] = useState(false);
   const [isEditingSentQuote, setIsEditingSentQuote] = useState(false);
   const [deliveryEtaInput, setDeliveryEtaInput] = useState('');
+  const [step2PinInput, setStep2PinInput] = useState('');
+  const [step2DispenseErr, setStep2DispenseErr] = useState<string | null>(null);
+  const [step2CameraOpen, setStep2CameraOpen] = useState(false);
+  const [openOrderDropdown, setOpenOrderDropdown] = useState<'date' | 'status' | null>(null);
+  const [customDateStr, setCustomDateStr] = useState('');
 
   // Reject / Out-of-Stock Modal State
   const [rejectTarget, setRejectTarget] = useState<BookingWithPartner | null>(null);
@@ -266,7 +278,16 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
   // Rx Image Preview Modal + Order Detail Inspector Modal
   const [rxPreviewUrl, setRxPreviewUrl] = useState<string | null>(null);
   const [rxFullScreen, setRxFullScreen] = useState(false);
+  const [rxImgLoading, setRxImgLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<BookingWithPartner | null>(null);
+
+  useEffect(() => {
+    if (selectedOrder?.bill_image_url) {
+      setRxImgLoading(true);
+    } else {
+      setRxImgLoading(false);
+    }
+  }, [selectedOrder?.booking_ref, selectedOrder?.bill_image_url]);
 
   // Register PWA Manifest + Service Worker on Web
   useEffect(() => {
@@ -400,7 +421,9 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
     loadPartnerData();
   }, [loadPartnerData]);
 
-  // Realtime subscription for incoming pharmacy orders
+  const paidAlertedRefs = useRef<Set<string>>(new Set());
+
+  // Realtime subscription for incoming pharmacy orders & live payment notifications
   useEffect(() => {
     try {
       const supabase = getSupabaseClient();
@@ -410,8 +433,8 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
           'postgres_changes',
           { event: '*', schema: 'public', table: 'bookings' },
           (payload: any) => {
+            const row = payload?.new || {};
             if (payload?.eventType === 'INSERT') {
-              const row = payload?.new || {};
               if (row.service_type === 'PHARMACY_SCAN_PAY') {
                 setIncomingOrderAlert({
                   ref: row.booking_ref || 'NEW',
@@ -424,6 +447,25 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                   );
                 }
               }
+            } else if (payload?.eventType === 'UPDATE' && row.service_type === 'PHARMACY_SCAN_PAY') {
+              if (
+                row.status === 'PAID' &&
+                Number(row.bill_amount || 0) > 0 &&
+                row.booking_ref &&
+                !paidAlertedRefs.current.has(row.booking_ref) &&
+                payload?.old?.status !== 'PAID'
+              ) {
+                paidAlertedRefs.current.add(row.booking_ref);
+                if (soundAlertsRef.current) {
+                  playPatientBillChime(
+                    'Payment Received!',
+                    `Order #${row.booking_ref} is PAID (₹${row.final_payable || row.bill_amount}). Set delivery time & dispatch!`
+                  );
+                }
+              }
+              setSelectedOrder((prev) =>
+                prev && prev.booking_ref === row.booking_ref ? { ...prev, ...row } : prev
+              );
             }
             loadPartnerData();
           }
@@ -511,16 +553,24 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
       if (orderDateFilter === 'LAST_MONTH' && (createdMs < lastMonthStart || createdMs >= thisMonthStart)) {
         return false;
       }
+      if (orderDateFilter === 'CUSTOM' && customDateStr.trim()) {
+        const d = new Date(o.created_at);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        if (`${yyyy}-${mm}-${dd}` !== customDateStr.trim()) return false;
+      }
 
       const payable = Number(o.final_payable ?? o.bill_amount ?? 0);
-      if (orderFilter === 'NEEDS_QUOTE') {
+      if (orderFilter === 'ACTIVE') {
+        if (o.status === 'COMPLETED' || o.status === 'CANCELLED' || o.status === 'MISSED') return false;
+      } else if (orderFilter === 'NEEDS_QUOTE') {
         if (o.status === 'COMPLETED' || o.status === 'CANCELLED' || o.status === 'MISSED') return false;
         if (o.status !== 'NEW' && o.status !== 'CALLING' && payable > 0) return false;
-      } else if (orderFilter === 'READY') {
-        if (o.status !== 'CONFIRMED' && o.status !== 'PAID') return false;
+      } else if (orderFilter === 'PAID_DELIVER') {
+        if (o.status !== 'PAID') return false;
       } else if (orderFilter === 'UNPAID') {
-        if (o.status === 'CANCELLED' || o.status === 'MISSED') return false;
-        if (o.payment_status === 'PAID') return false;
+        if (o.status !== 'CONFIRMED') return false;
       } else if (orderFilter === 'COMPLETED') {
         if (o.status !== 'COMPLETED') return false;
       } else if (orderFilter === 'LOST') {
@@ -534,7 +584,7 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
         (o.patient_phone || '').toLowerCase().includes(q)
       );
     });
-  }, [orders, orderFilter, orderDateFilter, searchQuery]);
+  }, [orders, orderFilter, orderDateFilter, customDateStr, searchQuery]);
 
   const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ORDER_PAGE_SIZE));
   const safeOrderPage = Math.min(orderPage, totalOrderPages);
@@ -781,24 +831,6 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
     }
   };
 
-  const handleUnlockCounterPay = async (o: BookingWithPartner) => {
-    try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('bookings')
-        .update({
-          status: 'PAID',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('booking_ref', o.booking_ref);
-      if (error) throw error;
-      if (selectedOrder && selectedOrder.booking_ref === o.booking_ref) {
-        setSelectedOrder({ ...selectedOrder, status: 'PAID' });
-      }
-      await loadPartnerData();
-    } catch {}
-  };
-
   const handleDeliveryStage = async (o: BookingWithPartner, stageLabel: string) => {
     try {
       const supabase = getSupabaseClient();
@@ -814,6 +846,65 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
       }
       await loadPartnerData();
     } catch {}
+  };
+
+  const handleInlineDispense = async (o: BookingWithPartner, overrideToken?: string) => {
+    setStep2DispenseErr(null);
+    const expectedPin = String(o.verification_code || '').trim();
+    const entered = (overrideToken ?? step2PinInput).trim();
+    if (expectedPin && entered !== expectedPin && entered.toUpperCase() !== o.booking_ref.toUpperCase()) {
+      setStep2DispenseErr(`Incorrect code. Ask the patient for their 4-digit PIN or scan their QR pass.`);
+      return;
+    }
+
+    setIsCompletingCheckIn(true);
+    try {
+      const supabase = getSupabaseClient();
+      const nowIso = new Date().toISOString();
+      const actorName = partnerUser?.fullName || currentPharmacy?.name || 'Pharmacy Desk';
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'COMPLETED',
+          checked_in_at: nowIso,
+          checked_in_by: actorName,
+          updated_at: nowIso,
+        })
+        .eq('booking_ref', o.booking_ref);
+
+      if (error) throw error;
+
+      if (partnerUser) {
+        logAdminAudit({
+          actorId: partnerUser.id,
+          actorName,
+          actorRole: partnerUser.role,
+          sourcePanel: 'PARTNER_PORTAL',
+          action: 'PARTNER_QR_CHECKIN',
+          entityType: 'booking',
+          entityId: o.booking_ref,
+          details: {
+            pharmacyId: currentPharmacy?.id,
+            pharmacyName: currentPharmacy?.name,
+            verificationCode: o.verification_code || null,
+          },
+        });
+      }
+
+      playAdminAlertChime('Medicine Dispensed', `Order #${o.booking_ref} marked completed.`);
+      setStep2PinInput('');
+      setSelectedOrder((prev) =>
+        prev && prev.booking_ref === o.booking_ref
+          ? { ...prev, status: 'COMPLETED', checked_in_at: nowIso, checked_in_by: actorName }
+          : prev
+      );
+      await loadPartnerData();
+    } catch (err: any) {
+      setStep2DispenseErr(err?.message || 'Could not mark order as dispensed.');
+    } finally {
+      setIsCompletingCheckIn(false);
+    }
   };
 
   const handleRejectOrder = async () => {
@@ -1316,9 +1407,17 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
               </View>
               <TouchableOpacity
                 onPress={() => {
+                  const ref = incomingOrderAlert.ref;
+                  const match = orders.find((o) => o.booking_ref === ref);
                   setIncomingOrderAlert(null);
-                  setOrderFilter('NEEDS_QUOTE');
-                  setActiveTab('orders');
+                  if (match) {
+                    openOrderWorkspace(match);
+                  } else if (ref && ref !== 'NEW') {
+                    router.push(`/partner/orders/${encodeURIComponent(ref)}` as any);
+                  } else {
+                    setOrderFilter('NEEDS_QUOTE');
+                    setActiveTab('orders');
+                  }
                 }}
                 style={{
                   backgroundColor: THEME.green,
@@ -1343,8 +1442,9 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                 <TouchableOpacity
                   onPress={() => {
                     setSelectedOrder(null);
+                    setActiveTab('orders');
                     if (initialOrderRef) {
-                      router.replace('/partner' as any);
+                      router.replace('/partner?tab=orders' as any);
                     }
                   }}
                   style={{
@@ -1390,7 +1490,7 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
               {/* Side-by-Side on Desktop, Stacked on Mobile */}
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14, alignItems: 'flex-start' }}>
                 {/* Left Column: Embedded Rx Image + Customer Details & Note */}
-                <View style={{ flex: 1, width: '100%', gap: 12 }}>
+                <View style={isDesktop ? { flex: 1, gap: 12 } : { width: '100%', gap: 12 }}>
                   {selectedOrder.bill_image_url ? (
                     <View
                       style={{
@@ -1435,12 +1535,37 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                           setRxFullScreen(true);
                           setRxPreviewUrl(selectedOrder.bill_image_url || null);
                         }}
+                        style={{ position: 'relative' }}
                       >
                         <Image
                           source={{ uri: selectedOrder.bill_image_url }}
                           style={{ width: '100%', height: 290, borderRadius: 10, backgroundColor: '#F3F4F6' }}
                           resizeMode="contain"
+                          onLoadStart={() => setRxImgLoading(true)}
+                          onLoadEnd={() => setRxImgLoading(false)}
+                          onError={() => setRxImgLoading(false)}
                         />
+                        {rxImgLoading && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              borderRadius: 10,
+                              backgroundColor: 'rgba(243, 244, 246, 0.92)',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            <ActivityIndicator size="small" color={THEME.green} />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.muted }}>
+                              Loading prescription image...
+                            </Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
                     </View>
                   ) : null}
@@ -1452,84 +1577,167 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                       padding: 14,
                       borderWidth: 1,
                       borderColor: THEME.border,
-                      gap: 8,
+                      gap: 10,
                     }}
                   >
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>
-                      {selectedOrder.patient_name} · {selectedOrder.patient_phone || 'N/A'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: THEME.muted }}>
-                      {selectedOrder.slot_time || 'Pickup / Delivery'}
-                      {selectedOrder.verification_code ? ` · PIN: ${selectedOrder.verification_code}` : ''}
-                    </Text>
-
-                    {selectedOrder.notes ? (
-                      <View
-                        style={{
-                          backgroundColor: THEME.amberBg,
-                          borderRadius: 10,
-                          padding: 10,
-                          borderWidth: 1,
-                          borderColor: THEME.amberBorder,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.amberText }}>
-                          CUSTOMER NOTE & DELIVERY DETAILS
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '800', color: THEME.ink }}>
+                          {selectedOrder.patient_name} · {selectedOrder.patient_phone || 'N/A'}
                         </Text>
-                        <Text style={{ fontSize: 12, color: THEME.ink, marginTop: 2, lineHeight: 17 }}>
-                          {selectedOrder.notes}
+                        <Text style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>
+                          {selectedOrder.slot_time || 'Pickup / Delivery'}
                         </Text>
                       </View>
-                    ) : null}
-
-                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
-                      {selectedOrder.patient_phone ? (
-                        <TouchableOpacity
-                          onPress={() => Linking.openURL(`tel:${selectedOrder.patient_phone}`)}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            backgroundColor: THEME.surfaceAlt,
-                            borderWidth: 1,
-                            borderColor: THEME.border,
-                          }}
-                        >
-                          <Phone size={13} color={THEME.ink} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>Call Patient</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                      {normalizePhone(selectedOrder.patient_phone) ? (
-                        <TouchableOpacity
-                          onPress={() =>
-                            Linking.openURL(
-                              `https://wa.me/${normalizePhone(selectedOrder.patient_phone)}?text=${encodeURIComponent(
-                                `Namaste ${selectedOrder.patient_name}, ${currentPharmacy?.name || 'Pharmacy'} here regarding your Adityam order #${selectedOrder.booking_ref}.`
-                              )}`
-                            )
-                          }
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            backgroundColor: THEME.greenSoft,
-                            borderWidth: 1,
-                            borderColor: THEME.greenBorder,
-                          }}
-                        >
-                          <MessageCircle size={13} color={THEME.greenDark} />
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenDark }}>
-                            WhatsApp Chat
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
                     </View>
+
+                    {(() => {
+                      const rawNotes = selectedOrder.notes || '';
+                      const dbLat = (selectedOrder as any).delivery_lat;
+                      const dbLng = (selectedOrder as any).delivery_lng;
+                      const dbAddr = (selectedOrder as any).delivery_address;
+
+                      // Extract ONLY the medicine note for the pharmacist
+                      const noteMatch = rawNotes.match(/Customer Note:\s*(.+?)(?=\.\s*Prescription request sent to|\.\s*Mode:|$)/i);
+                      const medicineNote = noteMatch?.[1]?.trim() || '';
+
+                      // Extract clean Delivery Address & GPS separately
+                      const gpsMatch = rawNotes.match(/GPS:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i);
+                      const addrMatch = rawNotes.match(/Delivery Address:\s*(.+?)(?=\s*GPS:|$)/i);
+                      const parsedAddress = dbAddr
+                        ? String(dbAddr)
+                        : addrMatch?.[1]?.replace(/\.$/, '').trim() || '';
+                      const cleanAddress =
+                        parsedAddress && parsedAddress !== 'Select Location' ? parsedAddress : '';
+
+                      const isDeliveryMode =
+                        rawNotes.toLowerCase().includes('mode: delivery') ||
+                        (selectedOrder.slot_time || '').toLowerCase().includes('delivery');
+                      const mapDestination =
+                        dbLat && dbLng
+                          ? `${dbLat},${dbLng}`
+                          : gpsMatch
+                            ? `${gpsMatch[1]},${gpsMatch[2]}`
+                            : cleanAddress || null;
+
+                      return (
+                        <View style={{ gap: 8 }}>
+                          {medicineNote ? (
+                            <View
+                              style={{
+                                backgroundColor: THEME.amberBg,
+                                borderRadius: 10,
+                                padding: 10,
+                                borderWidth: 1,
+                                borderColor: THEME.amberBorder,
+                                gap: 3,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.amberText }}>
+                                PHARMACIST / MEDICINE NOTE
+                              </Text>
+                              <Text style={{ fontSize: 12.5, fontWeight: '600', color: THEME.ink, lineHeight: 18 }}>
+                                {medicineNote}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {isDeliveryMode && (cleanAddress || mapDestination) ? (
+                            <View
+                              style={{
+                                backgroundColor: '#F8FAFC',
+                                borderRadius: 10,
+                                padding: 10,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                gap: 3,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF' }}>
+                                DELIVERY ADDRESS
+                              </Text>
+                              <Text style={{ fontSize: 12.5, fontWeight: '600', color: THEME.ink, lineHeight: 18 }}>
+                                {cleanAddress || 'Pinned GPS Location'}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingTop: 2 }}>
+                            {selectedOrder.patient_phone ? (
+                              <TouchableOpacity
+                                onPress={() => Linking.openURL(`tel:${selectedOrder.patient_phone}`)}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  borderRadius: 8,
+                                  backgroundColor: THEME.surfaceAlt,
+                                  borderWidth: 1,
+                                  borderColor: THEME.border,
+                                }}
+                              >
+                                <Phone size={13} color={THEME.ink} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>Call Patient</Text>
+                              </TouchableOpacity>
+                            ) : null}
+                            {normalizePhone(selectedOrder.patient_phone) ? (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  Linking.openURL(
+                                    `https://wa.me/${normalizePhone(selectedOrder.patient_phone)}?text=${encodeURIComponent(
+                                      `Namaste ${selectedOrder.patient_name}, ${currentPharmacy?.name || 'Pharmacy'} here regarding your Adityam order #${selectedOrder.booking_ref}.`
+                                    )}`
+                                  )
+                                }
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  borderRadius: 8,
+                                  backgroundColor: THEME.greenSoft,
+                                  borderWidth: 1,
+                                  borderColor: THEME.greenBorder,
+                                }}
+                              >
+                                <MessageCircle size={13} color={THEME.greenDark} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenDark }}>
+                                  WhatsApp Chat
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                            {isDeliveryMode && mapDestination ? (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  Linking.openURL(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapDestination)}`
+                                  )
+                                }
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
+                                  borderRadius: 8,
+                                  backgroundColor: '#EFF6FF',
+                                  borderWidth: 1,
+                                  borderColor: '#BFDBFE',
+                                }}
+                              >
+                                <ExternalLink size={13} color="#1D4ED8" />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4ED8' }}>
+                                  Navigate on Map
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
 
@@ -1549,11 +1757,11 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                     (selectedOrder.notes || '').toLowerCase().includes('mode: pickup');
                   const savedMeds = parseItemizedMedicines(selectedOrder.doctor_name);
                   const etaOptions = isPickupOrder
-                    ? ['Pickup Ready Now', 'Pickup Ready (10 mins)', 'Pickup Ready (15 mins)', 'Pickup Ready (30 mins)']
-                    : ['Home Delivery (15 mins)', 'Home Delivery (30 mins)', 'Home Delivery (45 mins)', 'Home Delivery (1 hr)'];
+                    ? ['Pickup Ready Now', 'Ready in 30 mins', 'Ready Today (Evening)', 'Will Call When Ready']
+                    : ['Delivery Today (Evening)', 'Delivery Within 1 Day', 'Delivery in 2–4 Hours', 'Will Call Before Delivery'];
 
                   return (
-                    <View style={{ flex: 1, width: '100%', gap: 12 }}>
+                    <View style={isDesktop ? { flex: 1, gap: 12 } : { width: '100%', gap: 12 }}>
                       {showStep1Form ? (
                         <View
                           style={{
@@ -1738,6 +1946,27 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                               </Text>
                             </TouchableOpacity>
                           </View>
+
+                          {!isEditingSentQuote && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                setRejectTarget(selectedOrder);
+                                setRejectReason('');
+                              }}
+                              style={{
+                                paddingVertical: 10,
+                                borderRadius: 9,
+                                backgroundColor: THEME.redBg,
+                                borderWidth: 1,
+                                borderColor: THEME.redBorder,
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.redText }}>
+                                Out of Stock / Cancel Order
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       ) : hasSentQuote ? (
                         <View
@@ -1857,23 +2086,8 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                                 Awaiting Patient Payment
                               </Text>
                               <Text style={{ fontSize: 11.5, color: THEME.amberText, lineHeight: 16 }}>
-                                Step 2 (Packing, Delivery Time & Dispense) will unlock automatically once the patient completes payment in the app.
+                                Step 2 (Packing, Delivery Time & Dispense) will unlock automatically with a sound alert once the patient pays in the app.
                               </Text>
-                              <TouchableOpacity
-                                onPress={() => handleUnlockCounterPay(selectedOrder)}
-                                style={{
-                                  backgroundColor: '#FFFFFF',
-                                  borderWidth: 1,
-                                  borderColor: THEME.amberBorder,
-                                  borderRadius: 8,
-                                  paddingVertical: 8,
-                                  alignItems: 'center',
-                                }}
-                              >
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.amberText }}>
-                                  Paying at Counter / COD → Unlock Step 2
-                                </Text>
-                              </TouchableOpacity>
                             </View>
                           )}
                         </View>
@@ -1892,7 +2106,9 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                           }}
                         >
                           <Text style={{ fontSize: 14.5, fontWeight: '800', color: THEME.ink }}>
-                            Step 2 · Packing, {isPickupOrder ? 'Pickup Ready Time' : 'Delivery ETA'} & Dispense
+                            {selectedOrder.status === 'CANCELLED'
+                              ? 'Order Cancelled / Declined'
+                              : `Step 2 · Packing, ${isPickupOrder ? 'Pickup Ready Time' : 'Delivery ETA'} & Dispense`}
                           </Text>
 
                           {isPaid ? (
@@ -2027,52 +2243,125 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                                 </TouchableOpacity>
                               </View>
 
-                              <TouchableOpacity
-                                onPress={() => {
-                                  const target = selectedOrder;
-                                  setSelectedOrder(null);
-                                  setActiveTab('scanner');
-                                  setManualCodeInput(target.verification_code || target.booking_ref);
-                                  setVerifiedBooking(target);
-                                  setLookupError(null);
-                                  setCheckInSuccessMsg(null);
-                                }}
+                              <View
                                 style={{
-                                  backgroundColor: THEME.greenDark,
-                                  borderRadius: 10,
-                                  paddingVertical: 12,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: 6,
-                                }}
-                              >
-                                <PackageCheck size={16} color="#FFFFFF" />
-                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
-                                  Verify QR / Code & Mark Dispensed
-                                </Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                onPress={() => {
-                                  const target = selectedOrder;
-                                  setSelectedOrder(null);
-                                  setRejectTarget(target);
-                                  setRejectReason('');
-                                }}
-                                style={{
-                                  paddingVertical: 10,
-                                  borderRadius: 9,
-                                  backgroundColor: THEME.redBg,
+                                  backgroundColor: THEME.bg,
                                   borderWidth: 1,
-                                  borderColor: THEME.redBorder,
-                                  alignItems: 'center',
+                                  borderColor: THEME.border,
+                                  borderRadius: 10,
+                                  padding: 11,
+                                  gap: 8,
                                 }}
                               >
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.redText }}>
-                                  Out of Stock / Cancel Order
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.ink }}>
+                                  Verify Patient 4-Digit Code or QR & Mark Dispensed
                                 </Text>
-                              </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                                  <TextInput
+                                    value={step2PinInput}
+                                    onChangeText={(txt) => {
+                                      setStep2PinInput(txt);
+                                      if (step2DispenseErr) setStep2DispenseErr(null);
+                                    }}
+                                    placeholder="Enter 4-digit PIN from patient"
+                                    placeholderTextColor="#9CA3AF"
+                                    keyboardType="number-pad"
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 160,
+                                      backgroundColor: THEME.surface,
+                                      borderWidth: 1,
+                                      borderColor: THEME.border,
+                                      borderRadius: 9,
+                                      paddingHorizontal: 11,
+                                      paddingVertical: 9,
+                                      fontSize: 13.5,
+                                      fontWeight: '700',
+                                      color: THEME.ink,
+                                    }}
+                                  />
+                                  <TouchableOpacity
+                                    onPress={async () => {
+                                      if (!step2CameraOpen && !permission?.granted) {
+                                        await requestPermission();
+                                      }
+                                      setStep2CameraOpen((prev) => !prev);
+                                    }}
+                                    style={{
+                                      backgroundColor: step2CameraOpen ? THEME.redBg : THEME.surfaceAlt,
+                                      borderWidth: 1,
+                                      borderColor: step2CameraOpen ? THEME.redBorder : THEME.border,
+                                      borderRadius: 9,
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 9,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: 5,
+                                    }}
+                                  >
+                                    <QrCode size={15} color={step2CameraOpen ? THEME.redText : THEME.ink} />
+                                    <Text
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: '800',
+                                        color: step2CameraOpen ? THEME.redText : THEME.ink,
+                                      }}
+                                    >
+                                      {step2CameraOpen ? 'Close QR' : 'Scan QR'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    onPress={() => handleInlineDispense(selectedOrder)}
+                                    disabled={isCompletingCheckIn}
+                                    style={{
+                                      backgroundColor: THEME.greenDark,
+                                      borderRadius: 9,
+                                      paddingHorizontal: 14,
+                                      paddingVertical: 9,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <PackageCheck size={16} color="#FFFFFF" />
+                                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#FFFFFF' }}>
+                                      {isCompletingCheckIn ? 'Saving...' : 'Mark Dispensed'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                                {step2CameraOpen && (
+                                  <View
+                                    style={{
+                                      height: 220,
+                                      borderRadius: 12,
+                                      overflow: 'hidden',
+                                      backgroundColor: '#000000',
+                                      borderWidth: 2,
+                                      borderColor: THEME.green,
+                                    }}
+                                  >
+                                    <CameraView
+                                      style={{ flex: 1 }}
+                                      facing="back"
+                                      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                                      onBarcodeScanned={({ data }) => {
+                                        if (!isCompletingCheckIn && data) {
+                                          const token = extractRefOrCodeFromScan(data);
+                                          setStep2CameraOpen(false);
+                                          handleInlineDispense(selectedOrder, token);
+                                        }
+                                      }}
+                                    />
+                                  </View>
+                                )}
+                                {step2DispenseErr && (
+                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.redText }}>
+                                    {step2DispenseErr}
+                                  </Text>
+                                )}
+                              </View>
                             </View>
                           ) : (
                             <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.green }}>
@@ -2199,7 +2488,7 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
 
                 <TouchableOpacity
                   onPress={() => {
-                    setOrderFilter('READY');
+                    setOrderFilter('PAID_DELIVER');
                     setActiveTab('orders');
                   }}
                   style={{
@@ -2463,7 +2752,7 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
             </View>
           ) : activeTab === 'orders' ? (
             <View style={{ gap: 12 }}>
-              {/* Search + Filter */}
+              {/* Search + Date Dropdown + Status Dropdown */}
               <View
                 style={{
                   backgroundColor: THEME.surface,
@@ -2472,99 +2761,260 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                   borderWidth: 1,
                   borderColor: THEME.border,
                   gap: 10,
+                  zIndex: 30,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: THEME.bg,
-                    borderRadius: 9,
-                    borderWidth: 1,
-                    borderColor: THEME.border,
-                    paddingHorizontal: 11,
-                    paddingVertical: 8,
-                  }}
-                >
-                  <Search size={15} color={THEME.muted} />
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search patient, phone, booking ref, or 6-char code..."
-                    placeholderTextColor="#9CA3AF"
-                    style={{ flex: 1, fontSize: 13, color: THEME.ink }}
-                  />
-                  {searchQuery ? (
-                    <TouchableOpacity onPress={() => setSearchQuery('')}>
-                      <X size={14} color={THEME.muted} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <View
+                    style={{
+                      flex: 1,
+                      minWidth: 220,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      backgroundColor: THEME.bg,
+                      borderRadius: 9,
+                      borderWidth: 1,
+                      borderColor: THEME.border,
+                      paddingHorizontal: 11,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <Search size={15} color={THEME.muted} />
+                    <TextInput
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      placeholder="Search patient, phone, booking ref, or code..."
+                      placeholderTextColor="#9CA3AF"
+                      style={{ flex: 1, fontSize: 13, color: THEME.ink }}
+                    />
+                    {searchQuery ? (
+                      <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <X size={14} color={THEME.muted} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {/* Date / Calendar Dropdown */}
+                  <View style={{ position: 'relative', zIndex: 40 }}>
+                    <TouchableOpacity
+                      onPress={() => setOpenOrderDropdown((prev) => (prev === 'date' ? null : 'date'))}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        borderRadius: 9,
+                        backgroundColor: orderDateFilter !== 'ALL' ? THEME.greenSoft : THEME.bg,
+                        borderWidth: 1,
+                        borderColor: orderDateFilter !== 'ALL' ? THEME.green : THEME.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '700',
+                          color: orderDateFilter !== 'ALL' ? THEME.greenDark : THEME.ink,
+                        }}
+                      >
+                        {orderDateFilter === 'ALL'
+                          ? 'All Dates'
+                          : orderDateFilter === 'TODAY'
+                            ? 'Today'
+                            : orderDateFilter === '7D'
+                              ? 'Last 7 Days'
+                              : orderDateFilter === 'THIS_MONTH'
+                                ? 'This Month'
+                                : orderDateFilter === 'LAST_MONTH'
+                                  ? 'Last Month'
+                                  : customDateStr || 'Custom Date'}{' '}
+                        {openOrderDropdown === 'date' ? '▲' : '▼'}
+                      </Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
 
-                {/* Date Filters (Today / 7D / This Month / Last Month / All Time) */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {(
-                    [
-                      { id: 'ALL', label: 'All Dates' },
-                      { id: 'TODAY', label: 'Today' },
-                      { id: '7D', label: 'Last 7 Days' },
-                      { id: 'THIS_MONTH', label: 'This Month' },
-                      { id: 'LAST_MONTH', label: 'Last Month' },
-                    ] as const
-                  ).map((df) => {
-                    const active = orderDateFilter === df.id;
-                    return (
-                      <TouchableOpacity
-                        key={df.id}
-                        onPress={() => setOrderDateFilter(df.id)}
+                    {openOrderDropdown === 'date' && (
+                      <View
                         style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 99,
-                          backgroundColor: active ? THEME.greenSoft : THEME.bg,
+                          position: 'absolute',
+                          top: 42,
+                          right: 0,
+                          width: 210,
+                          backgroundColor: THEME.surface,
+                          borderRadius: 12,
                           borderWidth: 1,
-                          borderColor: active ? THEME.green : THEME.border,
+                          borderColor: THEME.border,
+                          padding: 6,
+                          gap: 4,
+                          shadowColor: '#000',
+                          shadowOpacity: 0.12,
+                          shadowRadius: 12,
+                          elevation: 8,
+                          zIndex: 50,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: active ? THEME.greenDark : THEME.muted }}>
-                          {df.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                        {(
+                          [
+                            { id: 'ALL', label: 'All Dates' },
+                            { id: 'TODAY', label: 'Today' },
+                            { id: '7D', label: 'Last 7 Days' },
+                            { id: 'THIS_MONTH', label: 'This Month' },
+                            { id: 'LAST_MONTH', label: 'Last Month' },
+                          ] as const
+                        ).map((df) => {
+                          const active = orderDateFilter === df.id;
+                          return (
+                            <TouchableOpacity
+                              key={df.id}
+                              onPress={() => {
+                                setOrderDateFilter(df.id);
+                                setOpenOrderDropdown(null);
+                              }}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: active ? THEME.greenSoft : 'transparent',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  fontWeight: active ? '800' : '600',
+                                  color: active ? THEME.greenDark : THEME.ink,
+                                }}
+                              >
+                                {df.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                        <View style={{ borderTopWidth: 1, borderTopColor: THEME.border, paddingTop: 6, marginTop: 2, gap: 4 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.muted, paddingHorizontal: 4 }}>
+                            Specific Date (YYYY-MM-DD)
+                          </Text>
+                          <TextInput
+                            value={customDateStr}
+                            onChangeText={(txt) => {
+                              setCustomDateStr(txt);
+                              if (txt.trim().length === 10) {
+                                setOrderDateFilter('CUSTOM');
+                              }
+                            }}
+                            placeholder="e.g. 2026-11-16"
+                            placeholderTextColor="#9CA3AF"
+                            style={{
+                              backgroundColor: THEME.bg,
+                              borderWidth: 1,
+                              borderColor: THEME.border,
+                              borderRadius: 7,
+                              paddingHorizontal: 8,
+                              paddingVertical: 6,
+                              fontSize: 12,
+                              color: THEME.ink,
+                            }}
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {(
-                    [
-                      { id: 'ALL', label: `All (${orders.length})` },
-                      { id: 'NEEDS_QUOTE', label: `Needs Quote (${stats.needsQuoteCount})` },
-                      { id: 'READY', label: `Ready / Paid (${stats.readyCount})` },
-                      { id: 'UNPAID', label: 'Unpaid' },
-                      { id: 'COMPLETED', label: 'Dispensed' },
-                      { id: 'LOST', label: 'Lost / Cancelled' },
-                    ] as const
-                  ).map((f) => {
-                    const active = orderFilter === f.id;
-                    return (
-                      <TouchableOpacity
-                        key={f.id}
-                        onPress={() => setOrderFilter(f.id)}
+                  {/* Status Dropdown (Default: Active — Quote & Delivery, hides Dispensed) */}
+                  <View style={{ position: 'relative', zIndex: 40 }}>
+                    <TouchableOpacity
+                      onPress={() => setOpenOrderDropdown((prev) => (prev === 'status' ? null : 'status'))}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        borderRadius: 9,
+                        backgroundColor: THEME.greenSoft,
+                        borderWidth: 1,
+                        borderColor: THEME.green,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: THEME.greenDark }}>
+                        {orderFilter === 'ACTIVE'
+                          ? 'Active (Quote & Delivery)'
+                          : orderFilter === 'NEEDS_QUOTE'
+                            ? `Needs Quote (${stats.needsQuoteCount})`
+                            : orderFilter === 'PAID_DELIVER'
+                              ? 'Paid · Yet to Deliver'
+                              : orderFilter === 'UNPAID'
+                                ? 'Quoted · Unpaid'
+                                : orderFilter === 'COMPLETED'
+                                  ? 'Dispensed'
+                                  : orderFilter === 'LOST'
+                                    ? 'Lost / Cancelled'
+                                    : `All Orders (${orders.length})`}{' '}
+                        {openOrderDropdown === 'status' ? '▲' : '▼'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {openOrderDropdown === 'status' && (
+                      <View
                         style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: 99,
-                          backgroundColor: active ? THEME.greenDark : THEME.surfaceAlt,
+                          position: 'absolute',
+                          top: 42,
+                          right: 0,
+                          width: 225,
+                          backgroundColor: THEME.surface,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: THEME.border,
+                          padding: 6,
+                          gap: 4,
+                          shadowColor: '#000',
+                          shadowOpacity: 0.12,
+                          shadowRadius: 12,
+                          elevation: 8,
+                          zIndex: 50,
                         }}
                       >
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: active ? '#FFFFFF' : THEME.ink }}>
-                          {f.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                        {(
+                          [
+                            { id: 'ACTIVE', label: 'Active (Quote & Delivery)' },
+                            { id: 'NEEDS_QUOTE', label: `Needs Quote (${stats.needsQuoteCount})` },
+                            { id: 'PAID_DELIVER', label: 'Paid · Yet to Deliver' },
+                            { id: 'UNPAID', label: 'Quoted · Unpaid' },
+                            { id: 'COMPLETED', label: 'Dispensed / Completed' },
+                            { id: 'LOST', label: 'Lost / Cancelled' },
+                            { id: 'ALL', label: `All Orders (${orders.length})` },
+                          ] as const
+                        ).map((f) => {
+                          const active = orderFilter === f.id;
+                          return (
+                            <TouchableOpacity
+                              key={f.id}
+                              onPress={() => {
+                                setOrderFilter(f.id);
+                                setOpenOrderDropdown(null);
+                              }}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: active ? THEME.greenDark : 'transparent',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  fontWeight: active ? '800' : '600',
+                                  color: active ? '#FFFFFF' : THEME.ink,
+                                }}
+                              >
+                                {f.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                </View>
               </View>
 
               {filteredOrders.length === 0 ? (
@@ -2622,7 +3072,11 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                                   ? THEME.greenSoft
                                   : isCancelled
                                   ? THEME.redBg
+                                  : o.status === 'NEW'
+                                  ? '#E0F2FE'
                                   : THEME.amberBg,
+                                borderWidth: o.status === 'NEW' ? 1 : 0,
+                                borderColor: o.status === 'NEW' ? '#7DD3FC' : 'transparent',
                                 paddingHorizontal: 8,
                                 paddingVertical: 2,
                                 borderRadius: 99,
@@ -2636,6 +3090,8 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                                     ? THEME.green
                                     : isCancelled
                                     ? THEME.redText
+                                    : o.status === 'NEW'
+                                    ? '#0284C7'
                                     : THEME.amberText,
                                 }}
                               >
@@ -2643,8 +3099,14 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                               </Text>
                             </View>
                           </View>
-                          <Text style={{ fontSize: 15, fontWeight: '800', color: payable > 0 ? THEME.greenDark : THEME.amberText }}>
-                            {payable > 0 ? formatInr(payable) : 'Needs Quote'}
+                          <Text
+                            style={{
+                              fontSize: 15,
+                              fontWeight: '800',
+                              color: isCancelled ? THEME.redText : payable > 0 ? THEME.greenDark : THEME.amberText,
+                            }}
+                          >
+                            {isCancelled ? 'Declined' : payable > 0 ? formatInr(payable) : 'Needs Quote'}
                           </Text>
                         </View>
 
@@ -2653,7 +3115,6 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                         </Text>
                         <Text style={{ fontSize: 11.5, color: THEME.muted }}>
                           {o.slot_time || 'Store Pickup / Delivery'}
-                          {o.verification_code ? ` · PIN: ${o.verification_code}` : ''}
                         </Text>
 
                         {customNote ? (
@@ -2714,24 +3175,6 @@ export function PharmacyPartnerPortal({ initialOrderRef }: { initialOrderRef?: s
                             <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.amberText }}>View Rx</Text>
                           </TouchableOpacity>
                         ) : null}
-
-                        {!isDone && !isCancelled && (
-                          <TouchableOpacity
-                            onPress={() => openOrderWorkspace(o)}
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 8,
-                              borderRadius: 8,
-                              backgroundColor: THEME.greenSoft,
-                              borderWidth: 1,
-                              borderColor: THEME.greenBorder,
-                            }}
-                          >
-                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.greenDark }}>
-                              {payable > 0 ? 'Edit Quote' : 'Send Quote'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
 
                         {waPhone ? (
                           <TouchableOpacity

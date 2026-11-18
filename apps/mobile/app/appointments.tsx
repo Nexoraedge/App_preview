@@ -23,6 +23,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { confirmDialog } from '../src/utils/crossAlert';
+import { generateInvoiceHtml, type HistoryItem } from '../src/data/pharmacyData';
+import type { BillLine } from '../src/data/pharmacySample';
 import {
   ArrowLeft,
   Calendar,
@@ -94,8 +96,11 @@ export interface EnrichedAppointment {
   tokenNumber: number;
   roomNumber: string;
   doctorFee: number;
+  billAmount?: number;
+  discountAmount?: number;
   paymentStatus: 'PAID' | 'CANCELLED';
   prescriptionUrl?: string;
+  verificationCode?: string;
   assignedAgent?: string;
   isUpcoming: boolean;
   notes?: string;
@@ -221,8 +226,11 @@ export default function AppointmentsScreen() {
                     ? 'Inpatient Desk Room 101'
                     : 'OPD Desk Room 101',
             doctorFee: fee,
+            billAmount: Number(b.bill_amount || 0),
+            discountAmount: Number(b.discount_amount || 0),
             paymentStatus: (b.status === 'CANCELLED' ? 'CANCELLED' : 'PAID') as any,
             prescriptionUrl: b.bill_image_url || undefined,
+            verificationCode: (b as any).verification_code || undefined,
             assignedAgent: b.assigned_agent || undefined,
             isUpcoming: isUpc,
             notes: b.notes || 'Hospital booking confirmed.',
@@ -397,8 +405,66 @@ export default function AppointmentsScreen() {
     );
   };
 
-  // Prescription / Receipt Simulation
+  // Prescription / Receipt Download (Uses exact Pharmacy Tax Invoice template on Web + Share Sheet on Mobile)
   const handleDownloadPrescription = (apt: EnrichedAppointment) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const parsedItems: BillLine[] = [];
+      const docText = String(apt.doctorName || '').trim();
+      if (apt.serviceType === 'PHARMACY_SCAN_PAY' && docText && docText !== 'Adityam Partner Pharmacy') {
+        docText.split(',').map((s) => s.trim()).filter(Boolean).forEach((part, idx) => {
+          const m = part.match(/^(.+?)\s*\(([^)]+)\)\s*₹\s*([0-9.]+)$/);
+          if (m) {
+            parsedItems.push({
+              id: `rx-${idx}`,
+              name: m[1].trim(),
+              nameHi: m[1].trim(),
+              qty: Number(m[2]) || 1,
+              price: Number(m[3]) || 0,
+            });
+          }
+        });
+      }
+      const gross = apt.billAmount && apt.billAmount > 0 ? apt.billAmount : apt.doctorFee || 0;
+      const disc = apt.discountAmount || 0;
+      const isPickup = (apt.slotTime || '').toLowerCase().includes('pickup');
+      const invoiceOrder: HistoryItem = {
+        ref: apt.bookingRef,
+        shop: apt.hospitalName,
+        shopAddress: apt.hospitalAddress,
+        shopPhone: apt.patientPhone || '+91 82713 10911',
+        total: apt.doctorFee || 0,
+        subtotal: gross,
+        discount: disc,
+        deliveryFee: 0,
+        mode: isPickup ? 'pickup' : 'delivery',
+        paidInApp: apt.status === 'PAID' || apt.status === 'COMPLETED',
+        date: `${apt.slotDate}${apt.slotTime ? `, ${apt.slotTime}` : ''}`,
+        status: apt.status === 'COMPLETED' ? (isPickup ? 'picked_up' : 'delivered') : 'ready',
+        patientName: apt.patientName,
+        items:
+          parsedItems.length > 0
+            ? parsedItems
+            : [
+                {
+                  id: 'svc-1',
+                  name: apt.doctorName || apt.specialty || 'Healthcare Service',
+                  nameHi: apt.doctorNameHi || apt.specialtyHi || 'स्वास्थ्य सेवा',
+                  qty: 1,
+                  price: gross,
+                },
+              ],
+      };
+      const html = generateInvoiceHtml(invoiceOrder);
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 250);
+      }
+      return;
+    }
+
     Alert.alert(
       isHi ? 'प्रिस्क्रिप्शन व बिल डाउनलोड' : 'Download Prescription & Receipt',
       isHi
@@ -1116,9 +1182,13 @@ export default function AppointmentsScreen() {
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706', marginTop: 2 }}>
                             {isHi ? 'बिल कोटेशन प्रतीक्षित' : 'Quote Pending'}
                           </Text>
-                        ) : (
+                        ) : apt.status === 'PAID' || apt.status === 'COMPLETED' ? (
                           <Text style={{ fontSize: 10, fontWeight: '700', color: '#059669', marginTop: 2 }}>
                             {inr(apt.doctorFee)} {isHi ? '• भुगतान पूर्ण' : '• Paid'}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706', marginTop: 2 }}>
+                            {inr(apt.doctorFee)} {isHi ? '• भुगतान शेष' : '• Payment Due'}
                           </Text>
                         )}
                       </View>
@@ -1732,6 +1802,27 @@ export default function AppointmentsScreen() {
                       </Text>
                     </View>
                   )}
+                  {selectedAppointment?.verificationCode && (
+                    <View
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1.5,
+                        borderColor: '#2563EB',
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF', letterSpacing: 0.5 }}>
+                        {isHi ? 'डिलीवरी / पिकअप सत्यापन कोड' : 'DELIVERY / PICKUP VERIFICATION PIN'}
+                      </Text>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: '#1D4ED8', letterSpacing: 5, marginTop: 2 }}>
+                        {selectedAppointment.verificationCode}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -1805,7 +1896,9 @@ export default function AppointmentsScreen() {
                       ? (isHi ? 'कैशलेस टीपीए समन्वय (निशुल्क)' : 'Cashless TPA Coordination (Free)')
                       : selectedAppointment?.doctorFee === 0
                         ? (isHi ? 'पर्चा समीक्षाधीन (एजेंट कॉल करेगा)' : 'Under Review (Agent Connecting)')
-                        : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`}
+                        : selectedAppointment?.status === 'PAID' || selectedAppointment?.status === 'COMPLETED'
+                          ? `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`
+                          : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान शेष' : 'Payment Due'})`}
                   </Text>
                 </View>
               </View>

@@ -5,7 +5,7 @@ import { BillLine } from './pharmacySample';
 
 export type Stage = 'home' | 'shops' | 'track';
 export type Mode = 'delivery' | 'pickup';
-export type HistoryStatus = 'delivered' | 'picked_up' | 'ready' | 'out_for_delivery';
+export type HistoryStatus = 'delivered' | 'picked_up' | 'ready' | 'out_for_delivery' | 'cancelled';
 
 export interface HistoryItem {
   ref: string;
@@ -22,6 +22,9 @@ export interface HistoryItem {
   date: string;
   status: HistoryStatus;
   patientName: string;
+  verificationCode?: string;
+  cancelReason?: string;
+  prescriptionUrl?: string;
   items: BillLine[];
 }
 

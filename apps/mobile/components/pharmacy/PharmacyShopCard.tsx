@@ -26,12 +26,8 @@ export function PharmacyShopCard({
 }: PharmacyShopCardProps) {
   const name = getPharmacyName(shop, isHi);
   const area = getPharmacyArea(shop, isHi);
-  const estTime = shop.km <= 1.5
-    ? (isHi ? '15–20 मिनट' : '15–20 mins')
-    : shop.km <= 3.5
-    ? (isHi ? '25–30 मिनट' : '25–30 mins')
-    : (isHi ? '35–45 मिनट' : '35–45 mins');
-  const deliveryBadge = shop.km <= 3.0
+  const estTime = isHi ? '24 घंटे से पहले' : 'Before 24 Hours';
+  const deliveryBadge = shop.km < 0 || shop.km <= 3.0
     ? (isHi ? 'मुफ़्त डिलीवरी' : 'FREE Delivery')
     : (isHi ? '₹15 डिलीवरी' : '₹15 Delivery');
 
@@ -79,7 +75,10 @@ export function PharmacyShopCard({
             >
               <MapPin size={12} color={C.sub} />
               <Text style={{ fontSize: 12, color: C.sub }}>
-                {area} · <Text style={{ fontWeight: '700', color: C.brand }}>{shop.km} {isHi ? 'किमी' : 'km'}</Text>
+                {area} ·{' '}
+                <Text style={{ fontWeight: '700', color: C.brand }}>
+                  {shop.km >= 0 ? `${shop.km} ${isHi ? 'किमी' : 'km'}` : (isHi ? 'लोकेशन चुनें' : 'Location needed')}
+                </Text>
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
                 <Star size={11} color="#D97706" fill="#D97706" />

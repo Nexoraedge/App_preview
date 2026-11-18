@@ -3,7 +3,7 @@
 // Features: 1-Tap GPS detection, Saved Addresses (Home, Work, Other),
 // Add New Address Form, Search filter, and Popular Healthcare Hubs.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,7 @@ import { MapPinPickerModal } from './MapPinPickerModal';
 export function LocationPickerModal() {
   const {
     isPickerModalOpen,
+    initialAddingNew,
     closeLocationPicker,
     currentLocationName,
     activeAddress,
@@ -60,6 +61,12 @@ export function LocationPickerModal() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingNew, setIsAddingNew] = useState(false);
+
+  useEffect(() => {
+    if (isPickerModalOpen) {
+      setIsAddingNew(Boolean(initialAddingNew));
+    }
+  }, [isPickerModalOpen, initialAddingNew]);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [mapMode, setMapMode] = useState<'pick_active' | 'pin_for_form'>('pick_active');
   const [markedCoords, setMarkedCoords] = useState<{ latitude: number; longitude: number } | null>(null);

@@ -40,7 +40,7 @@ export const pharmacyCopy = {
     deliveryAvailable: 'Delivery available',
     pickupAvailable: 'Pickup available',
     sendOrderCta: 'Send Prescription to Pharmacy ›',
-    backToPrescription: '‹ Back to Prescription',
+    backToPrescription: 'Back to Prescription',
 
     // Step 3: Track & Bill
     trackTitle: 'Order Tracking',

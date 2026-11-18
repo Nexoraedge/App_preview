@@ -29,7 +29,7 @@ const CITIES = ['Surajpole Gate, Jaipur', 'C-Scheme, Jaipur', 'Malviya Nagar, Ja
 
 export function AppHeader({
   title,
-  subtitle = 'Surajpole Gate, Jaipur',
+  subtitle = '',
   onPressProfile,
   onPressLocation,
   rightAction,
@@ -203,7 +203,7 @@ export function AppHeader({
         </View>
 
         {/* Optional screen descriptive subtitle */}
-        {subtitle && subtitle !== 'South Delhi NCR · within 10 km' && subtitle !== 'Saket, South Delhi NCR' && (
+        {Boolean(subtitle) && subtitle !== 'South Delhi NCR · within 10 km' && subtitle !== 'Saket, South Delhi NCR' && (
           <Text
             numberOfLines={1}
             style={{

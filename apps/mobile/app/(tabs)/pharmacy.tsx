@@ -104,9 +104,9 @@ export default function PharmacyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const fam = useFamilyOptional();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { language } = useLanguage();
-  const { coords: ctxCoords, activeAddress, currentLocationName } = useLocation();
+  const { coords: ctxCoords, activeAddress, currentLocationName, openLocationPicker, openAddAddressModal, detectCurrentLocation } = useLocation();
   const isHi = language === 'hi';
   const c = isHi ? pharmacyCopy.hi : pharmacyCopy.en;
 
@@ -122,6 +122,10 @@ export default function PharmacyScreen() {
   const [reqRef, setReqRef] = useState('');
   const [code, setCode] = useState('');
   const [patientNote, setPatientNote] = useState('');
+  const [patientNameInput, setPatientNameInput] = useState(() => {
+    const n = user?.full_name?.trim() || '';
+    return n && n !== 'User' && n !== 'Patient' ? n : '';
+  });
   const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
   const [selectedOrder, setSelectedOrder] = useState<HistoryItem | null>(null);
   const [memberSheet, setMemberSheet] = useState(false);
@@ -129,8 +133,14 @@ export default function PharmacyScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
   const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
   const [liveTrackedBooking, setLiveTrackedBooking] = useState<any | null>(null);
+  const [liveToast, setLiveToast] = useState<{ title: string; body: string; ref: string; kind: 'bill' | 'delivered' | 'cancelled' | 'dispatch' } | null>(null);
   const askedLoc = useRef(false);
   const billSoundPlayedRef = useRef<string | null>(null);
+  const completedSoundPlayedRef = useRef<string | null>(null);
+  const cancelledSoundPlayedRef = useRef<string | null>(null);
+  const initializedOrdersRef = useRef(false);
+  const knownStatusesRef = useRef<Record<string, string>>({});
+  const knownSlotsRef = useRef<Record<string, string>>({});
 
   const syncTrackedBooking = (matched: any) => {
     if (!matched) return;
@@ -140,7 +150,28 @@ export default function PharmacyScreen() {
       matched.status !== 'NEW' &&
       matched.status !== 'CALLING';
 
-    if (matched.status === 'COMPLETED' || matched.status === 'PAID') {
+    if (matched.status === 'CANCELLED' || matched.status === 'MISSED') {
+      setStatus('sent');
+      if (cancelledSoundPlayedRef.current !== matched.booking_ref) {
+        cancelledSoundPlayedRef.current = matched.booking_ref;
+        playPatientBillChime(
+          isHi ? 'ऑर्डर रद्द / स्टॉक उपलब्ध नहीं' : 'Order Cancelled / Out of Stock',
+          matched.partner_notes || `${matched.hospital_name || 'Pharmacy'} could not fulfill order #${matched.booking_ref}.`
+        );
+      }
+    } else if (matched.status === 'COMPLETED') {
+      setPaidInApp(true);
+      setStatus('ready');
+      if (completedSoundPlayedRef.current !== matched.booking_ref) {
+        completedSoundPlayedRef.current = matched.booking_ref;
+        playPatientBillChime(
+          isHi ? 'ऑर्डर डिलीवर हो गया!' : 'Order Delivered! Thank You!',
+          isHi
+            ? `${matched.hospital_name || 'फार्मेसी'} से आपका ऑर्डर #${matched.booking_ref} सफलतापूर्वक पूरा हो गया है।`
+            : `Your order #${matched.booking_ref} from ${matched.hospital_name || 'Pharmacy'} has been delivered. Thank you!`
+        );
+      }
+    } else if (matched.status === 'PAID') {
       setPaidInApp(true);
       setStatus('ready');
     } else if (hasBill && matched.status === 'CONFIRMED') {
@@ -161,8 +192,27 @@ export default function PharmacyScreen() {
   useEffect(() => {
     const loadRealPharmacyOrders = async () => {
       try {
-        const allBookings = await getLocalBookings();
         const isDemo = user?.id === '00000000-0000-0000-0000-000000000001';
+        let allBookings = await getLocalBookings();
+
+        // Also pull latest from Supabase cloud so quote amounts & statuses are always fresh
+        if (user?.id) {
+          try {
+            const supabase = getSupabaseClient();
+            const { data: cloudRows } = await supabase
+              .from('bookings')
+              .select('*')
+              .eq('service_type', 'PHARMACY_SCAN_PAY')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(50);
+            if (cloudRows && cloudRows.length > 0) {
+              const cloudRefs = new Set(cloudRows.map((r: any) => r.booking_ref));
+              allBookings = [...(cloudRows as any[]), ...allBookings.filter((b) => !cloudRefs.has(b.booking_ref))];
+            }
+          } catch {}
+        }
+
         const pharmacyBookings = allBookings.filter(
           (b) =>
             b.service_type === 'PHARMACY_SCAN_PAY' &&
@@ -176,9 +226,95 @@ export default function PharmacyScreen() {
           if (tracked) syncTrackedBooking(tracked);
         }
 
+        // Notify patient with sound + banner if any order receives a bill or is delivered while on Home/Shops
+        if (initializedOrdersRef.current) {
+          for (const b of pharmacyBookings) {
+            const prevStatus = knownStatusesRef.current[b.booking_ref];
+            const prevSlot = knownSlotsRef.current[b.booking_ref];
+            const hasBill = Number(b.bill_amount || 0) > 0;
+            if ((b.status === 'CANCELLED' || b.status === 'MISSED') && prevStatus && prevStatus !== b.status) {
+              const pNotes = (b as any).partner_notes as string | undefined;
+              playPatientBillChime(
+                isHi ? 'ऑर्डर रद्द / स्टॉक उपलब्ध नहीं' : 'Order Cancelled / Out of Stock',
+                pNotes || `${b.hospital_name || 'Pharmacy'} could not fulfill #${b.booking_ref}.`
+              );
+              setLiveToast({
+                title: isHi ? 'ऑर्डर रद्द / स्टॉक उपलब्ध नहीं' : 'Order Cancelled / Out of Stock',
+                body: `${b.hospital_name || 'Pharmacy'} · #${b.booking_ref}${pNotes ? ` · ${pNotes}` : ''}`,
+                ref: b.booking_ref,
+                kind: 'cancelled',
+              });
+            } else if (b.status === 'CONFIRMED' && hasBill && prevStatus !== 'CONFIRMED') {
+              playPatientBillChime(
+                isHi ? 'फार्मेसी से बिल प्राप्त हुआ!' : 'Medicine Bill Ready!',
+                `${b.hospital_name || 'Pharmacy'} sent a bill of ₹${b.final_payable || b.bill_amount} for #${b.booking_ref}.`
+              );
+              setLiveToast({
+                title: isHi ? 'फार्मेसी से बिल प्राप्त हुआ!' : 'Medicine Bill Ready!',
+                body: `${b.hospital_name || 'Pharmacy'} · #${b.booking_ref} · ₹${b.final_payable || b.bill_amount}`,
+                ref: b.booking_ref,
+                kind: 'bill',
+              });
+            } else if (b.status === 'COMPLETED' && prevStatus && prevStatus !== 'COMPLETED') {
+              playPatientBillChime(
+                isHi ? 'ऑर्डर डिलीवर हो गया!' : 'Order Delivered! Thank You!',
+                `Your order #${b.booking_ref} from ${b.hospital_name || 'Pharmacy'} is completed.`
+              );
+              setLiveToast({
+                title: isHi ? 'ऑर्डर डिलीवर हो गया!' : 'Order Delivered! Thank You!',
+                body: `${b.hospital_name || 'Pharmacy'} · #${b.booking_ref}`,
+                ref: b.booking_ref,
+                kind: 'delivered',
+              });
+            } else if (
+              b.status === 'PAID' &&
+              b.slot_time &&
+              prevSlot &&
+              b.slot_time !== prevSlot
+            ) {
+              playPatientBillChime(
+                isHi ? 'ऑर्डर अपडेट!' : `Order Update: ${b.slot_time}`,
+                `${b.hospital_name || 'Pharmacy'} updated #${b.booking_ref} to "${b.slot_time}".`
+              );
+              setLiveToast({
+                title: isHi ? `अपडेट: ${b.slot_time}` : `Order Update: ${b.slot_time}`,
+                body: `${b.hospital_name || 'Pharmacy'} · #${b.booking_ref}`,
+                ref: b.booking_ref,
+                kind: 'dispatch',
+              });
+            }
+          }
+        }
+        const nextKnown: Record<string, string> = {};
+        const nextKnownSlots: Record<string, string> = {};
+        for (const b of pharmacyBookings) {
+          nextKnown[b.booking_ref] = b.status;
+          nextKnownSlots[b.booking_ref] = b.slot_time || '';
+        }
+        knownStatusesRef.current = nextKnown;
+        knownSlotsRef.current = nextKnownSlots;
+        initializedOrdersRef.current = true;
+
         if (pharmacyBookings.length > 0) {
           const items: HistoryItem[] = pharmacyBookings.map((b) => {
             const hasRealBill = (b.final_payable && b.final_payable > 0) || (b.bill_amount && b.bill_amount > 0);
+            const isPickup = (b.slot_time || '').toLowerCase().includes('pickup');
+            const docText = String(b.doctor_name || '').trim();
+            const parsedItems: BillLine[] = [];
+            if (docText && docText !== 'Adityam Partner Pharmacy') {
+              docText.split(',').map((s) => s.trim()).filter(Boolean).forEach((part, idx) => {
+                const m = part.match(/^(.+?)\s*\(([^)]+)\)\s*₹\s*([0-9.]+)$/);
+                if (m) {
+                  parsedItems.push({
+                    id: `rx-${idx}`,
+                    name: m[1].trim(),
+                    nameHi: m[1].trim(),
+                    qty: Number(m[2]) || 1,
+                    price: Number(m[3]) || 0,
+                  });
+                }
+              });
+            }
             return {
               ref: b.booking_ref,
               shop: b.hospital_name || 'Adityam Partner Pharmacy',
@@ -189,8 +325,8 @@ export default function PharmacyScreen() {
               subtotal: hasRealBill ? (b.bill_amount || 0) : 0,
               discount: hasRealBill ? (b.discount_amount || 0) : 0,
               deliveryFee: 0,
-              mode: (b.slot_time || '').toLowerCase().includes('delivery') ? 'delivery' : 'pickup',
-              paidInApp: Boolean(hasRealBill),
+              mode: isPickup ? 'pickup' : 'delivery',
+              paidInApp: b.status === 'PAID' || b.status === 'COMPLETED',
               date: new Date(b.created_at).toLocaleDateString('en-IN', {
                 day: '2-digit',
                 month: 'short',
@@ -198,17 +334,32 @@ export default function PharmacyScreen() {
                 hour: '2-digit',
                 minute: '2-digit',
               }),
-              status: hasRealBill ? (b.status === 'PAID' ? 'delivered' : 'ready') : 'ready',
+              status:
+                b.status === 'CANCELLED' || b.status === 'MISSED'
+                  ? 'cancelled'
+                  : b.status === 'COMPLETED'
+                    ? isPickup
+                      ? 'picked_up'
+                      : 'delivered'
+                    : (b.slot_time || '').toLowerCase().includes('out for delivery')
+                      ? 'out_for_delivery'
+                      : 'ready',
               patientName: b.patient_name || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
-              items: [
-                {
-                  id: 'rx-1',
-                  name: 'Prescription Medicine Order',
-                  nameHi: 'पर्चे अनुसार औषधियां',
-                  qty: 1,
-                  price: hasRealBill ? (b.final_payable || b.bill_amount || 0) : 0,
-                },
-              ],
+              verificationCode: (b as any).verification_code || '',
+              cancelReason: (b as any).partner_notes || undefined,
+              prescriptionUrl: (b as any).bill_image_url || undefined,
+              items:
+                parsedItems.length > 0
+                  ? parsedItems
+                  : [
+                      {
+                        id: 'rx-1',
+                        name: 'Prescription Medicine Order',
+                        nameHi: 'पर्चे अनुसार औषधियां',
+                        qty: 1,
+                        price: hasRealBill ? (b.final_payable || b.bill_amount || 0) : 0,
+                      },
+                    ],
             };
           });
           setHistory(items);
@@ -222,8 +373,12 @@ export default function PharmacyScreen() {
 
     loadRealPharmacyOrders();
     const unsub = subscribeBookings(loadRealPharmacyOrders);
-    return () => unsub();
-  }, [user?.id]);
+    const pollTimer = setInterval(loadRealPharmacyOrders, 3000);
+    return () => {
+      unsub();
+      clearInterval(pollTimer);
+    };
+  }, [user?.id, reqRef]);
 
   const { data: dbPharmacies } = usePharmacies();
 
@@ -236,31 +391,29 @@ export default function PharmacyScreen() {
     }
   }, [dbPharmacies, shopId, mode]);
 
-  // Prefer live Supabase pharmacies (only active stores); fall back to static list only if offline/empty
+  // Live Supabase pharmacies ONLY (never fall back to demo stores when all shops are closed)
   const livePharmacies: Pharmacy[] = useMemo(() => {
-    if (dbPharmacies && dbPharmacies.length > 0) {
-      return dbPharmacies
-        .filter((p: any) => p.is_active !== false)
-        .map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          nameHi: p.name_hi ?? p.name,
-          area: p.area,
-          areaHi: p.area_hi ?? p.area,
-          lat: Number(p.latitude ?? p.lat ?? 26.9205),
-          lng: Number(p.longitude ?? p.lng ?? 75.845),
-          sampleKm: Number(p.distance_km ?? 1.2),
-          rating: Number(p.rating ?? 4.5),
-          reviews: Number(p.reviews ?? 100),
-          delivery: Boolean(p.delivery),
-          pickup: Boolean(p.pickup),
-          appDiscountPct: Number(p.app_discount_pct ?? 15),
-        }));
-    }
-    return [...PHARMACIES];
+    if (!dbPharmacies || dbPharmacies.length === 0) return [];
+    return dbPharmacies
+      .filter((p: any) => p.is_active !== false)
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        nameHi: p.name_hi ?? p.name,
+        area: p.area,
+        areaHi: p.area_hi ?? p.area,
+        lat: Number(p.latitude ?? p.lat ?? 26.9205),
+        lng: Number(p.longitude ?? p.lng ?? 75.845),
+        sampleKm: Number(p.distance_km ?? 1.2),
+        rating: Number(p.rating ?? 4.5),
+        reviews: Number(p.reviews ?? 100),
+        delivery: Boolean(p.delivery),
+        pickup: Boolean(p.pickup),
+        appDiscountPct: Number(p.app_discount_pct ?? 15),
+      }));
   }, [dbPharmacies]);
 
-  // Priority coordinate resolution: Active Saved Address > LocationContext Coords > GPS > Regional Fallback
+  // Priority coordinate resolution: Active Saved Address > LocationContext Coords > Local GPS (NO fake fallback)
   const userCoords = useMemo(() => {
     if (activeAddress?.latitude && activeAddress?.longitude) {
       return { lat: Number(activeAddress.latitude), lng: Number(activeAddress.longitude) };
@@ -271,12 +424,8 @@ export default function PharmacyScreen() {
     if (coords?.lat && coords?.lng) {
       return coords;
     }
-    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
-    if (locText.includes('jaipur')) {
-      return { lat: 26.9205, lng: 75.8450 }; // Mohanbari / Surajpole Gate, Jaipur
-    }
-    return { lat: 26.9205, lng: 75.8450 }; // Mohanbari / Surajpole Gate, Jaipur
-  }, [activeAddress, ctxCoords, coords, currentLocationName, user?.city]);
+    return null;
+  }, [activeAddress, ctxCoords, coords]);
 
   // Ask for location permission when user enters shops stage if not already determined
   useEffect(() => {
@@ -348,15 +497,19 @@ export default function PharmacyScreen() {
     };
   }, [stage, reqRef]);
 
-  // Calculate live real-time distance and filter pharmacies within active city radius
+  // Calculate live real-time distance only when real coordinates are available
   const { shops, isSample } = useMemo(() => {
     const listWithDistance = livePharmacies.map((p) => {
-      const d = distanceKm(userCoords, p);
+      const d = userCoords ? distanceKm(userCoords, p) : -1;
       return {
         ...p,
-        km: Math.round(d * 10) / 10,
+        km: d >= 0 ? Math.round(d * 10) / 10 : -1,
       };
     });
+
+    if (!userCoords) {
+      return { shops: listWithDistance, isSample: false };
+    }
 
     // Match local pharmacies (within 35 km of delivery doorstep)
     const nearby = listWithDistance.filter((p) => p.km <= 35);
@@ -365,7 +518,7 @@ export default function PharmacyScreen() {
       ? nearby.sort((a, b) => a.km - b.km)
       : listWithDistance.sort((a, b) => a.km - b.km);
 
-    return { shops: finalShops, isSample: !usable };
+    return { shops: finalShops, isSample: livePharmacies.length > 0 && !usable };
   }, [userCoords, livePharmacies]);
 
   const visibleShops = useMemo(() => {
@@ -389,7 +542,7 @@ export default function PharmacyScreen() {
   const subtotal = SAMPLE_BILL.reduce((s, l) => s + l.price * l.qty, 0);
   const discount = shop ? Math.round((subtotal * shop.appDiscountPct) / 100) : 0;
   const total = subtotal - discount;
-  const maxPct = Math.max(...livePharmacies.map((p) => p.appDiscountPct));
+  const maxPct = livePharmacies.length > 0 ? Math.max(...livePharmacies.map((p) => p.appDiscountPct)) : 20;
   const forName = fam?.active
     ? fam.active.relation === 'Self'
       ? user?.full_name || fam.active.name || (isHi ? 'रोगी' : 'Patient')
@@ -447,6 +600,41 @@ export default function PharmacyScreen() {
       setIsVerifyPhoneOpen(true);
       return;
     }
+
+    const effectiveName = patientNameInput.trim() || (forName && forName !== 'User' && forName !== 'Patient' ? forName : '');
+    if (!effectiveName) {
+      const msg = isHi
+        ? 'कृपया ऑर्डर भेजने से पहले रोगी का नाम दर्ज करें।'
+        : 'Please enter the patient name before sending your prescription.';
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(msg);
+      } else {
+        Alert.alert(isHi ? 'नाम आवश्यक है' : 'Patient Name Required', msg);
+      }
+      return;
+    }
+    if (!user?.full_name || user.full_name === 'User' || user.full_name === 'Patient') {
+      updateUser({ full_name: effectiveName });
+    }
+
+    let resolvedLat = activeAddress?.latitude ? Number(activeAddress.latitude) : ctxCoords?.latitude ? Number(ctxCoords.latitude) : coords?.lat;
+    let resolvedLng = activeAddress?.longitude ? Number(activeAddress.longitude) : ctxCoords?.longitude ? Number(ctxCoords.longitude) : coords?.lng;
+
+    if (mode === 'delivery') {
+      if (!activeAddress) {
+        const msg = isHi
+          ? 'कृपया होम डिलीवरी के लिए अपना पूरा पता (मकान/फ्लैट नं., गली, पिनकोड) जोड़ें या चुनें।'
+          : 'Please add or select a complete delivery address (House/Flat No., Street, Pincode) for Home Delivery.';
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert(msg);
+        } else {
+          Alert.alert(isHi ? 'पूरा पता आवश्यक है' : 'Complete Delivery Address Required', msg);
+        }
+        openAddAddressModal();
+        return;
+      }
+    }
+
     const orderRef = `AN-RX-${Math.floor(100000 + Math.random() * 900000)}`;
     const verifyCode = String(Math.floor(1000 + Math.random() * 9000));
     setReqRef(orderRef);
@@ -477,7 +665,7 @@ export default function PharmacyScreen() {
       booking_ref: orderRef,
       service_type: 'PHARMACY_SCAN_PAY',
       user_id: user?.id || '00000000-0000-0000-0000-000000000001',
-      patient_name: forName || user?.full_name || (isHi ? 'रोगी' : 'Patient'),
+      patient_name: effectiveName,
       patient_phone: (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999') ? user.phone : '',
       hospital_id: shop.id,
       hospital_name: shop.name,
@@ -493,15 +681,19 @@ export default function PharmacyScreen() {
       discount_amount: 0,
       final_payable: 0,
       bill_image_url: uploadedImageUrl || images[0] || null,
-      notes: `${patientNote.trim() ? `Customer Note: ${patientNote.trim()}. ` : ''}Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Verification PIN: ${verifyCode}. Mode: ${mode}.${
+      notes: `${patientNote.trim() ? `Customer Note: ${patientNote.trim()}. ` : ''}Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Mode: ${mode}.${
         mode === 'delivery'
           ? ` Delivery Address: ${
               activeAddress
                 ? [activeAddress.house_flat, activeAddress.landmark_street, activeAddress.city, activeAddress.pincode]
                     .filter(Boolean)
                     .join(', ')
-                : currentLocationName || 'Current Location'
-            }.`
+                : currentLocationName && currentLocationName !== 'Select Location'
+                  ? currentLocationName
+                  : user?.city
+                    ? `${user.city} (GPS)`
+                    : 'GPS Location'
+            }.${resolvedLat && resolvedLng ? ` GPS: ${resolvedLat.toFixed(5)},${resolvedLng.toFixed(5)}.` : userCoords?.lat && userCoords?.lng ? ` GPS: ${userCoords.lat.toFixed(5)},${userCoords.lng.toFixed(5)}.` : ''}`
           : ''
       }`,
       created_at: new Date().toISOString(),
@@ -606,6 +798,86 @@ export default function PharmacyScreen() {
             placeholder={c.searchPlaceholder}
           />
         </AppHeader>
+
+        {liveToast && (
+          <Pressable
+            onPress={() => {
+              const found = history.find((h) => h.ref === liveToast.ref);
+              if (found) setSelectedOrder(found);
+              setLiveToast(null);
+            }}
+            style={{
+              marginHorizontal: 16,
+              marginBottom: 8,
+              backgroundColor:
+                liveToast.kind === 'cancelled'
+                  ? '#FEF2F2'
+                  : liveToast.kind === 'delivered'
+                    ? '#DCFCE7'
+                    : '#EFF6FF',
+              borderWidth: 1,
+              borderColor:
+                liveToast.kind === 'cancelled'
+                  ? '#FECACA'
+                  : liveToast.kind === 'delivered'
+                    ? '#86EFAC'
+                    : '#93C5FD',
+              borderRadius: 12,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '800',
+                  color:
+                    liveToast.kind === 'cancelled'
+                      ? '#B91C1C'
+                      : liveToast.kind === 'delivered'
+                        ? '#166534'
+                        : '#1D4ED8',
+                }}
+              >
+                {liveToast.title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: '600',
+                  color:
+                    liveToast.kind === 'cancelled'
+                      ? '#991B1B'
+                      : liveToast.kind === 'delivered'
+                        ? '#15803D'
+                        : '#1E40AF',
+                  marginTop: 1,
+                }}
+              >
+                {liveToast.body}
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: '800',
+                color:
+                  liveToast.kind === 'cancelled'
+                    ? '#B91C1C'
+                    : liveToast.kind === 'delivered'
+                      ? '#166534'
+                      : '#1D4ED8',
+              }}
+            >
+              {liveToast.kind === 'bill' ? (isHi ? 'देखें व भुगतान करें →' : 'View & Pay →') : (isHi ? 'देखें →' : 'View →')}
+            </Text>
+          </Pressable>
+        )}
 
         {/* ==================== 1. HOME STAGE ==================== */}
         {stage === 'home' && (
@@ -876,8 +1148,59 @@ export default function PharmacyScreen() {
                   </Pressable>
                 </View>
 
+                {/* No-Location Banner (never fake distance when GPS/Address not set) */}
+                {!userCoords && livePharmacies.length > 0 && (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      backgroundColor: '#EFF6FF',
+                      borderRadius: R.md,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: '#BFDBFE',
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E40AF', lineHeight: 17 }}>
+                      {isHi
+                        ? '📍 सटीक दूरी और होम डिलीवरी के लिए अपनी लोकेशन या पता चुनें।'
+                        : '📍 Set your delivery address or enable GPS to see exact distance from each pharmacy.'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                      <Pressable
+                        onPress={() => detectCurrentLocation()}
+                        style={{
+                          backgroundColor: '#2563EB',
+                          paddingHorizontal: 11,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                          {isHi ? 'GPS से लोकेशन चुनें' : 'Use GPS Location'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => openAddAddressModal()}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          paddingHorizontal: 11,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: '#93C5FD',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4ED8' }}>
+                          {isHi ? 'पता जोड़ें / चुनें' : '+ Add / Select Address'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
                 {/* Out-of-radius / Location Notice */}
-                {locState !== 'asking' && isSample && (
+                {locState !== 'asking' && livePharmacies.length > 0 && isSample && (
                   <View
                     style={{
                       marginTop: 10,
@@ -933,16 +1256,118 @@ export default function PharmacyScreen() {
 
                 {/* Modular Pharmacy Cards List */}
                 <View style={{ gap: 11, marginTop: 14 }}>
-                  {visibleShops.map((s, i) => (
-                    <PharmacyShopCard
-                      key={s.id}
-                      shop={s}
-                      isSelected={s.id === shopId}
-                      isHi={isHi}
-                      index={i}
-                      onSelect={(id) => setShopId(id)}
+                  {visibleShops.length === 0 ? (
+                    <View
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: R.xl,
+                        borderWidth: 1,
+                        borderColor: C.line,
+                        padding: 22,
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <Store size={32} color="#94A3B8" />
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: C.ink, textAlign: 'center' }}>
+                        {isHi ? 'अभी कोई पार्टनर फार्मेसी खुली नहीं है' : 'All Partner Pharmacies Are Currently Closed'}
+                      </Text>
+                      <Text style={{ fontSize: 12.5, color: C.sub, textAlign: 'center', lineHeight: 18 }}>
+                        {isHi
+                          ? 'सभी नज़दीकी पार्टनर स्टोर अभी बंद हैं। कृपया थोड़ी देर बाद पुनः प्रयास करें।'
+                          : 'Our partner pharmacies are closed right now. Please check back shortly or contact our care desk.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    visibleShops.map((s, i) => (
+                      <PharmacyShopCard
+                        key={s.id}
+                        shop={s}
+                        isSelected={s.id === shopId}
+                        isHi={isHi}
+                        index={i}
+                        onSelect={(id) => setShopId(id)}
+                      />
+                    ))
+                  )}
+                </View>
+
+                {visibleShops.length > 0 && (
+                  <>
+                {/* Patient Name & Delivery Address (Prefilled if saved, prompted if missing) */}
+                <View
+                  style={{
+                    marginTop: 14,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: R.md,
+                    padding: 13,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                    gap: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
+                    {isHi ? 'रोगी का नाम व डिलीवरी विवरण' : 'Patient Name & Delivery Details'}
+                  </Text>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
+                      {isHi ? 'रोगी का नाम *' : 'Patient Name *'}
+                    </Text>
+                    <TextInput
+                      value={patientNameInput}
+                      onChangeText={setPatientNameInput}
+                      placeholder={isHi ? 'रोगी का पूरा नाम लिखें' : 'Enter patient full name'}
+                      placeholderTextColor="#94A3B8"
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        borderRadius: 10,
+                        paddingHorizontal: 11,
+                        paddingVertical: 9,
+                        fontSize: 13.5,
+                        color: C.ink,
+                      }}
                     />
-                  ))}
+                  </View>
+                  {mode === 'delivery' && (
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
+                        {isHi ? 'पूरा डिलीवरी पता *' : 'Complete Delivery Address *'}
+                      </Text>
+                      <Pressable
+                        onPress={() => (activeAddress ? openLocationPicker() : openAddAddressModal())}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: activeAddress ? '#CBD5E1' : '#93C5FD',
+                          borderRadius: 10,
+                          paddingHorizontal: 11,
+                          paddingVertical: 10,
+                          gap: 8,
+                        }}
+                      >
+                        <Text style={{ flex: 1, fontSize: 13, color: activeAddress ? C.ink : '#2563EB', fontWeight: activeAddress ? '500' : '700' }} numberOfLines={2}>
+                          {activeAddress
+                            ? `${activeAddress.type === 'Other' && activeAddress.label ? activeAddress.label : activeAddress.type}: ${[
+                                activeAddress.house_flat,
+                                activeAddress.landmark_street,
+                                activeAddress.city,
+                                activeAddress.pincode,
+                              ]
+                                .filter(Boolean)
+                                .join(', ')}`
+                            : (isHi ? '+ पूरा पता जोड़ें (मकान/फ्लैट, गली, पिनकोड)' : '+ Add Proper Delivery Address (House/Flat, Street, Pin)')}
+                        </Text>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: C.brand }}>
+                          {activeAddress ? (isHi ? 'बदलें' : 'Change') : (isHi ? '+ जोड़ें' : '+ Add')}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
 
                 {/* Instructions / Notes for Pharmacist */}
@@ -1009,6 +1434,8 @@ export default function PharmacyScreen() {
                     }}
                   />
                 </View>
+                  </>
+                )}
               </View>
             </ScrollView>
 
@@ -1178,8 +1605,47 @@ export default function PharmacyScreen() {
                   />
                 </View>
 
-                {/* Informational Wait Notice */}
-                {(status === 'sent' || status === 'reviewing') && (
+                {/* Cancelled / Out of Stock Banner */}
+                {(liveTrackedBooking?.status === 'CANCELLED' || liveTrackedBooking?.status === 'MISSED') ? (
+                  <View
+                    style={{
+                      marginTop: 14,
+                      backgroundColor: '#FEF2F2',
+                      borderRadius: R.xl,
+                      borderWidth: 1.5,
+                      borderColor: '#FECACA',
+                      padding: 18,
+                      gap: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#B91C1C' }}>
+                      {isHi ? 'ऑर्डर रद्द • स्टॉक उपलब्ध नहीं' : 'Order Cancelled / Out of Stock'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#991B1B', lineHeight: 19 }}>
+                      {liveTrackedBooking?.partner_notes ||
+                        (isHi
+                          ? 'फार्मेसी में कुछ दवाइयां उपलब्ध नहीं थीं। कृपया दूसरी नज़दीकी फार्मेसी चुनें।'
+                          : 'The pharmacy could not fulfill this prescription right now. Please try another nearby pharmacy.')}
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        setShopId(null);
+                        setStage('shops');
+                      }}
+                      style={{
+                        alignSelf: 'flex-start',
+                        backgroundColor: '#DC2626',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#FFFFFF' }}>
+                        {isHi ? 'दूसरी फार्मेसी चुनें' : 'Select Another Pharmacy'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : (status === 'sent' || status === 'reviewing') && (
                   <View
                     style={{
                       flexDirection: 'row',
@@ -1254,19 +1720,134 @@ export default function PharmacyScreen() {
                   );
                 })()}
 
-                {/* Ready Code Verification Card */}
-                {status === 'ready' && (
+                {/* Ready Code Verification Card OR Delivered Thank You Card */}
+                {status === 'ready' && liveTrackedBooking?.status === 'COMPLETED' ? (
                   <View
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: R.xl,
-                      borderWidth: 1,
-                      borderColor: C.line,
-                      padding: 18,
                       marginTop: 14,
-                      ...SHADOW,
+                      backgroundColor: '#ECFDF5',
+                      borderRadius: R.xl,
+                      borderWidth: 1.5,
+                      borderColor: '#86EFAC',
+                      padding: 20,
+                      alignItems: 'center',
+                      gap: 10,
                     }}
                   >
+                    <View
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        backgroundColor: '#16A34A',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Check size={26} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#166534', textAlign: 'center' }}>
+                      {mode === 'pickup'
+                        ? isHi
+                          ? 'ऑर्डर पिकअप पूर्ण • धन्यवाद!'
+                          : 'Order Picked Up! Thank You!'
+                        : isHi
+                          ? 'ऑर्डर डिलीवर हो गया • धन्यवाद!'
+                          : 'Order Delivered! Thank You!'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#15803D', textAlign: 'center', lineHeight: 19 }}>
+                      {isHi
+                        ? 'आदित्यम निरामया फार्मेसी से दवाइयां लेने के लिए धन्यवाद। आपके अच्छे स्वास्थ्य की कामना करते हैं।'
+                        : `Your medicines from ${shop ? getPharmacyName(shop, isHi) : 'the pharmacy'} have been safely handed over. Wishing you a speedy recovery!`}
+                    </Text>
+                    {history.find((h) => h.ref === reqRef) && (
+                      <Pressable
+                        onPress={() => {
+                          const found = history.find((h) => h.ref === reqRef);
+                          if (found) handleDownloadInvoice(found);
+                        }}
+                        style={{
+                          marginTop: 4,
+                          backgroundColor: '#16A34A',
+                          paddingHorizontal: 18,
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                          {isHi ? 'टैक्स इनवॉइस डाउनलोड करें' : 'Download Tax Invoice'}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ) : status === 'ready' ? (
+                  <View style={{ gap: 12, marginTop: 14 }}>
+                    <View
+                      style={{
+                        backgroundColor: '#EFF6FF',
+                        borderRadius: R.xl,
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                        padding: 14,
+                        gap: 6,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#1D4ED8' }}>
+                          {mode === 'delivery'
+                            ? isHi
+                              ? 'डिलीवरी समय (फार्मेसी द्वारा सेट)'
+                              : 'Delivery Schedule (Set by Pharmacy)'
+                            : isHi
+                              ? 'पिकअप समय (फार्मेसी द्वारा सेट)'
+                              : 'Pickup Schedule (Set by Pharmacy)'}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: R.pill,
+                            borderWidth: 1,
+                            borderColor: '#93C5FD',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#1D4ED8' }}>
+                            {liveTrackedBooking?.slot_time &&
+                            liveTrackedBooking.slot_time !== 'Home Delivery' &&
+                            liveTrackedBooking.slot_time !== 'Counter Pickup'
+                              ? liveTrackedBooking.slot_time
+                              : mode === 'delivery'
+                                ? isHi
+                                  ? '24 घंटे से पहले'
+                                  : 'Before 24 Hours'
+                                : isHi
+                                  ? 'तैयार किया जा रहा है'
+                                  : 'Being Packed'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 12.5, color: '#1E3A8A', lineHeight: 18 }}>
+                        {mode === 'delivery'
+                          ? isHi
+                            ? 'यह आपको 24 घंटे से पहले डिलीवर कर दिया जाएगा। डिलीवरी से पहले हमारी टीम आपको कॉल करेगी।'
+                            : 'It will be delivered to you before 24 hours. Our pharmacy team will call you before delivery.'
+                          : isHi
+                            ? 'दवाइयां पैक होते ही फार्मेसी टीम आपको कॉल करेगी।'
+                            : 'Our pharmacy team will call you as soon as your medicines are packed & ready for pickup.'}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: R.xl,
+                        borderWidth: 1,
+                        borderColor: C.line,
+                        padding: 18,
+                        ...SHADOW,
+                      }}
+                    >
                     <Text
                       style={{
                         fontSize: 13.5,
@@ -1294,8 +1875,9 @@ export default function PharmacyScreen() {
                     >
                       {code}
                     </Text>
+                    </View>
                   </View>
-                )}
+                ) : null}
               </View>
             </ScrollView>
 
@@ -1402,6 +1984,26 @@ export default function PharmacyScreen() {
         onClose={() => setSelectedOrder(null)}
         isHi={isHi}
         onDownloadInvoice={handleDownloadInvoice}
+        onPayOrder={async (order) => {
+          try {
+            const supabase = getSupabaseClient();
+            await supabase
+              .from('bookings')
+              .update({ status: 'PAID', updated_at: new Date().toISOString() })
+              .eq('booking_ref', order.ref);
+            const updated = { ...order, paidInApp: true };
+            setSelectedOrder(updated);
+            setHistory((prev) => prev.map((h) => (h.ref === order.ref ? updated : h)));
+          } catch {}
+        }}
+        onReorder={(order) => {
+          setSelectedOrder(null);
+          setImages(order.prescriptionUrl ? [order.prescriptionUrl] : []);
+          setShopId(null);
+          setMode(order.mode || 'delivery');
+          setPatientNote('');
+          setStage('shops');
+        }}
       />
 
       {/* Profile Modal */}

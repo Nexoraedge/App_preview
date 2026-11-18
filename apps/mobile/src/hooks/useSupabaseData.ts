@@ -48,7 +48,8 @@ export function usePharmacies() {
   return useQuery({
     queryKey: ['pharmacies'],
     queryFn: fetchPharmacies,
-    staleTime: STALE_5MIN,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
     retry: 1,
   });
 }

@@ -161,7 +161,9 @@ export interface LocationContextType {
   coords: { latitude: number; longitude: number } | null;
   isDetecting: boolean;
   isPickerModalOpen: boolean;
+  initialAddingNew: boolean;
   openLocationPicker: () => void;
+  openAddAddressModal: () => void;
   closeLocationPicker: () => void;
   selectAddress: (addressId: string) => void;
   addAddress: (address: Omit<UserAddress, 'id'>) => string;
@@ -340,8 +342,19 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .catch(() => {});
   }, [user?.id, user?.phone, isDemoUser, isMockAddress, initialHub]);
 
-  const openLocationPicker = useCallback(() => setIsPickerModalOpen(true), []);
-  const closeLocationPicker = useCallback(() => setIsPickerModalOpen(false), []);
+  const [initialAddingNew, setInitialAddingNew] = useState(false);
+  const openLocationPicker = useCallback(() => {
+    setInitialAddingNew(false);
+    setIsPickerModalOpen(true);
+  }, []);
+  const openAddAddressModal = useCallback(() => {
+    setInitialAddingNew(true);
+    setIsPickerModalOpen(true);
+  }, []);
+  const closeLocationPicker = useCallback(() => {
+    setIsPickerModalOpen(false);
+    setInitialAddingNew(false);
+  }, []);
 
   const selectAddress = useCallback((addressId: string) => {
     const target = savedAddresses.find((a) => a.id === addressId);
@@ -596,7 +609,9 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       coords,
       isDetecting,
       isPickerModalOpen,
+      initialAddingNew,
       openLocationPicker,
+      openAddAddressModal,
       closeLocationPicker,
       selectAddress,
       addAddress,
@@ -613,7 +628,9 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       coords,
       isDetecting,
       isPickerModalOpen,
+      initialAddingNew,
       openLocationPicker,
+      openAddAddressModal,
       closeLocationPicker,
       selectAddress,
       addAddress,

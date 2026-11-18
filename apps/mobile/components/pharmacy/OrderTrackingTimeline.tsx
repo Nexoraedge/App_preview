@@ -50,19 +50,19 @@ export function OrderTrackingTimeline({
       title:
         mode === 'delivery'
           ? isHi
-            ? 'दवाएं रास्ते में हैं'
-            : 'On its way'
+            ? 'डिलीवरी शेड्यूल की जा रही है'
+            : 'Scheduled for Delivery'
           : isHi
           ? 'पिकअप के लिए तैयार'
           : 'Ready for pickup',
       sub:
         mode === 'delivery'
           ? isHi
-            ? 'फार्मेसी द्वारा होम डिलीवरी'
-            : 'Delivered by the pharmacy'
+            ? 'यह आपको 24 घंटे से पहले डिलीवर कर दिया जाएगा'
+            : 'It will be delivered to you before 24 hours'
           : isHi
-          ? 'काउंटर पर अपना कोड दिखाएं'
-          : 'Show your code at the counter',
+          ? 'तैयार होने पर कॉल किया जाएगा • काउंटर पर कोड दिखाएं'
+          : 'We will call when ready · Show your code at counter',
     },
   ];
 

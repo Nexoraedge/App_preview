@@ -121,24 +121,63 @@ export function OrderHistorySection({
                 >
                   {isHi && h.shopHi ? h.shopHi : h.shop}
                 </Text>
-                <View
-                  style={{
-                    backgroundColor: '#DCFCE7',
-                    paddingHorizontal: 7,
-                    paddingVertical: 2,
-                    borderRadius: R.pill,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: '800',
-                      color: '#166534',
-                    }}
-                  >
-                    {isHi ? 'डिलीवर हुआ' : 'Delivered'}
-                  </Text>
-                </View>
+                {(() => {
+                  const isCancelled = h.status === 'cancelled';
+                  const isAwaitingQuote = !isCancelled && h.total === 0;
+                  const isDone = h.status === 'delivered' || h.status === 'picked_up';
+                  const isOut = h.status === 'out_for_delivery';
+                  const badgeBg = isCancelled
+                    ? '#FEE2E2'
+                    : isDone
+                      ? '#DCFCE7'
+                      : isAwaitingQuote
+                        ? '#DBEAFE'
+                        : h.paidInApp
+                          ? '#DCFCE7'
+                          : '#FEF3C7';
+                  const badgeColor = isCancelled
+                    ? '#B91C1C'
+                    : isDone
+                      ? '#166534'
+                      : isAwaitingQuote
+                        ? '#1D4ED8'
+                        : h.paidInApp
+                          ? '#166534'
+                          : '#B45309';
+                  const badgeText = isCancelled
+                    ? isHi ? 'रद्द / स्टॉक नहीं' : 'Cancelled'
+                    : isAwaitingQuote
+                      ? isHi ? 'समीक्षाधीन' : 'Under Review'
+                      : isDone
+                        ? h.status === 'picked_up'
+                          ? isHi ? 'पिकअप पूर्ण' : 'Picked Up'
+                          : isHi ? 'डिलीवर हुआ' : 'Delivered'
+                        : isOut
+                          ? isHi ? 'डिलीवरी के लिए निकला' : 'Out for Delivery'
+                          : h.paidInApp
+                            ? isHi ? 'भुगतान पूर्ण' : 'Paid · Packing'
+                            : isHi ? 'बिल तैयार · भुगतान शेष' : 'Bill Ready';
+                  return (
+                    <View
+                      style={{
+                        backgroundColor: badgeBg,
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: R.pill,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '800',
+                          color: badgeColor,
+                        }}
+                      >
+                        {badgeText}
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
               <Text
                 style={{ fontSize: 11.5, color: C.sub, marginTop: 2 }}
@@ -152,13 +191,21 @@ export function OrderHistorySection({
                   ? 'पिकअप'
                   : 'Pickup'}{' '}
                 ·{' '}
-                {h.paidInApp
+                {h.status === 'cancelled'
                   ? isHi
-                    ? 'ऐप में भुगतान'
-                    : 'Paid in app'
-                  : isHi
-                  ? 'दुकान पर देय'
-                  : 'Pay at shop'}
+                    ? 'फार्मेसी द्वारा अस्वीकृत'
+                    : 'Declined / Out of stock'
+                  : h.total === 0
+                    ? isHi
+                      ? 'बिल प्रतीक्षित'
+                      : 'Awaiting bill'
+                    : h.paidInApp
+                      ? isHi
+                        ? 'ऐप में भुगतान'
+                        : 'Paid in app'
+                      : isHi
+                      ? 'भुगतान शेष'
+                      : 'Payment pending'}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 2 }}>
