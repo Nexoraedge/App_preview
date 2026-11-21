@@ -210,7 +210,7 @@ export default function PharmacyScreen() {
               const cloudRefs = new Set(cloudRows.map((r: any) => r.booking_ref));
               allBookings = [...(cloudRows as any[]), ...allBookings.filter((b) => !cloudRefs.has(b.booking_ref))];
             }
-          } catch {}
+          } catch { }
         }
 
         const pharmacyBookings = allBookings.filter(
@@ -352,14 +352,14 @@ export default function PharmacyScreen() {
                 parsedItems.length > 0
                   ? parsedItems
                   : [
-                      {
-                        id: 'rx-1',
-                        name: 'Prescription Medicine Order',
-                        nameHi: 'पर्चे अनुसार औषधियां',
-                        qty: 1,
-                        price: hasRealBill ? (b.final_payable || b.bill_amount || 0) : 0,
-                      },
-                    ],
+                    {
+                      id: 'rx-1',
+                      name: 'Prescription Medicine Order',
+                      nameHi: 'पर्चे अनुसार औषधियां',
+                      qty: 1,
+                      price: hasRealBill ? (b.final_payable || b.bill_amount || 0) : 0,
+                    },
+                  ],
             };
           });
           setHistory(items);
@@ -472,7 +472,7 @@ export default function PharmacyScreen() {
         if (!cancelled && data) {
           syncTrackedBooking(data);
         }
-      } catch {}
+      } catch { }
     };
 
     fetchLatestOrder();
@@ -547,8 +547,8 @@ export default function PharmacyScreen() {
     ? fam.active.relation === 'Self'
       ? user?.full_name || fam.active.name || (isHi ? 'रोगी' : 'Patient')
       : isHi
-      ? fam.active.nameHi || fam.active.name
-      : fam.active.name
+        ? fam.active.nameHi || fam.active.name
+        : fam.active.name
     : user?.full_name || null;
 
   const addImages = (uris: string[]) =>
@@ -681,25 +681,23 @@ export default function PharmacyScreen() {
       discount_amount: 0,
       final_payable: 0,
       bill_image_url: uploadedImageUrl || images[0] || null,
-      notes: `${patientNote.trim() ? `Customer Note: ${patientNote.trim()}. ` : ''}Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Mode: ${mode}.${
-        mode === 'delivery'
-          ? ` Delivery Address: ${
-              activeAddress
-                ? [activeAddress.house_flat, activeAddress.landmark_street, activeAddress.city, activeAddress.pincode]
-                    .filter(Boolean)
-                    .join(', ')
-                : currentLocationName && currentLocationName !== 'Select Location'
-                  ? currentLocationName
-                  : user?.city
-                    ? `${user.city} (GPS)`
-                    : 'GPS Location'
-            }.${resolvedLat && resolvedLng ? ` GPS: ${resolvedLat.toFixed(5)},${resolvedLng.toFixed(5)}.` : userCoords?.lat && userCoords?.lng ? ` GPS: ${userCoords.lat.toFixed(5)},${userCoords.lng.toFixed(5)}.` : ''}`
+      notes: `${patientNote.trim() ? `Customer Note: ${patientNote.trim()}. ` : ''}Prescription request sent to ${shop.name} (${shop.area}). ${images.length} slip(s) attached. Mode: ${mode}.${mode === 'delivery'
+          ? ` Delivery Address: ${activeAddress
+            ? [activeAddress.house_flat, activeAddress.landmark_street, activeAddress.city, activeAddress.pincode]
+              .filter(Boolean)
+              .join(', ')
+            : currentLocationName && currentLocationName !== 'Select Location'
+              ? currentLocationName
+              : user?.city
+                ? `${user.city} (GPS)`
+                : 'GPS Location'
+          }.${resolvedLat && resolvedLng ? ` GPS: ${resolvedLat.toFixed(5)},${resolvedLng.toFixed(5)}.` : userCoords?.lat && userCoords?.lng ? ` GPS: ${userCoords.lat.toFixed(5)},${userCoords.lng.toFixed(5)}.` : ''}`
           : ''
-      }`,
+        }`,
       created_at: new Date().toISOString(),
     };
 
-    await saveNewBooking(newBooking).catch(() => {});
+    await saveNewBooking(newBooking).catch(() => { });
     setPatientNote('');
     triggerBrowserNotification(
       'Prescription Sent to Pharmacy',
@@ -717,7 +715,7 @@ export default function PharmacyScreen() {
           .from('bookings')
           .update({ status: 'PAID', updated_at: new Date().toISOString() })
           .eq('booking_ref', reqRef);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -731,7 +729,7 @@ export default function PharmacyScreen() {
           .from('bookings')
           .update({ status: 'PAID', updated_at: new Date().toISOString() })
           .eq('booking_ref', reqRef);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -761,11 +759,11 @@ export default function PharmacyScreen() {
         isHi ? 'इनवॉइस डाउनलोड हुआ' : 'Invoice Downloaded',
         isHi
           ? `ऑर्डर #${order.ref} का टैक्स इनवॉइस सफलतापूर्वक सहेजा गया। कुल देय राशि: ${inr(
-              order.total
-            )}`
+            order.total
+          )}`
           : `Tax Invoice for Order #${order.ref} (Total: ${inr(
-              order.total
-            )}) is ready.`
+            order.total
+          )}) is ready.`
       );
     }
   };
@@ -774,7 +772,7 @@ export default function PharmacyScreen() {
     if (!shop) return;
     Linking.openURL(
       `https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lng}`
-    ).catch(() => {});
+    ).catch(() => { });
   };
 
   return (
@@ -1238,7 +1236,7 @@ export default function PharmacyScreen() {
                         </Pressable>
                       )}
                       <Pressable
-                        onPress={() => Linking.openURL('tel:+918271310911').catch(() => {})}
+                        onPress={() => Linking.openURL('tel:+918271310911').catch(() => { })}
                         style={{
                           backgroundColor: '#B45309',
                           paddingHorizontal: 10,
@@ -1294,146 +1292,146 @@ export default function PharmacyScreen() {
 
                 {visibleShops.length > 0 && (
                   <>
-                {/* Patient Name & Delivery Address (Prefilled if saved, prompted if missing) */}
-                <View
-                  style={{
-                    marginTop: 14,
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: R.md,
-                    padding: 13,
-                    borderWidth: 1,
-                    borderColor: C.line,
-                    gap: 10,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
-                    {isHi ? 'रोगी का नाम व डिलीवरी विवरण' : 'Patient Name & Delivery Details'}
-                  </Text>
-                  <View style={{ gap: 4 }}>
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
-                      {isHi ? 'रोगी का नाम *' : 'Patient Name *'}
-                    </Text>
-                    <TextInput
-                      value={patientNameInput}
-                      onChangeText={setPatientNameInput}
-                      placeholder={isHi ? 'रोगी का पूरा नाम लिखें' : 'Enter patient full name'}
-                      placeholderTextColor="#94A3B8"
+                    {/* Patient Name & Delivery Address (Prefilled if saved, prompted if missing) */}
+                    <View
                       style={{
-                        backgroundColor: '#F8FAFC',
+                        marginTop: 14,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: R.md,
+                        padding: 13,
                         borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                        borderRadius: 10,
-                        paddingHorizontal: 11,
-                        paddingVertical: 9,
-                        fontSize: 13.5,
-                        color: C.ink,
+                        borderColor: C.line,
+                        gap: 10,
                       }}
-                    />
-                  </View>
-                  {mode === 'delivery' && (
-                    <View style={{ gap: 4 }}>
-                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
-                        {isHi ? 'पूरा डिलीवरी पता *' : 'Complete Delivery Address *'}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
+                        {isHi ? 'रोगी का नाम व डिलीवरी विवरण' : 'Patient Name & Delivery Details'}
                       </Text>
-                      <Pressable
-                        onPress={() => (activeAddress ? openLocationPicker() : openAddAddressModal())}
+                      <View style={{ gap: 4 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
+                          {isHi ? 'रोगी का नाम *' : 'Patient Name *'}
+                        </Text>
+                        <TextInput
+                          value={patientNameInput}
+                          onChangeText={setPatientNameInput}
+                          placeholder={isHi ? 'रोगी का पूरा नाम लिखें' : 'Enter patient full name'}
+                          placeholderTextColor="#94A3B8"
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            borderRadius: 10,
+                            paddingHorizontal: 11,
+                            paddingVertical: 9,
+                            fontSize: 13.5,
+                            color: C.ink,
+                          }}
+                        />
+                      </View>
+                      {mode === 'delivery' && (
+                        <View style={{ gap: 4 }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: C.sub }}>
+                            {isHi ? 'पूरा डिलीवरी पता *' : 'Complete Delivery Address *'}
+                          </Text>
+                          <Pressable
+                            onPress={() => (activeAddress ? openLocationPicker() : openAddAddressModal())}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: activeAddress ? '#CBD5E1' : '#93C5FD',
+                              borderRadius: 10,
+                              paddingHorizontal: 11,
+                              paddingVertical: 10,
+                              gap: 8,
+                            }}
+                          >
+                            <Text style={{ flex: 1, fontSize: 13, color: activeAddress ? C.ink : '#2563EB', fontWeight: activeAddress ? '500' : '700' }} numberOfLines={2}>
+                              {activeAddress
+                                ? `${activeAddress.type === 'Other' && activeAddress.label ? activeAddress.label : activeAddress.type}: ${[
+                                  activeAddress.house_flat,
+                                  activeAddress.landmark_street,
+                                  activeAddress.city,
+                                  activeAddress.pincode,
+                                ]
+                                  .filter(Boolean)
+                                  .join(', ')}`
+                                : (isHi ? '+ पूरा पता जोड़ें (मकान/फ्लैट, गली, पिनकोड)' : '+ Add Proper Delivery Address (House/Flat, Street, Pin)')}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: C.brand }}>
+                              {activeAddress ? (isHi ? 'बदलें' : 'Change') : (isHi ? '+ जोड़ें' : '+ Add')}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Instructions / Notes for Pharmacist */}
+                    <View
+                      style={{
+                        marginTop: 14,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: R.md,
+                        padding: 13,
+                        borderWidth: 1,
+                        borderColor: C.line,
+                        gap: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
+                        {isHi ? 'फार्मेसी के लिए निर्देश (वैकल्पिक)' : 'Instructions for Pharmacist (Optional)'}
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                        {(isHi
+                          ? ['1 सप्ताह की दवा दें', '1 महीने की दवा दें', 'जेनेरिक विकल्प चलेगा', 'पैक करने से पहले कॉल करें']
+                          : ['Need medicine for 1 week', 'Need medicine for 1 month', 'Generic substitute OK', 'Call before packing']
+                        ).map((chip) => (
+                          <Pressable
+                            key={chip}
+                            onPress={() =>
+                              setPatientNote((prev) =>
+                                prev.trim() ? (prev.includes(chip) ? prev : `${prev.trim()}, ${chip}`) : chip
+                              )
+                            }
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 99,
+                              backgroundColor: '#F1F5F9',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.ink }}>{chip}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                      <TextInput
+                        value={patientNote}
+                        onChangeText={setPatientNote}
+                        multiline
+                        placeholder={
+                          isHi
+                            ? 'जैसे: केवल टैबलेट नं. 1 और 2 दें, 10 दिन के लिए...'
+                            : 'e.g. Give only medicine #1 & #2 for 1 week, call if out of stock...'
+                        }
+                        placeholderTextColor="#94A3B8"
                         style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
                           backgroundColor: '#F8FAFC',
                           borderWidth: 1,
-                          borderColor: activeAddress ? '#CBD5E1' : '#93C5FD',
+                          borderColor: '#E2E8F0',
                           borderRadius: 10,
                           paddingHorizontal: 11,
-                          paddingVertical: 10,
-                          gap: 8,
+                          paddingVertical: 9,
+                          fontSize: 13,
+                          color: C.ink,
+                          minHeight: 54,
+                          textAlignVertical: 'top',
                         }}
-                      >
-                        <Text style={{ flex: 1, fontSize: 13, color: activeAddress ? C.ink : '#2563EB', fontWeight: activeAddress ? '500' : '700' }} numberOfLines={2}>
-                          {activeAddress
-                            ? `${activeAddress.type === 'Other' && activeAddress.label ? activeAddress.label : activeAddress.type}: ${[
-                                activeAddress.house_flat,
-                                activeAddress.landmark_street,
-                                activeAddress.city,
-                                activeAddress.pincode,
-                              ]
-                                .filter(Boolean)
-                                .join(', ')}`
-                            : (isHi ? '+ पूरा पता जोड़ें (मकान/फ्लैट, गली, पिनकोड)' : '+ Add Proper Delivery Address (House/Flat, Street, Pin)')}
-                        </Text>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: C.brand }}>
-                          {activeAddress ? (isHi ? 'बदलें' : 'Change') : (isHi ? '+ जोड़ें' : '+ Add')}
-                        </Text>
-                      </Pressable>
+                      />
                     </View>
-                  )}
-                </View>
-
-                {/* Instructions / Notes for Pharmacist */}
-                <View
-                  style={{
-                    marginTop: 14,
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: R.md,
-                    padding: 13,
-                    borderWidth: 1,
-                    borderColor: C.line,
-                    gap: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: C.ink }}>
-                    {isHi ? 'फार्मेसी के लिए निर्देश (वैकल्पिक)' : 'Instructions for Pharmacist (Optional)'}
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {(isHi
-                      ? ['1 सप्ताह की दवा दें', '1 महीने की दवा दें', 'जेनेरिक विकल्प चलेगा', 'पैक करने से पहले कॉल करें']
-                      : ['Need medicine for 1 week', 'Need medicine for 1 month', 'Generic substitute OK', 'Call before packing']
-                    ).map((chip) => (
-                      <Pressable
-                        key={chip}
-                        onPress={() =>
-                          setPatientNote((prev) =>
-                            prev.trim() ? (prev.includes(chip) ? prev : `${prev.trim()}, ${chip}`) : chip
-                          )
-                        }
-                        style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: 99,
-                          backgroundColor: '#F1F5F9',
-                          borderWidth: 1,
-                          borderColor: '#E2E8F0',
-                        }}
-                      >
-                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: C.ink }}>{chip}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                  <TextInput
-                    value={patientNote}
-                    onChangeText={setPatientNote}
-                    multiline
-                    placeholder={
-                      isHi
-                        ? 'जैसे: केवल टैबलेट नं. 1 और 2 दें, 10 दिन के लिए...'
-                        : 'e.g. Give only medicine #1 & #2 for 1 week, call if out of stock...'
-                    }
-                    placeholderTextColor="#94A3B8"
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 10,
-                      paddingHorizontal: 11,
-                      paddingVertical: 9,
-                      fontSize: 13,
-                      color: C.ink,
-                      minHeight: 54,
-                      textAlignVertical: 'top',
-                    }}
-                  />
-                </View>
                   </>
                 )}
               </View>
@@ -1447,8 +1445,8 @@ export default function PharmacyScreen() {
                       ? `${getPharmacyName(shop, isHi)} को भेजें →`
                       : `Send to ${shop.name} →`
                     : isHi
-                    ? 'फार्मेसी चुनें'
-                    : 'Select a pharmacy'
+                      ? 'फार्मेसी चुनें'
+                      : 'Select a pharmacy'
                 }
                 disabled={!shop}
                 onPress={sendRequest}
@@ -1491,7 +1489,7 @@ export default function PharmacyScreen() {
                 >
                   <ArrowLeft size={16} color="#2563EB" />
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563EB' }}>
-                    {isHi ? '← दवा सूची व मुख्य पृष्ठ' : '← Back to Pharmacy'}
+                    {isHi ? ' दवा सूची व मुख्य पृष्ठ' : ' Back to Pharmacy'}
                   </Text>
                 </TouchableOpacity>
 
@@ -1697,14 +1695,14 @@ export default function PharmacyScreen() {
                   const billItems: BillLine[] = parsedLines.length > 0
                     ? parsedLines
                     : [
-                        {
-                          id: 'rx-1',
-                          name: 'Prescription Medicine Order',
-                          nameHi: 'पर्चे अनुसार औषधियां',
-                          qty: 1,
-                          price: realGross > 0 ? realGross : subtotal,
-                        },
-                      ];
+                      {
+                        id: 'rx-1',
+                        name: 'Prescription Medicine Order',
+                        nameHi: 'पर्चे अनुसार औषधियां',
+                        qty: 1,
+                        price: realGross > 0 ? realGross : subtotal,
+                      },
+                    ];
                   return (
                     <PharmacyBillCard
                       items={billItems}
@@ -1814,8 +1812,8 @@ export default function PharmacyScreen() {
                         >
                           <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#1D4ED8' }}>
                             {liveTrackedBooking?.slot_time &&
-                            liveTrackedBooking.slot_time !== 'Home Delivery' &&
-                            liveTrackedBooking.slot_time !== 'Counter Pickup'
+                              liveTrackedBooking.slot_time !== 'Home Delivery' &&
+                              liveTrackedBooking.slot_time !== 'Counter Pickup'
                               ? liveTrackedBooking.slot_time
                               : mode === 'delivery'
                                 ? isHi
@@ -1848,33 +1846,33 @@ export default function PharmacyScreen() {
                         ...SHADOW,
                       }}
                     >
-                    <Text
-                      style={{
-                        fontSize: 13.5,
-                        color: C.sub,
-                        marginTop: 4,
-                        lineHeight: 19,
-                      }}
-                    >
-                      {mode === 'pickup'
-                        ? isHi
-                          ? 'दुकान के काउंटर पर यह 4-अंकीय कोड दिखाएं:'
-                          : 'Show this verification code at the pharmacy counter:'
-                        : isHi
-                        ? 'डिलीवरी कर्मी को यह 4-अंकीय कोड बताएं:'
-                        : 'Share this verification code with the delivery person:'}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 38,
-                        fontWeight: '800',
-                        color: C.ink,
-                        letterSpacing: 8,
-                        marginTop: 4,
-                      }}
-                    >
-                      {code}
-                    </Text>
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          color: C.sub,
+                          marginTop: 4,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {mode === 'pickup'
+                          ? isHi
+                            ? 'दुकान के काउंटर पर यह 4-अंकीय कोड दिखाएं:'
+                            : 'Show this verification code at the pharmacy counter:'
+                          : isHi
+                            ? 'डिलीवरी कर्मी को यह 4-अंकीय कोड बताएं:'
+                            : 'Share this verification code with the delivery person:'}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 38,
+                          fontWeight: '800',
+                          color: C.ink,
+                          letterSpacing: 8,
+                          marginTop: 4,
+                        }}
+                      >
+                        {code}
+                      </Text>
                     </View>
                   </View>
                 ) : null}
@@ -1915,8 +1913,8 @@ export default function PharmacyScreen() {
                       ? 'अकाउंट धारक (स्वयं)'
                       : 'Account holder'
                     : isHi
-                    ? `${m.relationHi || m.relation} · ${m.age} वर्ष`
-                    : `${m.relation} · ${m.age} yrs`;
+                      ? `${m.relationHi || m.relation} · ${m.age} वर्ष`
+                      : `${m.relation} · ${m.age} yrs`;
 
                 return (
                   <Pressable
@@ -1994,7 +1992,7 @@ export default function PharmacyScreen() {
             const updated = { ...order, paidInApp: true };
             setSelectedOrder(updated);
             setHistory((prev) => prev.map((h) => (h.ref === order.ref ? updated : h)));
-          } catch {}
+          } catch { }
         }}
         onReorder={(order) => {
           setSelectedOrder(null);

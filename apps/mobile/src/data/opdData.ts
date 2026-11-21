@@ -94,52 +94,12 @@ export const SORT_OPTIONS: SortOptionItem[] = [
 ];
 
 /**
- * Calculates 3 realistic, consecutive appointment time slots for a doctor.
+ * Calculates 1-hour consultation window slots (each window supports 5-8 patients).
  */
 export function calculateDoctorSlots(doc: Doctor, isHi: boolean): string[] {
-  let raw = doc.next_available_slot || 'Today, 6:30 PM';
-  const isToday = raw.toLowerCase().includes('today');
-
-  if (isToday) {
-    if (
-      raw.includes('1:') ||
-      raw.includes('2:') ||
-      raw.includes('3:') ||
-      raw.includes('4:') ||
-      raw.includes('5:') ||
-      raw.includes('01:') ||
-      raw.includes('02:') ||
-      raw.includes('03:') ||
-      raw.includes('04:') ||
-      raw.includes('05:')
-    ) {
-      raw = 'Today, 6:30 PM';
-    }
-  }
-
-  let s1 = raw;
-  let s2 = 'Today, 7:45 PM';
-  let s3 = 'Tomorrow, 10:30 AM';
-
-  if (s1.toLowerCase().includes('today')) {
-    if (s1.includes('6:00') || s1.includes('6:15') || s1.includes('6:30')) {
-      s1 = 'Today, 6:30 PM';
-      s2 = 'Today, 7:45 PM';
-      s3 = 'Tomorrow, 10:30 AM';
-    } else if (s1.includes('6:45') || s1.includes('7:00') || s1.includes('7:15')) {
-      s1 = 'Today, 7:00 PM';
-      s2 = 'Today, 8:15 PM';
-      s3 = 'Tomorrow, 11:00 AM';
-    } else {
-      s1 = 'Today, 7:30 PM';
-      s2 = 'Today, 8:30 PM';
-      s3 = 'Tomorrow, 11:30 AM';
-    }
-  } else {
-    s1 = s1 || 'Tomorrow, 10:30 AM';
-    s2 = 'Tomorrow, 02:30 PM';
-    s3 = 'Tomorrow, 05:30 PM';
-  }
+  const s1 = doc.next_available_slot || 'Today, 10:00 AM - 11:00 AM';
+  const s2 = 'Today, 05:00 PM - 06:00 PM';
+  const s3 = 'Tomorrow, 10:00 AM - 11:00 AM';
 
   return [
     translateSlot(s1, isHi),

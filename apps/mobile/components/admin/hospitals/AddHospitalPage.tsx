@@ -10,8 +10,16 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { ArrowLeft, Upload, Plus, Trash2, CheckCircle2, ChevronDown, ChevronUp, Clock } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabaseClient } from '@adityam/supabase';
 import { SelectDropdown } from '../SelectDropdown';
+import { CustomChipSelector } from '../CustomChipSelector';
+import { FormStepBar } from '../FormStepBar';
+import { LocationPickerInput } from '../LocationPickerInput';
+import { ImageCropAdjustModal } from '../ImageCropAdjustModal';
+import { INDIA_STATES, INDIA_STATE_CITIES } from '../../../src/constants/indiaLocations';
+
+const sanitizeDigits = (txt: string, maxLen: number) => txt.replace(/\D/g, '').slice(0, maxLen);
 import {
   THEME,
   ExtendedHospital,
@@ -54,20 +62,31 @@ export interface HospitalPrefill {
 
 interface AddHospitalPageProps {
   editSlug?: string;
+  requestId?: string;
   prefill?: HospitalPrefill;
+  partnerMode?: boolean;
+  submittedBy?: { id?: string; fullName?: string; email?: string };
   isUploadingPhoto: boolean;
-  onPickPhoto: (onPicked: (url: string) => void) => Promise<void>;
+  onPickPhoto: (
+    onPicked: (url: string) => void,
+    options?: { aspect?: [number, number]; allowsEditing?: boolean }
+  ) => Promise<void>;
   onCancel: () => void;
   onCreated: (slug: string) => Promise<void>;
+  onSavedHospitalId?: (hospitalId: string) => Promise<void>;
 }
 
 export function AddHospitalPage({
   editSlug,
+  requestId,
   prefill,
+  partnerMode = false,
+  submittedBy,
   isUploadingPhoto,
   onPickPhoto,
   onCancel,
   onCreated,
+  onSavedHospitalId,
 }: AddHospitalPageProps) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
@@ -79,53 +98,57 @@ export function AddHospitalPage({
       ? prefill.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       : ''
   );
-  const [tag, setTag] = useState('Multi-Specialty Hospital');
+  const [slugTouched, setSlugTouched] = useState(Boolean(editSlug || requestId));
+  const [tag, setTag] = useState(partnerMode ? '' : 'Multi-Specialty Hospital');
   const [imageUrl, setImageUrl] = useState('');
   const [discount, setDiscount] = useState(prefill?.discount || '20');
   const [commission, setCommission] = useState('10');
   const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>(DEFAULT_WEEKLY_SCHEDULE);
-  const [is24x7, setIs24x7] = useState(true);
-  const [totalBeds, setTotalBeds] = useState('100');
-  const [icuBeds, setIcuBeds] = useState('20');
-  const [otCount, setOtCount] = useState('4');
-  const [nabh, setNabh] = useState(true);
+  const [is24x7, setIs24x7] = useState(partnerMode ? false : true);
+  const [totalBeds, setTotalBeds] = useState(partnerMode ? '' : '100');
+  const [icuBeds, setIcuBeds] = useState(partnerMode ? '' : '20');
+  const [otCount, setOtCount] = useState(partnerMode ? '' : '4');
+  const [nabh, setNabh] = useState(partnerMode ? false : true);
   const [jci, setJci] = useState(false);
   const [featured, setFeatured] = useState(false);
+  const [offersIpd, setOffersIpd] = useState(!partnerMode);
+  const [hasInHouseLab, setHasInHouseLab] = useState(!partnerMode);
   const [specialties, setSpecialties] = useState(
-    prefill?.specialty || 'General Medicine, Cardiology, Orthopedics'
+    prefill?.specialty || (partnerMode ? '' : 'General Medicine, Cardiology, Orthopedics')
   );
 
   // 2. Contacts & Location
   const [phone1, setPhone1] = useState(prefill?.phone || '');
   const [phone2, setPhone2] = useState('');
-  const [helpline, setHelpline] = useState('+91 141 400 8800');
+  const [helpline, setHelpline] = useState(partnerMode ? '' : '+91 141 400 8800');
   const [address, setAddress] = useState(prefill?.address || '');
-  const [city, setCity] = useState(prefill?.city || 'Jaipur');
-  const [stateName, setStateName] = useState('Rajasthan');
-  const [pincode, setPincode] = useState('302001');
-  const [lat, setLat] = useState('26.9124');
-  const [lng, setLng] = useState('75.7873');
+  const [city, setCity] = useState(prefill?.city || (partnerMode ? '' : 'Jaipur'));
+  const [stateName, setStateName] = useState(partnerMode ? '' : 'Rajasthan');
+  const [pincode, setPincode] = useState(partnerMode ? '' : '302001');
+  const [lat, setLat] = useState(partnerMode ? '' : '26.9124');
+  const [lng, setLng] = useState(partnerMode ? '' : '75.7873');
   const [mainBranchName, setMainBranchName] = useState('');
   const [mainBranchArea, setMainBranchArea] = useState(prefill?.area || '');
 
   // 3. Services, Labs, IPD & Insurance
-  const [facilities, setFacilities] = useState<string[]>([
-    'OPD Consultation',
-    '24x7 Emergency & Trauma',
-    'ICU / NICU / PICU',
-    'In-House Pharmacy',
-    'Cashless TPA Desk',
-  ]);
-  const [labs, setLabs] = useState<string[]>(['Pathology & Blood Tests', 'Digital X-Ray']);
-  const [ipdServices, setIpdServices] = useState<string[]>([
-    'General Surgery',
-    'Orthopedics & Joint Replacement',
-  ]);
-  const [insurance, setInsurance] = useState<string[]>([
-    'RGHS (Rajasthan Govt)',
-    'Star Health',
-    'HDFC Ergo',
-  ]);
+  const [facilities, setFacilities] = useState<string[]>(
+    partnerMode
+      ? []
+      : [
+          'OPD Consultation',
+          '24x7 Emergency & Trauma',
+          'ICU / NICU / PICU',
+          'In-House Pharmacy',
+          'Cashless TPA Desk',
+        ]
+  );
+  const [labs, setLabs] = useState<string[]>(partnerMode ? [] : ['Pathology & Blood Tests', 'Digital X-Ray']);
+  const [ipdServices, setIpdServices] = useState<string[]>(
+    partnerMode ? [] : ['General Surgery', 'Orthopedics & Joint Replacement']
+  );
+  const [insurance, setInsurance] = useState<string[]>(
+    partnerMode ? [] : ['RGHS (Rajasthan Govt)', 'Star Health', 'HDFC Ergo']
+  );
 
   // 4. Linked Doctors & Edit Mode State
   const [doctorsDraft, setDoctorsDraft] = useState<DraftDoctor[]>([]);
@@ -134,6 +157,193 @@ export function AddHospitalPage({
   const [editingHospitalId, setEditingHospitalId] = useState<string | null>(null);
   const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editSlug));
   const [isSaving, setIsSaving] = useState(false);
+
+  // Partner Compliance & Verification Docs
+  const [clinicalEstNo, setClinicalEstNo] = useState('');
+  const [licenseProofUrl, setLicenseProofUrl] = useState('');
+  const [authorizedSignatory, setAuthorizedSignatory] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsLocked, setTermsLocked] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [cropModalUri, setCropModalUri] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const draftKey = `partner_hospital_draft_${submittedBy?.id || 'anon'}_${editSlug || requestId || 'new'}`;
+
+  useEffect(() => {
+    if (!partnerMode || editSlug || requestId) return;
+    let active = true;
+    AsyncStorage.getItem(draftKey)
+      .then((raw) => {
+        if (!raw || !active) return;
+        const d = JSON.parse(raw);
+        if (d.name) setName(d.name);
+        if (d.slug) setSlug(d.slug);
+        if (d.tag) setTag(d.tag);
+        if (d.imageUrl) setImageUrl(d.imageUrl);
+        if (d.totalBeds) setTotalBeds(d.totalBeds);
+        if (d.icuBeds) setIcuBeds(d.icuBeds);
+        if (d.otCount) setOtCount(d.otCount);
+        if (d.specialties) setSpecialties(d.specialties);
+        if (typeof d.is24x7 === 'boolean') setIs24x7(d.is24x7);
+        if (typeof d.nabh === 'boolean') setNabh(d.nabh);
+        if (typeof d.jci === 'boolean') setJci(d.jci);
+        if (d.phone1) setPhone1(d.phone1);
+        if (d.phone2) setPhone2(d.phone2);
+        if (d.helpline) setHelpline(d.helpline);
+        if (d.address) setAddress(d.address);
+        if (d.city) setCity(d.city);
+        if (d.stateName) setStateName(d.stateName);
+        if (d.pincode) setPincode(d.pincode);
+        if (d.lat) setLat(d.lat);
+        if (d.lng) setLng(d.lng);
+        if (d.mainBranchName) setMainBranchName(d.mainBranchName);
+        if (d.mainBranchArea) setMainBranchArea(d.mainBranchArea);
+        if (Array.isArray(d.facilities)) setFacilities(d.facilities);
+        if (Array.isArray(d.labs)) setLabs(d.labs);
+        if (Array.isArray(d.ipdServices)) setIpdServices(d.ipdServices);
+        if (Array.isArray(d.insurance)) setInsurance(d.insurance);
+        if (d.weeklySchedule) setWeeklySchedule(d.weeklySchedule);
+        if (d.clinicalEstNo) setClinicalEstNo(d.clinicalEstNo);
+        if (d.licenseProofUrl) setLicenseProofUrl(d.licenseProofUrl);
+        if (d.authorizedSignatory) setAuthorizedSignatory(d.authorizedSignatory);
+        if (typeof d.currentStep === 'number') setCurrentStep(d.currentStep);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [partnerMode, editSlug, draftKey]);
+
+  const saveDraft = async (nextStep: number) => {
+    if (!partnerMode || editSlug) return;
+    try {
+      await AsyncStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          name,
+          slug,
+          tag,
+          imageUrl,
+          totalBeds,
+          icuBeds,
+          otCount,
+          specialties,
+          is24x7,
+          nabh,
+          jci,
+          phone1,
+          phone2,
+          helpline,
+          address,
+          city,
+          stateName,
+          pincode,
+          lat,
+          lng,
+          mainBranchName,
+          mainBranchArea,
+          facilities,
+          labs,
+          ipdServices,
+          insurance,
+          weeklySchedule,
+          clinicalEstNo,
+          licenseProofUrl,
+          authorizedSignatory,
+          currentStep: nextStep,
+        })
+      );
+    } catch {
+      // noop
+    }
+  };
+
+  const handleNextStep = async () => {
+    setFormError(null);
+    if (currentStep === 1) {
+      if (!name.trim()) {
+        setFormError('Hospital Name (*) is required.');
+        return;
+      }
+      if (partnerMode && !specialties.trim()) {
+        setFormError('Specialties (*) are required.');
+        return;
+      }
+    }
+    if (currentStep === 2) {
+      if (!phone1.trim() || phone1.replace(/\D/g, '').length < 10) {
+        setFormError('Valid 10-digit Phone 1 (Main Desk *) is required.');
+        return;
+      }
+      if (!address.trim()) {
+        setFormError('Full Address (*) is required.');
+        return;
+      }
+      if (!stateName.trim() || !city.trim()) {
+        setFormError('State (*) and City (*) are required.');
+        return;
+      }
+    }
+    const next = Math.min(4, currentStep + 1);
+    await saveDraft(next);
+    setCurrentStep(next);
+  };
+
+  useEffect(() => {
+    if (!requestId) return;
+    let active = true;
+    const loadRequest = async () => {
+      setIsLoadingEdit(true);
+      try {
+        const supabase = getSupabaseClient();
+        const { data: req } = await supabase
+          .from('partner_verification_requests')
+          .select('*')
+          .eq('id', requestId)
+          .maybeSingle();
+        if (!req || !active) return;
+        const full = (req as any).payload?.fullInsert || {};
+        const docs = (req as any).verification_docs || {};
+        if (full.name) setName(full.name);
+        if (full.slug) setSlug(full.slug);
+        if (full.tag) setTag(full.tag);
+        if (full.image_url) setImageUrl(full.image_url);
+        if (full.total_beds != null) setTotalBeds(String(full.total_beds));
+        if (full.icu_beds != null) setIcuBeds(String(full.icu_beds));
+        if (full.ot_count != null) setOtCount(String(full.ot_count));
+        if (Array.isArray(full.specialties)) setSpecialties(full.specialties.join(', '));
+        setIs24x7(Boolean(full.is_24x7));
+        setNabh(Boolean(full.nabh_accredited));
+        setJci(Boolean(full.jci_accredited));
+        if (full.contact_number) setPhone1(full.contact_number);
+        if (full.secondary_contact_number) setPhone2(full.secondary_contact_number);
+        if (full.virtual_exotel_number) setHelpline(full.virtual_exotel_number);
+        if (full.address) setAddress(full.address);
+        if (full.city) setCity(full.city);
+        if (full.state) setStateName(full.state);
+        if (full.pincode) setPincode(full.pincode);
+        if ((req as any).payload?.latNum) setLat(String((req as any).payload.latNum));
+        if ((req as any).payload?.lngNum) setLng(String((req as any).payload.lngNum));
+        if ((req as any).payload?.mainBranchName) setMainBranchName((req as any).payload.mainBranchName);
+        if ((req as any).payload?.mainBranchArea) setMainBranchArea((req as any).payload.mainBranchArea);
+        if (Array.isArray(full.facilities)) setFacilities(full.facilities);
+        if (Array.isArray(full.labs_offered)) setLabs(full.labs_offered);
+        if (Array.isArray(full.ipd_services_offered)) setIpdServices(full.ipd_services_offered);
+        if (Array.isArray(full.insurance_partners)) setInsurance(full.insurance_partners);
+        if (full.weekly_schedule) setWeeklySchedule(full.weekly_schedule);
+        if (docs.clinicalEstablishmentNo) setClinicalEstNo(docs.clinicalEstablishmentNo);
+        if (docs.licenseProofUrl) setLicenseProofUrl(docs.licenseProofUrl);
+        if (docs.authorizedSignatory) setAuthorizedSignatory(docs.authorizedSignatory);
+      } finally {
+        if (active) setIsLoadingEdit(false);
+      }
+    };
+    void loadRequest();
+    return () => {
+      active = false;
+    };
+  }, [requestId]);
 
   useEffect(() => {
     if (!editSlug) return;
@@ -178,11 +388,48 @@ export function AddHospitalPage({
         if (h.labs_offered?.length) setLabs(h.labs_offered);
         if (h.ipd_services_offered?.length) setIpdServices(h.ipd_services_offered);
         if (h.insurance_partners?.length) setInsurance(h.insurance_partners);
+        setOffersIpd((Number(h.total_beds) || 0) > 0 || (h.ipd_services_offered?.length ?? 0) > 0);
+        setHasInHouseLab((h.labs_offered?.length ?? 0) > 0);
+        if ((h as any).clinical_establishment_no) setClinicalEstNo(String((h as any).clinical_establishment_no));
+        if ((h as any).license_proof_url) setLicenseProofUrl(String((h as any).license_proof_url));
 
-        const [brRes, docRes] = await Promise.all([
+        const [brRes, docRes, vrRes] = await Promise.all([
           supabase.from('hospital_branches').select('*').eq('hospital_id', h.id).order('is_main_branch', { ascending: false }),
           supabase.from('doctors').select('*').eq('hospital_id', h.id).order('name', { ascending: true }),
+          supabase
+            .from('partner_verification_requests')
+            .select('verification_docs, terms_accepted')
+            .eq('entity_type', 'HOSPITAL')
+            .eq('entity_slug', h.slug)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
+
+        if (!active) return;
+        const brList = (brRes.data || []) as ExtendedBranch[];
+        setExistingBranches(brList);
+        const mainBr = brList.find((b) => b.is_main_branch) || brList[0];
+        if (mainBr) {
+          setMainBranchName(mainBr.name || '');
+          setMainBranchArea(mainBr.area || '');
+        }
+        const vrData = vrRes.data as { verification_docs?: any; terms_accepted?: boolean } | null;
+        if (vrData?.verification_docs) {
+          if (vrData.verification_docs.clinicalEstablishmentNo) {
+            setClinicalEstNo((prev) => prev || vrData.verification_docs.clinicalEstablishmentNo);
+          }
+          if (vrData.verification_docs.licenseProofUrl) {
+            setLicenseProofUrl((prev) => prev || vrData.verification_docs.licenseProofUrl);
+          }
+          if (vrData.verification_docs.authorizedSignatory) {
+            setAuthorizedSignatory(vrData.verification_docs.authorizedSignatory);
+          }
+        }
+        if (vrData?.terms_accepted) {
+          setTermsAccepted(true);
+          setTermsLocked(true);
+        }
         if (brRes.data && active) setExistingBranches(brRes.data as ExtendedBranch[]);
         if (docRes.data && active) {
           setDoctorsDraft(
@@ -296,7 +543,84 @@ export function AddHospitalPage({
         labs_offered: labs,
         ipd_services_offered: ipdServices,
         insurance_partners: insurance,
+        ...(partnerMode
+          ? {
+              clinical_establishment_no: clinicalEstNo.trim() || null,
+              license_proof_url: licenseProofUrl.trim() || null,
+              verification_status: 'VERIFIED',
+            }
+          : {}),
       };
+
+      if (partnerMode) {
+        setFormError(null);
+        if (!clinicalEstNo.trim()) {
+          setFormError('Clinical Establishment / Hospital Reg. No. (*) is required.');
+          return;
+        }
+        if (!authorizedSignatory.trim()) {
+          setFormError('Authorized Signatory (Name & Role *) is required.');
+          return;
+        }
+        if (!licenseProofUrl.trim()) {
+          setFormError('Hospital Registration / NABH / License Proof (*) is required.');
+          return;
+        }
+        if (!termsAccepted) {
+          setFormError('You must accept the Hospital Partner Terms & Conditions to submit.');
+          return;
+        }
+
+        const reqId = requestId || `vr-hosp-${cleanSlug.slice(0, 12)}-${Date.now().toString(36)}`;
+        const reqRow = {
+          id: reqId,
+          entity_type: 'HOSPITAL',
+          action_type: editingHospitalId ? 'UPDATE' : 'CREATE',
+          target_entity_id: editingHospitalId || null,
+          hospital_id: editingHospitalId || null,
+          submitted_by_user_id: submittedBy?.id || null,
+          submitted_by_name: submittedBy?.fullName || null,
+          submitted_by_email: submittedBy?.email || null,
+          entity_name: name.trim(),
+          entity_slug: cleanSlug,
+          payload: {
+            fullInsert,
+            baseInsert,
+            mainBranchName: mainBranchName.trim() || `${name.trim()} Main Campus`,
+            mainBranchArea: mainBranchArea.trim() || city.trim() || 'Jaipur',
+            latNum,
+            lngNum,
+          },
+          verification_docs: {
+            clinicalEstablishmentNo: clinicalEstNo.trim(),
+            licenseProofUrl: licenseProofUrl.trim(),
+            authorizedSignatory: authorizedSignatory.trim(),
+            nabhAccredited: nabh,
+            jciAccredited: jci,
+          },
+          terms_accepted: true,
+          terms_accepted_at: new Date().toISOString(),
+          status: 'PENDING',
+          reviewer_notes: null,
+          updated_at: new Date().toISOString(),
+        };
+        const { error: vrError } = requestId
+          ? await supabase.from('partner_verification_requests').update(reqRow).eq('id', requestId)
+          : await supabase.from('partner_verification_requests').insert(reqRow);
+
+        if (vrError) {
+          Alert.alert('Submission Failed', vrError.message);
+          return;
+        }
+
+        await AsyncStorage.removeItem(draftKey).catch(() => {});
+        Alert.alert(
+          'Submitted for Verification',
+          'Hospital details and license documents have been sent to Adityam Admin Staff for verification. Once approved, it will go live automatically.'
+        );
+        await onCreated(cleanSlug);
+        return;
+      }
 
       let hospitalId: string | null = editingHospitalId;
       if (editingHospitalId) {
@@ -400,6 +724,10 @@ export function AddHospitalPage({
         }
       }
 
+      if (hospitalId && onSavedHospitalId) {
+        await onSavedHospitalId(hospitalId);
+      }
+
       await onCreated(cleanSlug);
     } finally {
       setIsSaving(false);
@@ -462,18 +790,35 @@ export function AddHospitalPage({
           </TouchableOpacity>
           <View>
             <Text style={{ fontSize: 18, fontWeight: '800', color: THEME.ink }}>
-              {editingHospitalId ? `Edit Hospital · ${name || editSlug}` : 'Add New Hospital'}
+              {editingHospitalId || requestId ? `Update Hospital · ${name || editSlug || 'Details'}` : 'Add New Hospital'}
             </Text>
             <Text style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>
-              Fill hospital info, contacts, services, and link doctors in one place
+              {partnerMode
+                ? 'Step-by-step hospital onboarding — your progress is saved as you go'
+                : 'Fill hospital info, contacts, services, and link doctors in one place'}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Section 1 & 2: Two-column on Desktop */}
-      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 18 }}>
+      {partnerMode && currentStep === 4 && (
+        <FormStepBar
+          currentStep={currentStep}
+          onSelectStep={(s) => setCurrentStep(s)}
+          steps={[
+            { id: 1, title: 'Hospital Details', subtitle: 'Name, beds & specialties' },
+            { id: 2, title: 'Contacts & Branch', subtitle: 'Phone, address & GPS' },
+            { id: 3, title: 'Services & Timings', subtitle: 'Labs, IPD, TPA & hours' },
+            { id: 4, title: 'Verification & Terms', subtitle: 'License & T&C submit' },
+          ]}
+        />
+      )}
+
+      {/* Section 1 & 2: Two-column on Desktop (or Step 1 / Step 2 in Partner Wizard) */}
+      {(!partnerMode || currentStep === 1 || currentStep === 2) && (
+      <View style={{ flexDirection: isDesktop && !partnerMode ? 'row' : 'column', gap: 18 }}>
         {/* Card 1: Hospital Info & Photo */}
+        {(!partnerMode || currentStep === 1) && (
         <View
           style={{
             flex: 1,
@@ -489,53 +834,93 @@ export function AddHospitalPage({
             1. Hospital Details & Photo
           </Text>
 
-          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-            {imageUrl ? (
-              <Image
-                source={{ uri: imageUrl }}
-                style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: THEME.creamSoft }}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted }}>
+              Hospital Banner Photo (Recommended: 16:9 Landscape · 1200×675px)
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TextInput
+                value={imageUrl}
+                onChangeText={setImageUrl}
+                placeholder="Paste photo URL or upload (16:9 Landscape)"
+                placeholderTextColor="#9CA3AF"
+                style={[inputStyle, { flex: 1 }]}
               />
+              <TouchableOpacity
+                onPress={() =>
+                  onPickPhoto(
+                    (url) => {
+                      setImageUrl(url);
+                      setCropModalUri(url);
+                    },
+                    { aspect: [16, 9], allowsEditing: true }
+                  )
+                }
+                disabled={isUploadingPhoto}
+                style={{
+                  backgroundColor: THEME.greenSoft,
+                  borderWidth: 1,
+                  borderColor: THEME.greenBorder,
+                  paddingHorizontal: 13,
+                  paddingVertical: 10,
+                  borderRadius: 9,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                <Upload size={14} color={THEME.greenPrimary} />
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.greenPrimary }}>
+                  {isUploadingPhoto ? '...' : 'Upload'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {imageUrl ? (
+              <View style={{ gap: 6, alignItems: 'flex-start' }}>
+                <Image
+                  source={{ uri: imageUrl }}
+                  resizeMode="cover"
+                  style={{
+                    width: '100%',
+                    maxWidth: 320,
+                    aspectRatio: 16 / 9,
+                    borderRadius: 10,
+                    backgroundColor: THEME.creamSoft,
+                    borderWidth: 1,
+                    borderColor: THEME.border,
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={() => setCropModalUri(imageUrl)}
+                  style={{
+                    paddingHorizontal: 11,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    backgroundColor: THEME.greenSoft,
+                    borderWidth: 1,
+                    borderColor: THEME.greenBorder,
+                  }}
+                >
+                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: THEME.greenPrimary }}>
+                    Adjust Thumbnail Alignment / Zoom
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
-            <TextInput
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              placeholder="Paste photo URL or upload"
-              placeholderTextColor="#9CA3AF"
-              style={[inputStyle, { flex: 1 }]}
-            />
-            <TouchableOpacity
-              onPress={() => onPickPhoto((url) => setImageUrl(url))}
-              disabled={isUploadingPhoto}
-              style={{
-                backgroundColor: THEME.greenSoft,
-                borderWidth: 1,
-                borderColor: THEME.greenBorder,
-                paddingHorizontal: 13,
-                paddingVertical: 10,
-                borderRadius: 9,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <Upload size={14} color={THEME.greenPrimary} />
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.greenPrimary }}>
-                {isUploadingPhoto ? '...' : 'Upload'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
             <View style={{ flex: 1.4 }}>
               <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Hospital Name *
+                Hospital Name <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
               </Text>
               <TextInput
                 value={name}
                 onChangeText={(txt) => {
                   setName(txt);
-                  if (!slug) {
-                    setSlug(txt.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                  if (!editingHospitalId && (partnerMode || !slugTouched)) {
+                    const combined = [txt, mainBranchArea || city].filter(Boolean).join(' ');
+                    setSlug(combined.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
                   }
                 }}
                 placeholder="e.g. Fortis Hospital"
@@ -544,13 +929,21 @@ export function AddHospitalPage({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Page URL Slug
+                {partnerMode ? 'Page URL Slug (Auto-generated with Branch)' : 'Page URL Slug'}
               </Text>
               <TextInput
                 value={slug}
-                onChangeText={setSlug}
-                placeholder="fortis-jaipur"
-                style={inputStyle}
+                editable={!partnerMode}
+                onChangeText={
+                  partnerMode
+                    ? undefined
+                    : (txt) => {
+                        setSlugTouched(true);
+                        setSlug(txt.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-/, ''));
+                      }
+                }
+                placeholder="hospital-branch-slug"
+                style={[inputStyle, partnerMode && { opacity: 0.7, backgroundColor: '#F3EFE4' }]}
               />
             </View>
           </View>
@@ -562,46 +955,35 @@ export function AddHospitalPage({
               </Text>
               <TextInput value={tag} onChangeText={setTag} style={inputStyle} />
             </View>
-            <View style={{ flex: 0.8 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Discount (%)
-              </Text>
-              <TextInput value={discount} onChangeText={setDiscount} keyboardType="numeric" style={inputStyle} />
-            </View>
-            <View style={{ flex: 0.8 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Commission (%)
-              </Text>
-              <TextInput value={commission} onChangeText={setCommission} keyboardType="numeric" style={inputStyle} />
-            </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Total Beds
-              </Text>
-              <TextInput value={totalBeds} onChangeText={setTotalBeds} keyboardType="numeric" style={inputStyle} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                ICU Beds
-              </Text>
-              <TextInput value={icuBeds} onChangeText={setIcuBeds} keyboardType="numeric" style={inputStyle} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                OTs
-              </Text>
-              <TextInput value={otCount} onChangeText={setOtCount} keyboardType="numeric" style={inputStyle} />
-            </View>
+            {!partnerMode && (
+              <>
+                <View style={{ flex: 0.8 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                    Discount (%)
+                  </Text>
+                  <TextInput value={discount} onChangeText={setDiscount} keyboardType="numeric" style={inputStyle} />
+                </View>
+                <View style={{ flex: 0.8 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                    Commission (%)
+                  </Text>
+                  <TextInput value={commission} onChangeText={setCommission} keyboardType="numeric" style={inputStyle} />
+                </View>
+              </>
+            )}
           </View>
 
           <View>
             <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-              Specialties (comma-separated)
+              Specialties (comma-separated) {partnerMode ? <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text> : null}
             </Text>
-            <TextInput value={specialties} onChangeText={setSpecialties} style={inputStyle} />
+            <TextInput
+              value={specialties}
+              onChangeText={setSpecialties}
+              placeholder="e.g. Cardiology, Orthopedics, General Medicine"
+              placeholderTextColor="#9CA3AF"
+              style={inputStyle}
+            />
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -609,7 +991,12 @@ export function AddHospitalPage({
               { label: '24x7 Open', val: is24x7, toggle: () => setIs24x7(!is24x7) },
               { label: 'NABH', val: nabh, toggle: () => setNabh(!nabh) },
               { label: 'JCI', val: jci, toggle: () => setJci(!jci) },
-              { label: 'Featured', val: featured, toggle: () => setFeatured(!featured) },
+              ...(partnerMode
+                ? [
+                    { label: 'Offers IPD / Admissions', val: offersIpd, toggle: () => setOffersIpd(!offersIpd) },
+                    { label: 'In-House Lab & Scans', val: hasInHouseLab, toggle: () => setHasInHouseLab(!hasInHouseLab) },
+                  ]
+                : [{ label: 'Featured', val: featured, toggle: () => setFeatured(!featured) }]),
             ].map((t) => (
               <TouchableOpacity
                 key={t.label}
@@ -629,9 +1016,69 @@ export function AddHospitalPage({
               </TouchableOpacity>
             ))}
           </View>
+
+          {(!partnerMode || offersIpd) && (
+            <View
+              style={{
+                backgroundColor: THEME.creamBg,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: THEME.border,
+                padding: 12,
+                gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.ink }}>
+                IPD Bed &amp; Operation Theatre Capacity
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                    Total Beds
+                  </Text>
+                  <TextInput
+                    value={totalBeds}
+                    onChangeText={(t) => setTotalBeds(sanitizeDigits(t, 5))}
+                    placeholder="e.g. 50"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    style={[inputStyle, { backgroundColor: THEME.surface }]}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                    ICU Beds
+                  </Text>
+                  <TextInput
+                    value={icuBeds}
+                    onChangeText={(t) => setIcuBeds(sanitizeDigits(t, 4))}
+                    placeholder="e.g. 10"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    style={[inputStyle, { backgroundColor: THEME.surface }]}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                    OTs
+                  </Text>
+                  <TextInput
+                    value={otCount}
+                    onChangeText={(t) => setOtCount(sanitizeDigits(t, 3))}
+                    placeholder="e.g. 2"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    style={[inputStyle, { backgroundColor: THEME.surface }]}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
         </View>
+        )}
 
         {/* Card 2: Contacts & Location */}
+        {(!partnerMode || currentStep === 2) && (
         <View
           style={{
             flex: 1,
@@ -650,62 +1097,123 @@ export function AddHospitalPage({
           <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Phone 1 (Main Desk)
+                Phone 1 (Main Desk, 10 digits) <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
               </Text>
-              <TextInput value={phone1} onChangeText={setPhone1} placeholder="+91 141 ..." style={inputStyle} />
+              <TextInput
+                value={phone1}
+                onChangeText={(t) => setPhone1(sanitizeDigits(t, 10))}
+                placeholder="e.g. 9829012345"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={10}
+                style={inputStyle}
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-                Phone 2 (Emergency)
+                Phone 2 (Emergency, 10 digits)
               </Text>
-              <TextInput value={phone2} onChangeText={setPhone2} placeholder="+91 141 ..." style={inputStyle} />
+              <TextInput
+                value={phone2}
+                onChangeText={(t) => setPhone2(sanitizeDigits(t, 10))}
+                placeholder="e.g. 9829054321"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={10}
+                style={inputStyle}
+              />
             </View>
           </View>
 
           <View>
             <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-              Virtual Helpline
-            </Text>
-            <TextInput value={helpline} onChangeText={setHelpline} style={inputStyle} />
-          </View>
-
-          <View>
-            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
-              Full Address *
+              Helpline / Reception Landline (10 digits)
             </Text>
             <TextInput
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Street, Area, Landmark"
+              value={helpline}
+              onChangeText={(t) => setHelpline(sanitizeDigits(t, 10))}
+              placeholder="e.g. 0141400880"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+              maxLength={10}
               style={inputStyle}
             />
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+              Full Address <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
+            </Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Building / Plot No., Street, Locality, Landmark"
+              placeholderTextColor="#9CA3AF"
+              style={inputStyle}
+            />
+          </View>
+
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>City</Text>
-              <TextInput value={city} onChangeText={setCity} style={inputStyle} />
+              <SelectDropdown
+                label="State *"
+                placeholder="Select State..."
+                value={stateName}
+                options={INDIA_STATES.map((st) => ({ value: st, label: st }))}
+                onChange={(nextState) => {
+                  setStateName(nextState);
+                  const stateCities = INDIA_STATE_CITIES[nextState] || [];
+                  if (!stateCities.includes(city)) {
+                    setCity(stateCities[0] || '');
+                  }
+                }}
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>State</Text>
-              <TextInput value={stateName} onChangeText={setStateName} style={inputStyle} />
+              <SelectDropdown
+                label="City *"
+                placeholder={stateName ? 'Select City...' : 'Select State first'}
+                value={city}
+                options={(INDIA_STATE_CITIES[stateName] || (city ? [city] : [])).map((c) => ({
+                  value: c,
+                  label: c,
+                }))}
+                onChange={(nextCity) => setCity(nextCity)}
+              />
             </View>
-            <View style={{ flex: 0.8 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>Pincode</Text>
-              <TextInput value={pincode} onChangeText={setPincode} keyboardType="numeric" style={inputStyle} />
+            <View style={{ flex: 0.7 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                Pincode (6 digits)
+              </Text>
+              <TextInput
+                value={pincode}
+                onChangeText={(t) => setPincode(sanitizeDigits(t, 6))}
+                placeholder="e.g. 302001"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                maxLength={6}
+                style={inputStyle}
+              />
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>Latitude</Text>
-              <TextInput value={lat} onChangeText={setLat} keyboardType="numeric" style={inputStyle} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>Longitude</Text>
-              <TextInput value={lng} onChangeText={setLng} keyboardType="numeric" style={inputStyle} />
-            </View>
-          </View>
+          <LocationPickerInput
+            address={address}
+            city={city}
+            pincode={pincode}
+            lat={lat}
+            lng={lng}
+            onChangeCoords={(nextLat, nextLng) => {
+              setLat(nextLat);
+              setLng(nextLng);
+            }}
+            onFillAddressMeta={(meta) => {
+              if (meta.city && !city.trim()) setCity(meta.city);
+              if (meta.state && !stateName.trim()) setStateName(meta.state);
+              if (meta.pincode && !pincode.trim()) setPincode(meta.pincode);
+              if (meta.address && !address.trim()) setAddress(meta.address);
+            }}
+          />
 
           <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 10 }}>
             <View style={{ flex: 1 }}>
@@ -725,16 +1233,25 @@ export function AddHospitalPage({
               </Text>
               <TextInput
                 value={mainBranchArea}
-                onChangeText={setMainBranchArea}
+                onChangeText={(txt) => {
+                  setMainBranchArea(txt);
+                  if (!editingHospitalId && (partnerMode || !slugTouched)) {
+                    const combined = [name, txt || city].filter(Boolean).join(' ');
+                    setSlug(combined.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                  }
+                }}
                 placeholder="e.g. Malviya Nagar"
                 style={inputStyle}
               />
             </View>
           </View>
         </View>
+        )}
       </View>
+      )}
 
       {/* Collapsible Full-Width OPD Schedule Card */}
+      {(!partnerMode || currentStep === 3) && (
       <View
         style={{
           backgroundColor: THEME.surface,
@@ -769,7 +1286,7 @@ export function AddHospitalPage({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14.5, fontWeight: '800', color: THEME.ink }}>
-                Hospital OPD Timings (Day-by-Day)
+                {partnerMode ? 'Hospital OPD & Lab Hours (Day-by-Day)' : 'Hospital OPD Timings (Day-by-Day)'}
               </Text>
               <Text numberOfLines={1} style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>
                 {summarizeWeeklySchedule(weeklySchedule)}
@@ -808,8 +1325,10 @@ export function AddHospitalPage({
           />
         )}
       </View>
+      )}
 
-      {/* Section 3: Services, Labs, IPD & Insurance */}
+      {/* Section 3: Services, Labs, IPD & Insurance (With Infinite Custom Options) */}
+      {(!partnerMode || currentStep === 3) && (
       <View
         style={{
           backgroundColor: THEME.surface,
@@ -820,57 +1339,61 @@ export function AddHospitalPage({
           gap: 18,
         }}
       >
-        <Text style={{ fontSize: 15, fontWeight: '800', color: THEME.ink }}>
-          3. Services, Labs, IPD & Insurance
-        </Text>
+        <View>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: THEME.ink }}>
+            3. Services, Labs, IPD & Insurance
+          </Text>
+          <Text style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>
+            Select only verified services available at your hospital, or add unlimited custom items below.
+          </Text>
+        </View>
 
-        {[
-          { title: 'Facilities', items: PRESET_FACILITIES, selected: facilities, set: setFacilities },
-          { title: 'Labs & Scans', items: PRESET_LABS, selected: labs, set: setLabs },
-          { title: 'IPD & Surgeries', items: PRESET_IPD_SERVICES, selected: ipdServices, set: setIpdServices },
-          { title: 'Insurance / TPA', items: PRESET_INSURANCE_PARTNERS, selected: insurance, set: setInsurance },
-        ].map((group) => (
-          <View key={group.title} style={{ gap: 8 }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.muted }}>{group.title}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {group.items.map((item) => {
-                const active = group.selected.includes(item);
-                if (isLoadingEdit) {
-    return (
-      <View style={{ padding: 48, alignItems: 'center', gap: 10 }}>
-        <ActivityIndicator size="large" color={THEME.greenPrimary} />
-        <Text style={{ fontSize: 13, fontWeight: '600', color: THEME.muted }}>
-          Loading hospital details...
-        </Text>
+        <CustomChipSelector
+          title="Facilities"
+          subtitle="Core hospital infrastructure & patient support"
+          presets={PRESET_FACILITIES}
+          selected={facilities}
+          onChange={setFacilities}
+          placeholder="Add custom facility (e.g. NICU Level 3, Burn Unit)..."
+        />
+
+        {(!partnerMode || hasInHouseLab) && (
+          <CustomChipSelector
+            title="Labs & Diagnostic Scans"
+            subtitle="In-house pathology & imaging facilities"
+            presets={PRESET_LABS}
+            selected={labs}
+            onChange={setLabs}
+            placeholder="Add custom lab/scan (e.g. PET-CT, 3T MRI, DEXA)..."
+          />
+        )}
+
+        {(!partnerMode || offersIpd) && (
+          <>
+            <CustomChipSelector
+              title="IPD & Surgeries"
+              subtitle="In-patient departments & surgical specialties"
+              presets={PRESET_IPD_SERVICES}
+              selected={ipdServices}
+              onChange={setIpdServices}
+              placeholder="Add custom surgery/IPD department..."
+            />
+
+            <CustomChipSelector
+              title="Insurance / TPA Empanelment"
+              subtitle="Cashless & government health schemes accepted"
+              presets={PRESET_INSURANCE_PARTNERS}
+              selected={insurance}
+              onChange={setInsurance}
+              placeholder="Add custom TPA / Insurance partner..."
+            />
+          </>
+        )}
       </View>
-    );
-  }
+      )}
 
-  return (
-                  <TouchableOpacity
-                    key={item}
-                    onPress={() => toggleChip(group.selected, group.set, item)}
-                    style={{
-                      paddingHorizontal: 11,
-                      paddingVertical: 7,
-                      borderRadius: 8,
-                      backgroundColor: active ? THEME.greenSoft : THEME.creamBg,
-                      borderWidth: 1,
-                      borderColor: active ? THEME.greenPrimary : THEME.border,
-                    }}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: active ? '700' : '600', color: active ? THEME.greenPrimary : THEME.muted }}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Section 4: Link Doctors to This Hospital */}
+      {/* Section 4: Link Doctors to This Hospital (Admin only — Partners add doctors via dedicated Doctor Verification form) */}
+      {!partnerMode && (
       <View
         style={{
           backgroundColor: THEME.surface,
@@ -1001,11 +1524,142 @@ export function AddHospitalPage({
           </View>
         )}
       </View>
+      )}
+
+      {partnerMode && currentStep === 4 && (
+        <View
+          style={{
+            backgroundColor: THEME.surface,
+            borderRadius: 14,
+            padding: 20,
+            borderWidth: 1,
+            borderColor: THEME.border,
+            gap: 14,
+          }}
+        >
+          <Text style={{ fontSize: 15, fontWeight: '800', color: THEME.ink }}>
+            4. Hospital Registration, License & Terms Verification
+          </Text>
+          <Text style={{ fontSize: 12, color: THEME.muted }}>
+            Hospital creation and edits are reviewed by Adityam Admin Staff before going live to patients.
+          </Text>
+
+          <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                Clinical Establishment / Hospital Reg. No. <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
+              </Text>
+              <TextInput
+                value={clinicalEstNo}
+                onChangeText={setClinicalEstNo}
+                placeholder="e.g. CEA/RJ/JPR/2024/1120"
+                style={inputStyle}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: THEME.muted, marginBottom: 5 }}>
+                Authorized Signatory (Name & Role) <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
+              </Text>
+              <TextInput
+                value={authorizedSignatory}
+                onChangeText={setAuthorizedSignatory}
+                placeholder="e.g. Dr. R. Sharma (Medical Director)"
+                style={inputStyle}
+              />
+            </View>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.muted }}>
+              Hospital Registration / NABH / License Proof (Upload or URL) <Text style={{ color: '#DC2626', fontWeight: '900' }}>*</Text>
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={licenseProofUrl}
+                onChangeText={setLicenseProofUrl}
+                placeholder="https://... or upload license certificate"
+                style={[inputStyle, { flex: 1 }]}
+              />
+              <TouchableOpacity
+                onPress={() => void onPickPhoto(setLicenseProofUrl)}
+                disabled={isUploadingPhoto}
+                style={{
+                  paddingHorizontal: 14,
+                  borderRadius: 9,
+                  backgroundColor: THEME.greenSoft,
+                  borderWidth: 1,
+                  borderColor: THEME.greenBorder,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 6,
+                }}
+              >
+                <Upload size={14} color={THEME.greenPrimary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenPrimary }}>
+                  {isUploadingPhoto ? '...' : 'Upload'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              if (!termsLocked) setTermsAccepted((v) => !v);
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              padding: 12,
+              borderRadius: 10,
+              backgroundColor: termsAccepted ? THEME.greenSoft : THEME.creamBg,
+              borderWidth: 1,
+              borderColor: termsAccepted ? THEME.greenBorder : THEME.border,
+            }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 6,
+                borderWidth: 1.5,
+                borderColor: termsAccepted ? THEME.greenPrimary : THEME.muted,
+                backgroundColor: termsAccepted ? THEME.greenPrimary : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {termsAccepted ? <CheckCircle2 size={14} color="#FFFFFF" /> : null}
+            </View>
+            <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '700', color: THEME.ink }}>
+              I accept the Adityam Niramayaa Hospital Partner Terms & Conditions and certify all licenses and facility claims are genuine.
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {formError ? (
+        <View
+          style={{
+            backgroundColor: '#FDF2F2',
+            borderWidth: 1,
+            borderColor: '#F5C2C2',
+            borderRadius: 10,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+          }}
+        >
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#DC2626' }}>
+            {formError}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Bottom Save Bar */}
-      <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end', paddingBottom: 16 }}>
+      <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingBottom: 16 }}>
         <TouchableOpacity
-          onPress={onCancel}
+          onPress={partnerMode && currentStep > 1 ? () => setCurrentStep((s) => Math.max(1, s - 1)) : onCancel}
           style={{
             paddingHorizontal: 18,
             paddingVertical: 13,
@@ -1015,28 +1669,68 @@ export function AddHospitalPage({
             borderColor: THEME.border,
           }}
         >
-          <Text style={{ fontSize: 13.5, fontWeight: '700', color: THEME.ink }}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleSaveHospital}
-          disabled={isSaving}
-          style={{
-            paddingHorizontal: 22,
-            paddingVertical: 13,
-            borderRadius: 10,
-            backgroundColor: THEME.greenPrimary,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 7,
-          }}
-        >
-          <CheckCircle2 size={16} color="#FFFFFF" />
-          <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
-            {isSaving ? 'Saving...' : editingHospitalId ? 'Save Hospital Changes' : 'Save Hospital & Doctors'}
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: THEME.ink }}>
+            {partnerMode && currentStep > 1 ? '← Previous Step' : 'Cancel'}
           </Text>
         </TouchableOpacity>
+
+        {partnerMode && currentStep < 4 ? (
+          <TouchableOpacity
+            onPress={() => void handleNextStep()}
+            style={{
+              paddingHorizontal: 22,
+              paddingVertical: 13,
+              borderRadius: 10,
+              backgroundColor: THEME.greenPrimary,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 7,
+            }}
+          >
+            <CheckCircle2 size={16} color="#FFFFFF" />
+            <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
+              Save & Next →
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={handleSaveHospital}
+            disabled={isSaving}
+            style={{
+              paddingHorizontal: 22,
+              paddingVertical: 13,
+              borderRadius: 10,
+              backgroundColor: THEME.greenPrimary,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 7,
+            }}
+          >
+            <CheckCircle2 size={16} color="#FFFFFF" />
+            <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
+              {isSaving
+                ? 'Submitting...'
+                : partnerMode
+                  ? requestId || editingHospitalId
+                    ? 'Update & Send for Verification'
+                    : 'Submit for Admin Verification'
+                  : editingHospitalId
+                    ? 'Save Hospital Changes'
+                    : 'Save Hospital & Doctors'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      <ImageCropAdjustModal
+        visible={Boolean(cropModalUri)}
+        imageUri={cropModalUri || ''}
+        aspect={[16, 9]}
+        filePrefix="hospital_thumb"
+        title="Adjust Hospital Banner (16:9)"
+        onClose={() => setCropModalUri(null)}
+        onSaved={(croppedUrl) => setImageUrl(croppedUrl)}
+      />
     </View>
   );
 }

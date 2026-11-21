@@ -435,9 +435,18 @@ export function PrescriptionQueueSection({
                         {formatTimeAgo(b.created_at)}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: THEME.ink }}>
-                      {b.patient_name} · {b.patient_phone}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: THEME.ink }}>
+                        {b.patient_name} · {b.patient_phone}
+                      </Text>
+                      {(b.service_type === 'INVESTIGATION' || String(b.booking_ref || '').includes('LAB-RX')) && (
+                        <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4ED8' }}>
+                            LAB RX PACKAGE
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
                       <Text style={{ fontSize: 11.5, color: THEME.muted }}>
                         {b.hospital_name || b.service_type}

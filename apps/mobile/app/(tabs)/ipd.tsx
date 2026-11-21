@@ -18,14 +18,12 @@ import { saveNewBooking, subscribeCloudBookings } from '../../src/services/booki
 import { useAuth } from '../../src/context/AuthContext';
 import { useLanguage } from '../../src/context/LanguageContext';
 import { useLocation } from '../../src/context/LocationContext';
-import { uploadPrescriptionSlip } from '../../src/lib/supabase';
+import { uploadPrescriptionSlip, calculateDistanceKm } from '../../src/lib/supabase';
 import { ipdCopy } from '../../src/i18n/ipdCopy';
 import {
   CategoryFilter,
   PlannedSurgery,
   HospitalAdmissionInfo,
-  MASTER_SURGERIES,
-  MASTER_HOSPITALS,
 } from '../../src/data/ipdData';
 import { useIpdSurgeries } from '../../src/hooks/useSupabaseData';
 import { ProfileModal } from '../../components/ui/ProfileModal';
@@ -56,17 +54,73 @@ export default function IpdScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifyPhoneOpen, setIsVerifyPhoneOpen] = useState(false);
   const [pendingIpdAction, setPendingIpdAction] = useState<'admission' | 'advice' | null>(null);
+  const [liveHospitals, setLiveHospitals] = useState<HospitalAdmissionInfo[]>([]);
+
+  const loadIpdHospitals = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const supabase = getSupabaseClient();
+      const [{ data: hospRows }, { data: branchRows }] = await Promise.all([
+        supabase.from('hospitals').select('*').order('name', { ascending: true }),
+        supabase.from('hospital_branches').select('*'),
+      ]);
+
+      const refLat = activeAddress?.latitude ?? null;
+      const refLng = activeAddress?.longitude ?? null;
+
+      const activeHosps = (hospRows || []).filter((h: any) => h.is_active !== false);
+      const activeBranches = (branchRows || []).filter((b: any) => b.is_active !== false);
+      const mapped: HospitalAdmissionInfo[] = activeHosps.map((h: any) => {
+        const mainBr = activeBranches.find((b: any) => b.hospital_id === h.id && b.is_main_branch) ||
+          activeBranches.find((b: any) => b.hospital_id === h.id);
+        const hLat = Number(mainBr?.latitude ?? h.latitude);
+        const hLng = Number(mainBr?.longitude ?? h.longitude);
+        const dist =
+          refLat && refLng && Number.isFinite(hLat) && Number.isFinite(hLng) && hLat !== 0 && hLng !== 0
+            ? Number(calculateDistanceKm(refLat, refLng, hLat, hLng).toFixed(1))
+            : Number(h.distance_km ?? 0);
+
+        const disc = Number(h.discount_percentage ?? 0);
+        const facs = Array.isArray(h.facilities) && h.facilities.length > 0
+          ? h.facilities
+          : ['24x7 IPD', 'Cashless Care'];
+
+        return {
+          id: h.id,
+          name: h.name,
+          nameHi: h.name_hi || h.name,
+          location: h.address || mainBr?.address || h.city || 'Jaipur',
+          locationHi: h.address_hi || h.address || mainBr?.address || 'जयपुर',
+          distance_km: dist,
+          image_url: h.image_url || 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=800&q=80',
+          rating: Number(h.rating ?? 4.8),
+          total_reviews: Number(h.total_reviews ?? h.reviews_count ?? 0),
+          tag: disc > 0 ? `${disc}% Off IPD` : 'Adityam Verified',
+          tagHi: disc > 0 ? `${disc}% छूट` : 'सत्यापित अस्पताल',
+          specialties: facs,
+          specialtiesHi: Array.isArray(h.facilities_hi) && h.facilities_hi.length > 0 ? h.facilities_hi : facs,
+        };
+      });
+
+      mapped.sort((a, b) => a.distance_km - b.distance_km);
+      setLiveHospitals(mapped);
+    } catch {
+      setLiveHospitals([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeAddress?.latitude, activeAddress?.longitude]);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(t);
-  }, []);
+    void loadIpdHospitals();
+  }, [loadIpdHospitals]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 500);
-  }, []);
+    await loadIpdHospitals();
+    setIsRefreshing(false);
+  }, [loadIpdHospitals]);
 
   const { data: dbSurgeries } = useIpdSurgeries(selectedCategory !== 'ALL' ? selectedCategory : undefined);
 
@@ -90,7 +144,7 @@ export default function IpdScreen() {
         recoveryTimelineHi: s.recovery_timeline_hi ?? s.recovery_timeline ?? '',
       }));
     }
-    return MASTER_SURGERIES;
+    return [];
   }, [dbSurgeries]);
 
   // Filtered surgeries based on search query and category chip
@@ -111,13 +165,13 @@ export default function IpdScreen() {
         (s.tagHi && s.tagHi.toLowerCase().includes(q)) ||
         s.category.toLowerCase().includes(q)
     );
-  }, [searchQuery, selectedCategory]);
+  }, [liveSurgeries, searchQuery, selectedCategory]);
 
   // Filtered hospitals based on search query
   const filteredHospitals = useMemo(() => {
-    if (!searchQuery.trim()) return MASTER_HOSPITALS;
+    if (!searchQuery.trim()) return liveHospitals;
     const q = searchQuery.toLowerCase().trim();
-    return MASTER_HOSPITALS.filter(
+    return liveHospitals.filter(
       (h) =>
         h.name.toLowerCase().includes(q) ||
         (h.nameHi && h.nameHi.toLowerCase().includes(q)) ||
@@ -126,7 +180,7 @@ export default function IpdScreen() {
         h.specialties.some((spec) => spec.toLowerCase().includes(q)) ||
         (h.specialtiesHi && h.specialtiesHi.some((spec) => spec.toLowerCase().includes(q)))
     );
-  }, [searchQuery]);
+  }, [liveHospitals, searchQuery]);
 
   // Bottom Sheet State for Procedure / Hospital Booking
   const [bottomSheetVisible, setBottomSheetVisible] = useState(false);
@@ -200,6 +254,7 @@ export default function IpdScreen() {
       user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       patient_name: patientName,
       patient_phone: patientPhone,
+      hospital_id: selectedHospital?.id || undefined,
       hospital_name: selectedHospital?.name || 'Network Hospital',
       doctor_name: selectedSurgery?.name || 'Inpatient Specialist',
       slot_time: 'Next Available Admission',

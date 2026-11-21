@@ -33,6 +33,7 @@ import { AdminListSkeleton } from '../AdminSkeleton';
 import { getSourcePanelForRole, useAdminAuth } from '../AdminAuthGate';
 import { logAdminAudit } from '../../../src/services/adminAudit';
 import { CrmActivityModal } from '../CrmActivityModal';
+import { SelectDropdown } from '../SelectDropdown';
 
 const THEME = {
   bg: '#FAF8F2',
@@ -117,8 +118,8 @@ export function LiveBookingsSection({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [serviceFilter, setServiceFilter] = useState<'ALL' | ServiceType>(initialServiceFilter);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | BookingStatus>('ALL');
-  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | '7D' | '30D'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | BookingStatus>('ACTIVE');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | '7D' | '30D'>('7D');
   const [followUpFilter, setFollowUpFilter] = useState<'ALL' | 'MISSED' | 'UPCOMING' | 'NONE'>('ALL');
   const [showStatusGuide, setShowStatusGuide] = useState(false);
   const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
@@ -164,14 +165,14 @@ export function LiveBookingsSection({
   }, []);
 
   const stats = useMemo(() => {
-    const today = new Date().toDateString();
     const nowMs = Date.now();
     const SLA_MS = 15 * 60 * 1000;
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
     let newCount = 0;
     let slaBreachCount = 0;
     let callingCount = 0;
     let confirmedCount = 0;
-    let completedToday = 0;
+    let completedThisWeek = 0;
 
     bookings.forEach((b) => {
       if (b.status === 'NEW') {
@@ -183,11 +184,14 @@ export function LiveBookingsSection({
       }
       else if (b.status === 'CALLING') callingCount += 1;
       else if (b.status === 'CONFIRMED' || b.status === 'PAID') confirmedCount += 1;
-      if (b.status === 'COMPLETED' && new Date(b.created_at).toDateString() === today) {
-        completedToday += 1;
+      if (b.status === 'COMPLETED') {
+        const createdMs = new Date(b.created_at).getTime();
+        if (!Number.isNaN(createdMs) && nowMs - createdMs <= WEEK_MS) {
+          completedThisWeek += 1;
+        }
       }
     });
-    return { newCount, slaBreachCount, callingCount, confirmedCount, completedToday };
+    return { newCount, slaBreachCount, callingCount, confirmedCount, completedThisWeek };
   }, [bookings]);
 
   const followUpCounts = useMemo(() => {
@@ -433,29 +437,33 @@ export function LiveBookingsSection({
           </Text>
         </TouchableOpacity>
 
-        <View
+        <TouchableOpacity
+          onPress={() => {
+            setStatusFilter(statusFilter === 'COMPLETED' ? 'ACTIVE' : 'COMPLETED');
+            setPage(1);
+          }}
           style={{
             flex: 1,
-            backgroundColor: THEME.surface,
+            backgroundColor: statusFilter === 'COMPLETED' ? THEME.greenSoft : THEME.surface,
             borderRadius: 14,
             padding: 16,
             borderWidth: 1,
-            borderColor: THEME.border,
+            borderColor: statusFilter === 'COMPLETED' ? THEME.green : THEME.border,
           }}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: THEME.muted, letterSpacing: 0.6 }}>
-              COMPLETED TODAY
+              COMPLETED THIS WEEK
             </Text>
             <CheckCircle2 size={15} color={THEME.green} />
           </View>
           <Text style={{ fontSize: 26, fontWeight: '800', color: THEME.ink, marginTop: 6 }}>
-            {stats.completedToday}
+            {stats.completedThisWeek}
           </Text>
           <Text style={{ fontSize: 12, color: THEME.muted, marginTop: 4 }}>
-            {lastSyncedAt ? `Synced ${lastSyncedAt}` : 'Live Supabase sync'}
+            {lastSyncedAt ? `Last 7 days · Synced ${lastSyncedAt}` : 'Last 7 days'}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Search & Filter Toolbar */}
@@ -509,74 +517,6 @@ export function LiveBookingsSection({
           </View>
 
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                backgroundColor: THEME.surfaceAlt,
-                borderRadius: 9,
-                padding: 3,
-                borderWidth: 1,
-                borderColor: THEME.border,
-              }}
-            >
-              {(['ALL', 'TODAY', '7D', '30D'] as const).map((df) => {
-                const active = dateFilter === df;
-                return (
-                  <TouchableOpacity
-                    key={df}
-                    onPress={() => {
-                      setDateFilter(df);
-                      setPage(1);
-                    }}
-                    style={{
-                      paddingHorizontal: 9,
-                      paddingVertical: 5,
-                      borderRadius: 6,
-                      backgroundColor: active ? THEME.greenDark : 'transparent',
-                    }}
-                  >
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: active ? '#FFFFFF' : THEME.muted }}>
-                      {df}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setShowFiltersDropdown((prev) => !prev)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-                paddingHorizontal: 11,
-                paddingVertical: 8,
-                borderRadius: 9,
-                backgroundColor:
-                  showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
-                    ? THEME.greenDark
-                    : THEME.surfaceAlt,
-                borderWidth: 1,
-                borderColor:
-                  showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
-                    ? THEME.greenDark
-                    : THEME.border,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '700',
-                  color:
-                    showFiltersDropdown || serviceFilter !== 'ALL' || statusFilter !== 'ALL' || followUpFilter !== 'ALL'
-                      ? '#FFFFFF'
-                      : THEME.ink,
-                }}
-              >
-                {showFiltersDropdown ? 'Filters ▲' : 'Filters ▼'}
-              </Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               onPress={() => setShowStatusGuide((prev) => !prev)}
               style={{
@@ -641,133 +581,78 @@ export function LiveBookingsSection({
           </View>
         )}
 
-        {showFiltersDropdown && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {(
-              [
-                { id: 'ALL', label: 'All Services' },
-                { id: 'OPD_CONCIERGE', label: 'OPD' },
-                { id: 'INVESTIGATION', label: 'Labs & Scans' },
-                { id: 'PHARMACY_SCAN_PAY', label: 'Pharmacy' },
-                { id: 'IPD_ENQUIRY', label: 'IPD' },
-              ] as const
-            ).map((s) => {
-              const active = serviceFilter === s.id;
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => {
-                    setServiceFilter(s.id);
-                    setPage(1);
-                  }}
-                  style={{
-                    paddingHorizontal: 11,
-                    paddingVertical: 6,
-                    borderRadius: 99,
-                    backgroundColor: active ? THEME.greenDark : THEME.bg,
-                    borderWidth: 1,
-                    borderColor: active ? THEME.greenDark : THEME.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: active ? '#FFFFFF' : THEME.muted,
-                    }}
-                  >
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {(['ALL', 'ACTIVE', 'NEW', 'CALLING', 'CONFIRMED', 'PAID', 'COMPLETED', 'CANCELLED'] as const).map(
-              (st) => {
-                const active = statusFilter === st;
-                return (
-                  <TouchableOpacity
-                    key={st}
-                    onPress={() => {
-                      setStatusFilter(st);
-                      setPage(1);
-                    }}
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 99,
-                      backgroundColor: active ? THEME.greenSoft : THEME.bg,
-                      borderWidth: 1,
-                      borderColor: active ? THEME.green : THEME.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: '700',
-                        color: active ? THEME.greenDark : THEME.muted,
-                      }}
-                    >
-                      {st === 'ALL' ? 'All Statuses' : st === 'ACTIVE' ? 'Active Only' : st}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-            )}
-          </ScrollView>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {(
-              [
-                { id: 'ALL', label: 'All Follow-ups' },
-                { id: 'MISSED', label: `Missed Follow-Up (${followUpCounts.missed})` },
-                { id: 'UPCOMING', label: `Upcoming Follow-Up (${followUpCounts.upcoming})` },
-                { id: 'NONE', label: 'No Follow-Up' },
-              ] as const
-            ).map((fu) => {
-              const active = followUpFilter === fu.id;
-              const isMissed = fu.id === 'MISSED' && followUpCounts.missed > 0;
-              return (
-                <TouchableOpacity
-                  key={fu.id}
-                  onPress={() => {
-                    setFollowUpFilter(fu.id);
-                    setPage(1);
-                  }}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 99,
-                    backgroundColor: active
-                      ? isMissed
-                        ? THEME.redBg
-                        : THEME.amberBg
-                      : THEME.bg,
-                    borderWidth: 1,
-                    borderColor: active
-                      ? isMissed
-                        ? THEME.redBorder
-                        : THEME.amberBorder
-                      : THEME.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: '700',
-                      color: active ? (isMissed ? THEME.redText : THEME.amberText) : THEME.muted,
-                    }}
-                  >
-                    {fu.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+        {/* Clean 4-Dropdown Filter Row */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <View style={{ flex: 1, minWidth: 150 }}>
+            <SelectDropdown
+              label="Service"
+              value={serviceFilter}
+              options={[
+                { value: 'ALL', label: 'All Services' },
+                { value: 'OPD_CONCIERGE', label: 'OPD Consultations' },
+                { value: 'INVESTIGATION', label: 'Labs & Scans' },
+                { value: 'PHARMACY_SCAN_PAY', label: 'Pharmacy' },
+                { value: 'IPD_ENQUIRY', label: 'IPD Admissions' },
+              ]}
+              onChange={(v) => {
+                setServiceFilter(v as any);
+                setPage(1);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 140 }}>
+            <SelectDropdown
+              label="Date Range"
+              value={dateFilter}
+              options={[
+                { value: '7D', label: 'Last 7 Days' },
+                { value: 'TODAY', label: 'Today' },
+                { value: '30D', label: 'Last 30 Days' },
+                { value: 'ALL', label: 'All Dates' },
+              ]}
+              onChange={(v) => {
+                setDateFilter(v as any);
+                setPage(1);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 140 }}>
+            <SelectDropdown
+              label="Status"
+              value={statusFilter}
+              options={[
+                { value: 'ALL', label: 'All Statuses' },
+                { value: 'ACTIVE', label: 'Active Only' },
+                { value: 'NEW', label: 'NEW' },
+                { value: 'CALLING', label: 'CALLING' },
+                { value: 'CONFIRMED', label: 'CONFIRMED' },
+                { value: 'PAID', label: 'PAID' },
+                { value: 'COMPLETED', label: 'COMPLETED' },
+                { value: 'CANCELLED', label: 'CANCELLED' },
+              ]}
+              onChange={(v) => {
+                setStatusFilter(v as any);
+                setPage(1);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 160 }}>
+            <SelectDropdown
+              label="Follow-Up"
+              value={followUpFilter}
+              options={[
+                { value: 'ALL', label: 'All Follow-ups' },
+                { value: 'MISSED', label: `Missed Follow-Up (${followUpCounts.missed})` },
+                { value: 'UPCOMING', label: `Upcoming Follow-Up (${followUpCounts.upcoming})` },
+                { value: 'NONE', label: 'No Follow-Up' },
+              ]}
+              onChange={(v) => {
+                setFollowUpFilter(v as any);
+                setPage(1);
+              }}
+            />
+          </View>
         </View>
-        )}
       </View>
 
       {/* Bookings List */}
@@ -791,332 +676,272 @@ export function LiveBookingsSection({
             Try adjusting your service or status filters.
           </Text>
         </View>
-      ) : (
-        <View style={{ gap: 10 }}>
-          {paged.map((b) => {
+      ) : isDesktop ? (
+        <View
+          style={{
+            backgroundColor: THEME.surface,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: THEME.border,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Spreadsheet Table Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: THEME.surfaceAlt,
+              borderBottomWidth: 1,
+              borderBottomColor: THEME.border,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              gap: 10,
+            }}
+          >
+            <Text style={{ flex: 1.15, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5 }}>
+              REF & SERVICE
+            </Text>
+            <Text style={{ flex: 1.15, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5 }}>
+              PATIENT
+            </Text>
+            <Text style={{ flex: 1.35, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5 }}>
+              PARTNER / DOCTOR
+            </Text>
+            <Text style={{ flex: 1.25, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5 }}>
+              SLOT / PURPOSE
+            </Text>
+            <Text style={{ flex: 0.85, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5 }}>
+              STATUS
+            </Text>
+            <Text style={{ flex: 0.6, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5, textAlign: 'right' }}>
+              FEE
+            </Text>
+            <Text style={{ width: 170, fontSize: 10.5, fontWeight: '800', color: THEME.muted, letterSpacing: 0.5, textAlign: 'right' }}>
+              ACTIONS
+            </Text>
+          </View>
+
+          {/* Spreadsheet Rows (Click row to open /admin/bookings/[ref]) */}
+          {paged.map((b, idx) => {
             const badge = getStatusBadge(b.status);
             const waPhone = normalizePhone(b.patient_phone);
             const payable = Number(b.final_payable || b.bill_amount || b.doctor_fee || 0);
-            const isUpdating = updatingId === b.id;
+            const cleanPurpose = b.notes
+              ? String(b.notes)
+                  .replace(/Counter OTP:\s*\d+\.?/gi, '')
+                  .replace(/Paid online via [^.]+\.?/gi, '')
+                  .replace(/Direct OPD consult booked for [^.]+\.?/gi, '')
+                  .replace(/Priority QR pass issued\.?/gi, '')
+                  .replace(/^Reason\s*\/\s*Symptoms:\s*/i, '')
+                  .trim()
+                  .replace(/\.$/, '')
+              : '';
+            const serviceShort = String(b.service_type || '').includes('OPD')
+              ? 'OPD'
+              : String(b.service_type || '').includes('PHARMACY')
+                ? 'PHARMACY'
+                : String(b.service_type || '').includes('INVESTIGATION') || String(b.service_type || '').includes('LAB')
+                  ? 'LABS'
+                  : String(b.service_type || '').includes('IPD')
+                    ? 'IPD'
+                    : b.service_type;
 
             return (
-              <View
+              <TouchableOpacity
                 key={b.id}
+                onPress={() => onInspectBooking(b)}
+                activeOpacity={0.7}
                 style={{
-                  backgroundColor: THEME.surface,
-                  borderRadius: 14,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: THEME.border,
-                  flexDirection: isDesktop ? 'row' : 'column',
-                  justifyContent: 'space-between',
-                  alignItems: isDesktop ? 'center' : 'stretch',
-                  gap: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 14,
+                  paddingVertical: 11,
+                  gap: 10,
+                  backgroundColor: idx % 2 === 1 ? '#FCFBF8' : THEME.surface,
+                  borderBottomWidth: idx === paged.length - 1 ? 0 : 1,
+                  borderBottomColor: '#EFECE3',
                 }}
               >
-                <View style={{ flex: 1.4, gap: 4 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: THEME.ink }}>
-                      {b.booking_ref}
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: badge.bg,
-                        borderWidth: 1,
-                        borderColor: badge.border,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 99,
-                      }}
-                    >
-                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: badge.text }}>
-                        {b.status}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        backgroundColor: THEME.surfaceAlt,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.muted }}>
-                        {b.service_type}
-                      </Text>
+                {/* Ref & Service */}
+                <View style={{ flex: 1.15, gap: 3 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: THEME.ink }} numberOfLines={1}>
+                    {b.booking_ref}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    <View style={{ backgroundColor: THEME.surfaceAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: THEME.muted }}>{serviceShort}</Text>
                     </View>
                     {b.bill_image_url ? (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          backgroundColor: THEME.amberBg,
-                          paddingHorizontal: 7,
-                          paddingVertical: 2,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <FileImage size={11} color={THEME.amberText} />
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.amberText }}>
-                          Rx Attached
-                        </Text>
+                      <View style={{ backgroundColor: THEME.amberBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: THEME.amberText }}>Rx</Text>
                       </View>
                     ) : null}
-                    {(() => {
-                      if (b.status !== 'NEW') return null;
-                      const createdMs = new Date(b.created_at).getTime();
-                      const isBreach = !Number.isNaN(createdMs) && Date.now() - createdMs > 15 * 60 * 1000;
-                      if (!isBreach) return null;
-                      const minsAgo = Math.max(16, Math.floor((Date.now() - createdMs) / 60000));
-                      return (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 4,
-                            backgroundColor: THEME.redBg,
-                            borderWidth: 1,
-                            borderColor: THEME.redBorder,
-                            paddingHorizontal: 7,
-                            paddingVertical: 2,
-                            borderRadius: 6,
-                          }}
-                        >
-                          <AlertTriangle size={11} color={THEME.redText} />
-                          <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.redText }}>
-                            SLA BREACH ({minsAgo}m)
-                          </Text>
-                        </View>
-                      );
-                    })()}
-                    {(() => {
-                      const fu = (b as any).follow_up_at;
-                      if (!fu || b.status === 'COMPLETED' || b.status === 'CANCELLED') return null;
-                      const fuMs = new Date(fu).getTime();
-                      const missed = !Number.isNaN(fuMs) && fuMs < Date.now();
-                      return (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 4,
-                            backgroundColor: missed ? THEME.redBg : THEME.amberBg,
-                            borderWidth: 1,
-                            borderColor: missed ? THEME.redBorder : THEME.amberBorder,
-                            paddingHorizontal: 7,
-                            paddingVertical: 2,
-                            borderRadius: 6,
-                          }}
-                        >
-                          <CalendarClock size={11} color={missed ? THEME.redText : THEME.amberText} />
-                          <Text
-                            style={{
-                              fontSize: 10.5,
-                              fontWeight: '800',
-                              color: missed ? THEME.redText : THEME.amberText,
-                            }}
-                          >
-                            {missed
-                              ? 'Missed Follow-Up'
-                              : `Follow-up: ${new Date(fu).toLocaleDateString('en-IN', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                })}`}
-                          </Text>
-                        </View>
-                      );
-                    })()}
                   </View>
-
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }}>
-                    {b.patient_name} · {b.patient_phone}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: THEME.muted }}>
-                    {b.hospital_name || b.doctor_name || 'Adityam Concierge'}
-                    {b.slot_time ? ` · Slot: ${b.slot_time}` : ''}
-                    {` · ${formatTimeAgo(b.created_at)}`}
-                    {b.assigned_agent ? ` · Coordinator: ${b.assigned_agent}` : ''}
-                  </Text>
-                  {b.notes ? (
-                    <Text style={{ fontSize: 11.5, color: THEME.amberText }} numberOfLines={1}>
-                      Note: {b.notes}
-                    </Text>
-                  ) : null}
                 </View>
 
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, alignItems: 'center' }}>
+                {/* Patient */}
+                <View style={{ flex: 1.15, gap: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }} numberOfLines={1}>
+                    {b.patient_name}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: THEME.muted }} numberOfLines={1}>
+                    {b.patient_phone || 'N/A'}
+                  </Text>
+                </View>
+
+                {/* Partner / Doctor */}
+                <View style={{ flex: 1.35, gap: 2 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: THEME.ink }} numberOfLines={1}>
+                    {b.hospital_name || 'Adityam Concierge'}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: THEME.green, fontWeight: '600' }} numberOfLines={1}>
+                    {b.doctor_name || formatTimeAgo(b.created_at)}
+                  </Text>
+                </View>
+
+                {/* Slot / Purpose */}
+                <View style={{ flex: 1.25, gap: 2 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }} numberOfLines={1}>
+                    {b.slot_time || formatTimeAgo(b.created_at)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: cleanPurpose ? THEME.amberText : THEME.muted }} numberOfLines={1}>
+                    {cleanPurpose || formatTimeAgo(b.created_at)}
+                  </Text>
+                </View>
+
+                {/* Status */}
+                <View style={{ flex: 0.85, alignItems: 'flex-start' }}>
                   <View
                     style={{
-                      paddingHorizontal: 9,
-                      paddingVertical: 5,
-                      borderRadius: 8,
-                      backgroundColor: payable > 0 ? THEME.greenSoft : THEME.surfaceAlt,
+                      backgroundColor: badge.bg,
                       borderWidth: 1,
-                      borderColor: payable > 0 ? THEME.greenBorder : THEME.border,
+                      borderColor: badge.border,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 99,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: '800',
-                        color: payable > 0 ? THEME.greenDark : THEME.muted,
-                      }}
-                    >
-                      {payable > 0 ? formatInr(payable) : 'Unpriced'}
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: badge.text }}>
+                      {b.status === 'PAID' ? 'PAID ONLINE' : b.status}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => Linking.openURL(`tel:${b.patient_phone}`)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 5,
-                      paddingHorizontal: 10,
-                      paddingVertical: 7,
-                      borderRadius: 8,
-                      backgroundColor: THEME.surfaceAlt,
-                      borderWidth: 1,
-                      borderColor: THEME.border,
-                    }}
-                  >
-                    <Phone size={13} color={THEME.ink} />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.ink }}>Call</Text>
-                  </TouchableOpacity>
+                </View>
 
-                  {(() => {
-                    const partnerPhone =
-                      (b.hospital_id && partnerPhoneMap[b.hospital_id]) ||
-                      (b.hospital_name && partnerPhoneMap[b.hospital_name.trim().toLowerCase()]) ||
-                      (b.doctor_id && partnerPhoneMap[b.doctor_id]) ||
-                      (b.doctor_name && partnerPhoneMap[b.doctor_name.trim().toLowerCase()]);
-                    if (!partnerPhone) return null;
-                    return (
-                      <TouchableOpacity
-                        onPress={() => Linking.openURL(`tel:${partnerPhone}`)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 5,
-                          paddingHorizontal: 10,
-                          paddingVertical: 7,
-                          borderRadius: 8,
-                          backgroundColor: '#EEF4FF',
-                          borderWidth: 1,
-                          borderColor: '#C7D9FA',
-                        }}
-                      >
-                        <Phone size={13} color="#1D4ED8" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4ED8' }}>
-                          Call Partner
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })()}
+                {/* Fee */}
+                <View style={{ flex: 0.6, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: payable > 0 ? THEME.greenDark : THEME.muted }}>
+                    {payable > 0 ? formatInr(payable) : '—'}
+                  </Text>
+                </View>
 
+                {/* Quick Actions */}
+                <View style={{ width: 170, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 5 }}>
+                  {b.patient_phone ? (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        Linking.openURL(`tel:${b.patient_phone}`);
+                      }}
+                      style={{
+                        padding: 6,
+                        borderRadius: 7,
+                        backgroundColor: THEME.surfaceAlt,
+                        borderWidth: 1,
+                        borderColor: THEME.border,
+                      }}
+                    >
+                      <Phone size={13} color={THEME.ink} />
+                    </TouchableOpacity>
+                  ) : null}
                   {waPhone ? (
                     <TouchableOpacity
-                      onPress={() =>
-                        Linking.openURL(
-                          `https://wa.me/${waPhone}?text=${encodeURIComponent(
-                            `Namaste ${b.patient_name}, Adityam Care Coordinator here regarding your booking ${b.booking_ref}.`
-                          )}`
-                        )
-                      }
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        Linking.openURL(`https://wa.me/${waPhone}`);
+                      }}
                       style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 8,
+                        padding: 6,
+                        borderRadius: 7,
                         backgroundColor: THEME.greenSoft,
                         borderWidth: 1,
                         borderColor: THEME.greenBorder,
                       }}
                     >
                       <MessageCircle size={13} color={THEME.greenDark} />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.greenDark }}>
-                        WhatsApp
-                      </Text>
                     </TouchableOpacity>
                   ) : null}
-
-                  {b.status === 'NEW' && (
-                    <TouchableOpacity
-                      disabled={isUpdating}
-                      onPress={() => handleQuickStatus(b, 'CALLING')}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 8,
-                        backgroundColor: '#EEF4FF',
-                        borderWidth: 1,
-                        borderColor: '#C7D9FA',
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4ED8' }}>
-                        Mark Calling
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {(b.status === 'NEW' || b.status === 'CALLING') && (
-                    <TouchableOpacity
-                      disabled={isUpdating}
-                      onPress={() => handleQuickStatus(b, 'CONFIRMED')}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 8,
-                        backgroundColor: THEME.green,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
-                        Confirm
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
                   <TouchableOpacity
-                    onPress={() => setCrmTarget(b)}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      setCrmTarget(b);
+                    }}
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 5,
-                      paddingHorizontal: 10,
-                      paddingVertical: 7,
-                      borderRadius: 8,
+                      padding: 6,
+                      borderRadius: 7,
                       backgroundColor: THEME.amberBg,
                       borderWidth: 1,
                       borderColor: THEME.amberBorder,
                     }}
                   >
                     <CalendarClock size={13} color={THEME.amberText} />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: THEME.amberText }}>
-                      CRM Log
-                    </Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     onPress={() => onInspectBooking(b)}
                     style={{
+                      paddingHorizontal: 9,
+                      paddingVertical: 6,
+                      borderRadius: 7,
+                      backgroundColor: THEME.greenDark,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 5,
-                      paddingHorizontal: 11,
-                      paddingVertical: 7,
-                      borderRadius: 8,
-                      backgroundColor: THEME.greenDark,
+                      gap: 4,
                     }}
                   >
-                    <Eye size={13} color="#FFFFFF" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>
-                      Inspect
-                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>Open →</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={{ gap: 10 }}>
+          {paged.map((b) => {
+            const badge = getStatusBadge(b.status);
+            const payable = Number(b.final_payable || b.bill_amount || b.doctor_fee || 0);
+            return (
+              <TouchableOpacity
+                key={b.id}
+                onPress={() => onInspectBooking(b)}
+                style={{
+                  backgroundColor: THEME.surface,
+                  borderRadius: 12,
+                  padding: 13,
+                  borderWidth: 1,
+                  borderColor: THEME.border,
+                  gap: 6,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '800', color: THEME.ink }}>{b.booking_ref}</Text>
+                  <View style={{ backgroundColor: badge.bg, borderWidth: 1, borderColor: badge.border, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: badge.text }}>{b.status === 'PAID' ? 'PAID ONLINE' : b.status}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.ink }}>
+                  {b.patient_name} · {b.patient_phone}
+                </Text>
+                <Text style={{ fontSize: 12, color: THEME.muted }} numberOfLines={1}>
+                  {b.hospital_name || b.doctor_name || 'Adityam Concierge'} {b.slot_time ? `· ${b.slot_time}` : ''}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: THEME.greenDark }}>
+                    {payable > 0 ? formatInr(payable) : 'Unpriced'}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: THEME.green }}>Open Details →</Text>
+                </View>
+              </TouchableOpacity>
             );
           })}
         </View>

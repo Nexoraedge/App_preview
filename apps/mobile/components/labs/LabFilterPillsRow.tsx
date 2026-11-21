@@ -72,11 +72,20 @@ export function LabFilterPillsRow({
         paddingTop: 10,
       }}
     >
-      {segment === 'lab' && (
+      {(segment === 'all' || segment === 'lab') && (
         <FilterChip
-          label={isHi ? 'घर पर सैंपल' : 'Home collection'}
+          label={isHi ? 'घर पर सैंपल' : 'Home Collection'}
           active={filters.home}
           onPress={() => onToggleFilter('home')}
+        />
+      )}
+      {segment !== 'scan' && (
+        <FilterChip
+          label={isHi ? 'लैब / अस्पताल विज़िट' : 'In-Lab / Hospital'}
+          active={!filters.home}
+          onPress={() => {
+            if (filters.home) onToggleFilter('home');
+          }}
         />
       )}
       <FilterChip

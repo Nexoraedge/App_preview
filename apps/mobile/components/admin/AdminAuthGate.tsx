@@ -54,6 +54,7 @@ export function getAllowedSectionsForRole(role?: string | null): string[] {
     'hospitals',
     'solo-doctors',
     'enquiries',
+    'verifications',
     'labs',
     'pharmacies',
     'patients',
@@ -556,22 +557,8 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
                   </Text>
                 </View>
                 <Text style={{ fontSize: 12.5, color: THEME.ink, lineHeight: 18 }}>
-                  Signed in as <Text style={{ fontWeight: '800' }}>{sessionEmail || sessionUserId}</Text> (role:{' '}
-                  <Text style={{ fontWeight: '800' }}>{unauthorizedRole}</Text>). Staff & patients cannot access this private panel.
+                  Signed in as <Text style={{ fontWeight: '800' }}>{sessionEmail || 'current account'}</Text>. Only authorized Adityam Admin Staff can access this private panel.
                 </Text>
-                <View
-                  style={{
-                    backgroundColor: THEME.surface,
-                    borderWidth: 1,
-                    borderColor: THEME.border,
-                    borderRadius: 8,
-                    padding: 10,
-                  }}
-                >
-                  <Text selectable style={{ fontSize: 11, fontFamily: 'monospace', color: THEME.ink }}>
-                    {`UPDATE public.users SET role = 'admin' WHERE id = '${sessionUserId}';`}
-                  </Text>
-                </View>
               </View>
 
               <View style={{ flexDirection: 'row', gap: 10 }}>

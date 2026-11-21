@@ -2,6 +2,7 @@
 // Labs & Scans: Pick tests first, then pick the diagnostic centre offering all selections.
 
 import React, { useMemo, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -26,13 +27,14 @@ import {
   ITEMS,
   ITEM_BY_ID,
   centresFor,
+  partialCentresFor,
   fromPrice,
   homeAvailable,
   type Item,
   type Segment,
   type Centre,
 } from '../../src/data/labsSample';
-import { useLabItems, useLabCentres } from '../../src/hooks/useSupabaseData';
+import { useLabItems, useLabCentres, useLabPrices } from '../../src/hooks/useSupabaseData';
 import { TabSegment } from '../../src/data/labsData';
 import { labsCopy } from '../../src/i18n/labsCopy';
 
@@ -93,6 +95,30 @@ export default function LabsScreen() {
 
   const { data: dbItems } = useLabItems();
   const { data: dbCentres } = useLabCentres();
+  const [cartHydrated, setCartHydrated] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@adityam_lab_cart_v1')
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            setCarts({
+              lab: Array.isArray(parsed.lab) ? parsed.lab : [],
+              scan: Array.isArray(parsed.scan) ? parsed.scan : [],
+              package: Array.isArray(parsed.package) ? parsed.package : [],
+            });
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCartHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
+    AsyncStorage.setItem('@adityam_lab_cart_v1', JSON.stringify(carts)).catch(() => {});
+  }, [carts, cartHydrated]);
 
   const liveItems: Item[] = useMemo(() => {
     if (dbItems && dbItems.length > 0) {
@@ -137,6 +163,38 @@ export default function LabsScreen() {
     () => Array.from(new Set([...carts.lab, ...carts.scan, ...carts.package])),
     [carts]
   );
+  const { data: dbPrices } = useLabPrices(allCartIds);
+
+  const liveCentres: Centre[] = useMemo(() => {
+    if (!dbCentres || dbCentres.length === 0) return [];
+    const priceByCentre: Record<string, Record<string, number | null>> = {};
+    for (const p of (dbPrices as any[]) || []) {
+      const cid = String(p.centre_id || '');
+      const iid = String(p.item_id || '');
+      if (!cid || !iid) continue;
+      if (!priceByCentre[cid]) priceByCentre[cid] = {};
+      priceByCentre[cid][iid] = p.is_available === false ? null : Number(p.price || 0);
+    }
+    return (dbCentres as any[]).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      area: c.area || c.city || 'Jaipur',
+      areaHi: c.area_hi || c.area || c.city || 'जयपुर',
+      city: c.city || 'Jaipur',
+      lat: typeof c.latitude === 'number' ? c.latitude : undefined,
+      lng: typeof c.longitude === 'number' ? c.longitude : undefined,
+      distanceKm: Number(c.distance_km ?? 0),
+      rating: Number(c.rating ?? 0),
+      reviews: Number(c.reviews ?? 0),
+      home: Boolean(c.home_collection),
+      nextSlot: c.next_slot || 'Today, 5:00 PM',
+      nextSlotHi: c.next_slot_hi || c.next_slot || 'आज, शाम 5:00 बजे',
+      offers: (Array.isArray(c.offers) && c.offers.length > 0 ? c.offers : ['lab']) as Segment[],
+      factor: Number(c.price_factor ?? 1),
+      exclude: Array.isArray(c.exclude_items) ? c.exclude_items : undefined,
+      prices: priceByCentre[c.id],
+    }));
+  }, [dbCentres, dbPrices]);
   const cartIds = allCartIds;
   const counts: Record<TabSegment, number> = {
     all: allCartIds.length,
@@ -179,8 +237,26 @@ export default function LabsScreen() {
   const userCity = activeAddress?.city || currentLocationName || user?.city || 'Jaipur';
 
   const options = useMemo(
-    () => centresFor(cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean), userCoords, userCity),
-    [cartIds, itemMap, userCoords, userCity]
+    () =>
+      centresFor(
+        cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean),
+        userCoords,
+        userCity,
+        liveCentres,
+        flt.home
+      ),
+    [cartIds, itemMap, userCoords, userCity, liveCentres, flt.home]
+  );
+  const partialOptions = useMemo(
+    () =>
+      partialCentresFor(
+        cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean),
+        userCoords,
+        userCity,
+        liveCentres,
+        flt.home
+      ),
+    [cartIds, itemMap, userCoords, userCity, liveCentres, flt.home]
   );
   const cheapestTotal = options.length
     ? Math.min(...options.map((o) => o.total))
@@ -244,7 +320,9 @@ export default function LabsScreen() {
     segment === 'package'
       ? []
       : segment === 'all'
-      ? [...CATEGORIES.lab.slice(0, 6), CATEGORIES.scan[3], CATEGORIES.scan[0]]
+      ? flt.home
+        ? CATEGORIES.lab.slice(0, 6)
+        : [...CATEGORIES.lab.slice(0, 6), CATEGORIES.scan[3], CATEGORIES.scan[0]]
       : CATEGORIES[segment];
   const showBrowse = !query && !category;
 
@@ -631,6 +709,16 @@ export default function LabsScreen() {
         cartIds={cartIds}
         options={options}
         sortedOptions={sorted}
+        partialOptions={partialOptions}
+        onBookAvailableAtCentre={(opt) => {
+          const keepIds = new Set(opt.availableItems.map((i) => i.id));
+          setCarts((prev) => ({
+            lab: prev.lab.filter((id) => keepIds.has(id)),
+            scan: prev.scan.filter((id) => keepIds.has(id)),
+            package: prev.package.filter((id) => keepIds.has(id)),
+          }));
+          setPick(opt.centre.id);
+        }}
         cheapestTotal={cheapestTotal}
         nearestDistance={nearest}
         sort={sort}

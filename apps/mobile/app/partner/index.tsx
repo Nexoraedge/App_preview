@@ -4,7 +4,7 @@ import { PharmacyPartnerPortal } from '../../components/partner/PharmacyPartnerP
 
 export default function PartnerPortalScreen() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const validTabs = ['dashboard', 'orders', 'scanner', 'payouts', 'store'];
+  const validTabs = ['dashboard', 'orders', 'opd', 'opd_doctors', 'opd_hospital', 'labs', 'ipd', 'scanner', 'payouts', 'settings'];
   const initialTab = tab && validTabs.includes(tab) ? (tab as any) : undefined;
   return <PharmacyPartnerPortal initialTab={initialTab} />;
 }

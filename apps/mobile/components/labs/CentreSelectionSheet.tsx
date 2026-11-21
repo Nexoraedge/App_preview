@@ -7,6 +7,7 @@ import { MapPin, Star, Home as HomeIcon, X, Check } from 'lucide-react-native';
 import {
   Item,
   Centre,
+  PartialCentreOption,
   ITEM_BY_ID,
   getItemName,
   fromPrice,
@@ -24,6 +25,8 @@ interface CentreSelectionSheetProps {
   cartIds: string[];
   options: CentreOption[];
   sortedOptions: CentreOption[];
+  partialOptions?: PartialCentreOption[];
+  onBookAvailableAtCentre?: (opt: PartialCentreOption) => void;
   cheapestTotal: number | null;
   nearestDistance: number | null;
   sort: 'near' | 'cheap' | 'rated';
@@ -119,6 +122,8 @@ export function CentreSelectionSheet({
   cartIds,
   options,
   sortedOptions,
+  partialOptions = [],
+  onBookAvailableAtCentre,
   cheapestTotal,
   nearestDistance,
   sort,
@@ -407,9 +412,61 @@ export function CentreSelectionSheet({
                   }}
                 >
                   {isHi
-                    ? 'आपके चुने हुए कुछ टेस्ट अलग-अलग जांच केंद्रों पर उपलब्ध हैं। किसी एक को हटाकर अलग से बुक करें।'
-                    : 'Some of your selections are only done at different centres. Remove one and book it on its own.'}
+                    ? 'आपके चुने हुए कुछ टेस्ट अलग-अलग जांच केंद्रों पर उपलब्ध हैं। नीचे किसी केंद्र पर उपलब्ध टेस्ट चुनें या बाकी हटाकर अलग बुक करें।'
+                    : 'No single hospital/centre has all selected tests & scans. Pick a centre below to book what it offers and split the rest separately.'}
                 </Text>
+                {partialOptions.length > 0 && (
+                  <View style={{ gap: 10, marginTop: 12 }}>
+                    {partialOptions.slice(0, 4).map((opt) => (
+                      <View
+                        key={opt.centre.id}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: R.md,
+                          padding: 12,
+                          borderWidth: 1,
+                          borderColor: C.line,
+                          gap: 6,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: C.ink, flex: 1 }}>
+                            {opt.centre.name}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: C.brand }}>
+                            {inr(opt.total)}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: C.good }}>
+                          {opt.availableItems.length}/{cartIds.length} available ({opt.centre.distanceKm} km)
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: C.warn }}>
+                          {isHi ? 'उपलब्ध नहीं: ' : 'Not available here: '}
+                          {opt.missingItems.map((m) => getItemName(m, isHi)).join(', ')}
+                        </Text>
+                        {onBookAvailableAtCentre && (
+                          <Pressable
+                            onPress={() => onBookAvailableAtCentre(opt)}
+                            style={{
+                              marginTop: 4,
+                              backgroundColor: C.brand,
+                              paddingVertical: 9,
+                              paddingHorizontal: 12,
+                              borderRadius: R.md,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
+                              {isHi
+                                ? `यहाँ ${opt.availableItems.length} उपलब्ध टेस्ट बुक करें`
+                                : `Book ${opt.availableItems.length} Available Here (Remove Missing)`}
+                            </Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             ) : (
               sortedOptions.map(({ centre, total }) => {

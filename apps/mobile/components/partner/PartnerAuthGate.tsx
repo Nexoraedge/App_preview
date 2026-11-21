@@ -12,6 +12,7 @@ import {
 import { Lock, LogOut, ShieldCheck, Store } from 'lucide-react-native';
 import { getSupabaseClient } from '@adityam/supabase';
 import { logAdminAudit } from '../../src/services/adminAudit';
+import { resolvePartnerModules, type PartnerModule } from '../../src/services/partnerModules';
 
 const THEME = {
   bg: '#FAF8F2',
@@ -45,6 +46,10 @@ export interface PartnerUser {
   role: string;
   partnerEntityId: string | null;
   partnerType: string | null;
+  enabledModules: PartnerModule[];
+  partnerHospitalId?: string | null;
+  partnerLabId?: string | null;
+  partnerPharmacyId?: string | null;
 }
 
 interface PartnerAuthContextValue {
@@ -79,11 +84,23 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: row } = await supabase
+      let row: any = null;
+      const fullRes = await supabase
         .from('users')
-        .select('id, email, full_name, role, partner_entity_id, partner_type')
+        .select('id, email, full_name, role, partner_entity_id, partner_type, enabled_modules, partner_hospital_id, partner_lab_id, partner_pharmacy_id')
         .eq('id', user.id)
         .maybeSingle();
+
+      if (fullRes.error) {
+        const legacyRes = await supabase
+          .from('users')
+          .select('id, email, full_name, role, partner_entity_id, partner_type')
+          .eq('id', user.id)
+          .maybeSingle();
+        row = legacyRes.data;
+      } else {
+        row = fullRes.data;
+      }
 
       const role = String(row?.role || 'patient').toLowerCase();
       if (!ALLOWED_PARTNER_ROLES.has(role)) {
@@ -98,6 +115,14 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
         role,
         partnerEntityId: row?.partner_entity_id || null,
         partnerType: row?.partner_type || null,
+        enabledModules: resolvePartnerModules({
+          role,
+          partnerType: row?.partner_type,
+          enabledModules: row?.enabled_modules,
+        }),
+        partnerHospitalId: row?.partner_hospital_id || null,
+        partnerLabId: row?.partner_lab_id || null,
+        partnerPharmacyId: row?.partner_pharmacy_id || null,
       });
     } catch {
       setPartnerUser(null);
@@ -143,17 +168,29 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: row } = await supabase
+      let row: any = null;
+      const fullRes = await supabase
         .from('users')
-        .select('id, email, full_name, role, partner_entity_id, partner_type')
+        .select('id, email, full_name, role, partner_entity_id, partner_type, enabled_modules, partner_hospital_id, partner_lab_id, partner_pharmacy_id')
         .eq('id', data.user.id)
         .maybeSingle();
+
+      if (fullRes.error) {
+        const legacyRes = await supabase
+          .from('users')
+          .select('id, email, full_name, role, partner_entity_id, partner_type')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        row = legacyRes.data;
+      } else {
+        row = fullRes.data;
+      }
 
       const role = String(row?.role || 'patient').toLowerCase();
       if (!ALLOWED_PARTNER_ROLES.has(role)) {
         await supabase.auth.signOut();
         setErrorMsg(
-          'This account does not have Partner access. Ask Adityam Admin to assign your Pharmacy Partner role.'
+          'This account does not have Partner access. Ask Adityam Admin to assign your Partner role.'
         );
         return;
       }
@@ -170,6 +207,14 @@ export function PartnerAuthGate({ children }: { children: React.ReactNode }) {
         role,
         partnerEntityId: row?.partner_entity_id || null,
         partnerType: row?.partner_type || null,
+        enabledModules: resolvePartnerModules({
+          role,
+          partnerType: row?.partner_type,
+          enabledModules: row?.enabled_modules,
+        }),
+        partnerHospitalId: row?.partner_hospital_id || null,
+        partnerLabId: row?.partner_lab_id || null,
+        partnerPharmacyId: row?.partner_pharmacy_id || null,
       };
       setPartnerUser(signedIn);
 

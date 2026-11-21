@@ -419,122 +419,113 @@ export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lo
 
 // Function to fetch nearby hospitals using PostGIS RPC or local calculation
 export async function fetchNearbyHospitals(
-  userLat: number = 28.5355, // Defaulting to South Delhi / Connaught Place vicinity
-  userLng: number = 77.2000,
+  userLat?: number | null,
+  userLng?: number | null,
   specialty?: string
 ): Promise<Hospital[]> {
   const client = getSupabaseClient();
+  const hasCoords =
+    typeof userLat === 'number' &&
+    typeof userLng === 'number' &&
+    Number.isFinite(userLat) &&
+    Number.isFinite(userLng);
 
   try {
-    const { data, error } = await client.rpc('get_nearby_hospitals', {
-      user_lat: userLat,
-      user_lng: userLng,
-      radius_meters: 50000,
-      specialty_filter: specialty || null,
-      limit_count: 20,
-    });
+    const { data: hospRows, error: hospErr } = await client
+      .from('hospitals')
+      .select('*, hospital_branches(*, doctors(*))')
+      .order('rating', { ascending: false });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const hospitalIds = data.map((h: any) => h.id);
-
-      try {
-        const { data: branchesData } = await client
-          .from('hospital_branches')
-          .select('*, doctors(*)')
-          .in('hospital_id', hospitalIds)
-          .eq('is_active', true)
-          .order('is_main_branch', { ascending: false });
-
-        if (branchesData && branchesData.length > 0) {
-          const branchesByHosp: Record<string, any[]> = {};
-          for (const b of branchesData) {
-            if (!branchesByHosp[b.hospital_id]) branchesByHosp[b.hospital_id] = [];
-            branchesByHosp[b.hospital_id].push({
-              id: b.id,
-              hospital_id: b.hospital_id,
-              name: b.name,
-              area: b.area,
-              address: b.address,
-              city: b.city,
-              latitude: Number(b.latitude),
-              longitude: Number(b.longitude),
-              distance_km: calculateDistanceKm(userLat, userLng, Number(b.latitude), Number(b.longitude)),
-              contact_number: b.contact_number,
-              virtual_exotel_number: b.virtual_exotel_number,
-              is_main_branch: b.is_main_branch,
-              doctors: (b.doctors || []).map((doc: any) => ({
-                id: doc.id,
-                hospital_id: doc.hospital_id,
-                branch_id: doc.branch_id,
-                name: doc.name,
-                specialty: doc.specialty,
-                qualification: doc.qualification,
-                experience_years: doc.experience_years,
-                rating: Number(doc.rating),
-                total_reviews: doc.total_reviews,
-                consultation_fee: doc.consultation_fee,
-                discounted_fee: doc.discounted_fee,
-                next_available_slot: doc.next_available_slot,
-                avatar_url: doc.avatar_url,
-                languages: doc.languages,
-                opd_timing: doc.opd_timing,
-              })),
-            });
-          }
-
-          return data.map((h: any) => ({
-            ...h,
-            branches: branchesByHosp[h.id] || [],
-          }));
-        }
-      } catch {
-        // Fall back to seed matching if branch query fails
-      }
-
-      return data.map((h: any) => {
-        const seedMatch = SEED_HOSPITALS.find((s) => s.id === h.id);
-        return {
-          ...h,
-          branches: seedMatch?.branches || [],
-        };
-      });
+    if (hospErr || !Array.isArray(hospRows)) {
+      return [];
     }
-  } catch {
-    // Graceful fallback to client calculation
-  }
 
-  // Fallback calculation using structured seed data
-  let filtered = [...SEED_HOSPITALS];
-  if (specialty && specialty !== 'All') {
-    const specLower = specialty.toLowerCase();
-    filtered = filtered.filter(h => {
-      const hospitalMatch = h.specialties.some(s => s.toLowerCase().includes(specLower));
-      const doctorMatch = h.branches?.some(b => b.doctors.some(d => d.specialty.toLowerCase().includes(specLower)));
-      return hospitalMatch || doctorMatch;
-    });
-  }
+    let mapped: Hospital[] = hospRows.map((h: any) => {
+      const rawBranches = Array.isArray(h.hospital_branches) ? h.hospital_branches : [];
+      const mappedBranches = rawBranches
+        .map((b: any) => {
+          const bLat = Number(b.latitude ?? h.latitude ?? 0);
+          const bLng = Number(b.longitude ?? h.longitude ?? 0);
+          const bDist =
+            hasCoords && bLat && bLng
+              ? calculateDistanceKm(userLat as number, userLng as number, bLat, bLng)
+              : undefined;
+          const rawDocs = Array.isArray(b.doctors) ? b.doctors : [];
+          return {
+            id: b.id,
+            hospital_id: b.hospital_id,
+            name: b.name,
+            area: b.area || '',
+            address: b.address || h.address || '',
+            city: b.city || h.city || '',
+            latitude: bLat,
+            longitude: bLng,
+            distance_km: bDist,
+            contact_number: b.contact_number,
+            virtual_exotel_number: b.virtual_exotel_number,
+            is_main_branch: Boolean(b.is_main_branch),
+            is_active: b.is_active !== false,
+            doctors: rawDocs.map((doc: any) => ({
+              id: doc.id,
+              hospital_id: doc.hospital_id,
+              branch_id: doc.branch_id,
+              name: doc.name,
+              specialty: doc.specialty || 'General Physician',
+              qualification: doc.qualification || 'MBBS',
+              experience_years: Number(doc.experience_years || 0),
+              rating: Number(doc.rating || 4.5),
+              total_reviews: Number(doc.total_reviews || 0),
+              consultation_fee: Number(doc.consultation_fee || 0),
+              discounted_fee: Number(doc.discounted_fee ?? doc.consultation_fee ?? 0),
+              next_available_slot: doc.next_available_slot || '',
+              avatar_url: doc.avatar_url || '',
+              languages: Array.isArray(doc.languages) ? doc.languages : ['English', 'Hindi'],
+              opd_timing: doc.opd_timing || doc.opd_hours || h.opd_hours || '',
+              opd_hours: doc.opd_hours || doc.opd_timing || h.opd_hours || '',
+              slot_capacity: Number(doc.slot_capacity || 6),
+              is_active: doc.is_active !== false,
+            })),
+          };
+        })
+        .sort((a: any, b: any) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
 
-  const mapped = filtered
-    .map(h => {
-      const dist = calculateDistanceKm(userLat, userLng, h.latitude, h.longitude);
-      // Recalculate branch distances
-      const updatedBranches = h.branches?.map(b => ({
-        ...b,
-        distance_km: calculateDistanceKm(userLat, userLng, b.latitude, b.longitude),
-      })).sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+      const activeBranches = mappedBranches.filter((b: any) => b.is_active !== false);
+      const closestDist =
+        activeBranches.find((b: any) => typeof b.distance_km === 'number')?.distance_km ??
+        (hasCoords && h.latitude && h.longitude
+          ? calculateDistanceKm(userLat as number, userLng as number, Number(h.latitude), Number(h.longitude))
+          : undefined);
 
       return {
         ...h,
-        distance_km: dist,
-        distance_meters: dist * 1000,
-        branches: updatedBranches,
-      };
-    })
-    .sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
+        featured: Boolean(h.is_featured || h.featured),
+        priority_rank: Number(h.priority_rank ?? 100),
+        is_active: h.is_active !== false,
+        distance_km: closestDist,
+        distance_meters: typeof closestDist === 'number' ? closestDist * 1000 : undefined,
+        branches: mappedBranches,
+      } as any;
+    });
 
-  // If nearby hospitals within 50 km exist for the user's city/coords, only return those
-  const withinCity = mapped.filter(h => (h.distance_km || 0) <= 50);
-  return withinCity.length > 0 ? withinCity : mapped;
+    if (specialty && specialty !== 'All') {
+      const specLower = specialty.toLowerCase();
+      mapped = mapped.filter((h: any) => {
+        const hospitalMatch = (h.specialties || []).some((s: string) =>
+          s.toLowerCase().includes(specLower)
+        );
+        const doctorMatch = (h.branches || []).some((b: any) =>
+          (b.doctors || []).some((d: any) =>
+            String(d.specialty || '').toLowerCase().includes(specLower)
+          )
+        );
+        return hospitalMatch || doctorMatch;
+      });
+    }
+
+    return mapped;
+  } catch {
+    return [];
+  }
 }
 
 // CRM stream – demo bookings purged for Jaipur launch (all bookings fetch live from Supabase)

@@ -581,15 +581,19 @@ function calcLabDist(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export const centresFor = (
   items: Item[],
   userCoords?: { lat: number; lng: number } | null,
-  city?: string
+  city?: string,
+  customCentres?: Centre[] | null,
+  homeOnly?: boolean
 ): { centre: Centre; total: number }[] => {
   if (!items.length) return [];
+  const sourceCentres = customCentres && customCentres.length > 0 ? customCentres : CENTRES;
   const out: { centre: Centre; total: number }[] = [];
 
   const isJaipurUser = (city || '').toLowerCase().includes('jaipur') ||
     (userCoords && userCoords.lat >= 26.0 && userCoords.lat <= 28.0 && userCoords.lng >= 75.0 && userCoords.lng <= 77.0);
 
-  for (const rawCentre of CENTRES) {
+  for (const rawCentre of sourceCentres) {
+    if (homeOnly && !rawCentre.home) continue;
     let total = 0;
     let ok = true;
     for (const it of items) {
@@ -621,6 +625,56 @@ export const centresFor = (
   }
 
   return out.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
+};
+
+export interface PartialCentreOption {
+  centre: Centre;
+  total: number;
+  availableItems: Item[];
+  missingItems: Item[];
+}
+
+export const partialCentresFor = (
+  items: Item[],
+  userCoords?: { lat: number; lng: number } | null,
+  city?: string,
+  customCentres?: Centre[] | null,
+  homeOnly?: boolean
+): PartialCentreOption[] => {
+  if (items.length <= 1) return [];
+  const sourceCentres = customCentres && customCentres.length > 0 ? customCentres : CENTRES;
+  const out: PartialCentreOption[] = [];
+  for (const rawCentre of sourceCentres) {
+    if (homeOnly && !rawCentre.home) continue;
+    let total = 0;
+    const availableItems: Item[] = [];
+    const missingItems: Item[] = [];
+    for (const it of items) {
+      const p = priceAt(it, rawCentre);
+      if (p === null) {
+        missingItems.push(it);
+      } else {
+        availableItems.push(it);
+        total += p;
+      }
+    }
+    if (availableItems.length > 0 && missingItems.length > 0) {
+      const centre = { ...rawCentre };
+      if (userCoords && centre.lat && centre.lng) {
+        centre.distanceKm = calcLabDist(userCoords.lat, userCoords.lng, centre.lat, centre.lng);
+      }
+      out.push({ centre, total, availableItems, missingItems });
+    }
+  }
+  const isJaipurUser =
+    (city || '').toLowerCase().includes('jaipur') ||
+    (userCoords && userCoords.lat >= 26.0 && userCoords.lat <= 28.0 && userCoords.lng >= 75.0 && userCoords.lng <= 77.0);
+  const scoped = isJaipurUser
+    ? out.filter((o) => o.centre.city?.toLowerCase().includes('jaipur') || (o.centre.distanceKm && o.centre.distanceKm <= 40))
+    : out;
+  return (scoped.length > 0 ? scoped : out).sort(
+    (a, b) => b.availableItems.length - a.availableItems.length || a.centre.distanceKm - b.centre.distanceKm
+  );
 };
 
 // Helper accessors for Hindi localization

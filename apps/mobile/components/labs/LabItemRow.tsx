@@ -129,6 +129,30 @@ export function LabItemRow({
                 </Text>
               </View>
             )}
+            <View
+              style={{
+                backgroundColor: item.segment === 'scan' ? '#FEF3C7' : '#ECFDF5',
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+                borderRadius: R.pill,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: item.segment === 'scan' ? '#B45309' : '#047857',
+                }}
+              >
+                {item.segment === 'scan'
+                  ? isHi
+                    ? 'केवल लैब/अस्पताल'
+                    : 'In-Lab / Hospital Only'
+                  : isHi
+                  ? 'होम + लैब'
+                  : 'Home + Lab'}
+              </Text>
+            </View>
           </View>
           <Text style={{ fontSize: 12.5, color: C.sub, marginTop: 2 }}>
             {reportText(item, isHi)} · {fastText(item, isHi)}

@@ -47,6 +47,7 @@ import { calculateDoctorSlots } from '../../src/data/opdData';
 import { useAuth } from '../../src/context/AuthContext';
 import { useFamily, getRelationLabel, type Member } from '../../src/context/FamilyContext';
 import { inr } from '../../src/theme';
+import { getSupabaseClient } from '../../src/lib/supabase';
 import { PaymentGatewayModal, PaymentMethod } from '../payment/PaymentGatewayModal';
 import { AppointmentQrCode } from '../ui/AppointmentQrCode';
 import { VerifyPhoneModal } from '../auth/VerifyPhoneModal';
@@ -92,10 +93,10 @@ export function isDoctorAvailableOnDay(timingStr: string | undefined, date: Date
 export function isSlotBookable(
   slotTimeStr: string,
   isToday: boolean
-): { bookable: boolean; reason?: 'passed' | 'buffer' } {
+): { bookable: boolean; reason?: 'passed' | 'buffer' | 'full' } {
   if (!isToday) return { bookable: true };
 
-  const match = slotTimeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const match = slotTimeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i);
   if (!match) return { bookable: true };
 
   let hours = parseInt(match[1], 10);
@@ -251,21 +252,78 @@ export function BookingSlotModal({
     : effectiveSelfName;
   const currentPatientPhone = effectiveSelfPhone;
 
-  // Shift slots
-  const morningSlots = ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM'];
-  const eveningSlots = ['05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM'];
+  // 1-hour window slots (each window supports 5-8 clients)
+  const morningSlots = [
+    '09:00 AM - 10:00 AM',
+    '10:00 AM - 11:00 AM',
+    '11:00 AM - 12:00 PM',
+    '12:00 PM - 01:00 PM',
+  ];
+  const eveningSlots = [
+    '04:00 PM - 05:00 PM',
+    '05:00 PM - 06:00 PM',
+    '06:00 PM - 07:00 PM',
+    '07:00 PM - 08:00 PM',
+  ];
   const activeSlots = selectedShift === 'morning' ? morningSlots : eveningSlots;
 
   const selectedDateOpt = dateOptions.find((d) => d.key === selectedDateKey) || dateOptions[0];
   const isSelectedDayToday = selectedDateOpt?.isToday ?? false;
 
-  // Evaluate bookability of every slot in the active shift
+  const slotCapacity = Math.min(
+    20,
+    Math.max(
+      1,
+      Number(
+        (bookingTargetDoctor?.doctor as any)?.slot_capacity ??
+          (bookingTargetDoctor?.doctor as any)?.weekly_schedule?._slot_capacity ??
+          6
+      )
+    )
+  );
+  const [slotBookedCounts, setSlotBookedCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!visible || !bookingTargetDoctor) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data } = await supabase
+          .from('bookings')
+          .select('slot_time')
+          .in('service_type', ['OPD_CONCIERGE', 'OPD'])
+          .eq('hospital_name', bookingTargetDoctor.hospitalName)
+          .eq('doctor_name', bookingTargetDoctor.doctor.name)
+          .neq('status', 'CANCELLED');
+        if (cancelled || !Array.isArray(data)) return;
+        const counts: Record<string, number> = {};
+        for (const row of data) {
+          const st = String(row.slot_time || '').trim();
+          if (st) counts[st] = (counts[st] || 0) + 1;
+        }
+        setSlotBookedCounts(counts);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, bookingTargetDoctor?.doctor.name, bookingTargetDoctor?.hospitalName]);
+
+  // Evaluate bookability + remaining capacity of every 1-hour window
   const evaluatedSlots = useMemo(() => {
-    return activeSlots.map((slot) => ({
-      slot,
-      ...isSlotBookable(slot, isSelectedDayToday),
-    }));
-  }, [activeSlots, isSelectedDayToday]);
+    const dateLabel = selectedDateOpt?.fullDateStr || 'Today';
+    return activeSlots.map((slot) => {
+      const base = isSlotBookable(slot, isSelectedDayToday);
+      const composedKey = `${dateLabel} · ${slot}`;
+      const bookedCount = slotBookedCounts[composedKey] || 0;
+      const remaining = Math.max(0, slotCapacity - bookedCount);
+      if (base.bookable && remaining <= 0) {
+        return { slot, bookable: false, reason: 'full' as const, remaining: 0 };
+      }
+      return { slot, ...base, remaining };
+    });
+  }, [activeSlots, isSelectedDayToday, selectedDateOpt?.fullDateStr, slotBookedCounts, slotCapacity]);
 
   const hasAnyBookableSlot = useMemo(() => {
     return evaluatedSlots.some((s) => s.bookable);
@@ -552,6 +610,7 @@ export function BookingSlotModal({
                     doctorName={confirmedBooking.doctor_name || bookingTargetDoctor?.doctor.name || 'Specialist Doctor'}
                     hospitalName={confirmedBooking.hospital_name || bookingTargetDoctor?.hospitalName || 'Adityam Partner Clinic'}
                     slotTime={confirmedBooking.slot_time || 'Tomorrow, 10:30 AM'}
+                    verificationCode={(confirmedBooking as any).verification_code || undefined}
                     size={130}
                   />
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginTop: 10 }}>
@@ -560,6 +619,27 @@ export function BookingSlotModal({
                   <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
                     {isHi ? 'अस्पताल रिसेप्शन डेस्क पर त्वरित प्रवेश हेतु यह कोड दिखाएं' : 'Show this QR at reception for fast-track queue bypass'}
                   </Text>
+                  {(confirmedBooking as any).verification_code ? (
+                    <View
+                      style={{
+                        marginTop: 10,
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1.5,
+                        borderColor: '#2563EB',
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#1E40AF', letterSpacing: 0.5 }}>
+                        {isHi ? 'गोपनीय काउंटर चेक-इन OTP (केवल रिसेप्शन पर बताएं)' : 'CONFIDENTIAL COUNTER OTP (SHARE ONLY AT DESK)'}
+                      </Text>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: '#1D4ED8', letterSpacing: 6, marginTop: 2 }}>
+                        {(confirmedBooking as any).verification_code}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Exotel Telephony Virtual Route Notice */}
@@ -935,7 +1015,7 @@ export function BookingSlotModal({
                   </View>
 
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {evaluatedSlots.map(({ slot, bookable, reason }) => {
+                    {evaluatedSlots.map(({ slot, bookable, reason, remaining }) => {
                       const isSelected = effectiveSelectedSlot === slot;
                       return (
                         <TouchableOpacity
@@ -979,9 +1059,17 @@ export function BookingSlotModal({
                           >
                             {slot}
                           </Text>
-                          {!bookable && (
+                          {bookable ? (
+                            <Text style={{ fontSize: 9.5, fontWeight: '700', color: isSelected ? '#DBEAFE' : '#16A34A' }}>
+                              {remaining}/{slotCapacity}
+                            </Text>
+                          ) : (
                             <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#DC2626' }}>
-                              {reason === 'passed' ? (isHi ? 'समाप्त' : 'Passed') : (isHi ? '<1 घंटा' : '<1 hr')}
+                              {reason === 'full'
+                                ? isHi ? 'पूर्ण' : 'Full'
+                                : reason === 'passed'
+                                  ? isHi ? 'समाप्त' : 'Passed'
+                                  : isHi ? '<1 घंटा' : '<1 hr'}
                             </Text>
                           )}
                         </TouchableOpacity>
@@ -989,7 +1077,7 @@ export function BookingSlotModal({
                     })}
                   </View>
 
-                  {/* EMERGENCY CALL DESK BANNER WHEN ALL SLOTS IN SHIFT ARE PASSED OR BUFFERED */}
+                  {/* UNAVAILABLE FOR THIS TIME BANNER */}
                   {!hasAnyBookableSlot && (
                     <View
                       style={{
@@ -1004,46 +1092,114 @@ export function BookingSlotModal({
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <AlertCircle size={15} color="#D97706" />
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#B45309' }}>
-                          {isHi ? 'इस शिफ्ट के ऑनलाइन स्लॉट बंद हैं' : 'Online Booking Closed for this Shift'}
+                          {isHi ? 'इस समय के लिए उपलब्ध नहीं' : 'Not Available for This Time'}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 11, color: '#92400E', marginTop: 4, lineHeight: 15 }}>
                         {isHi
-                          ? 'डॉक्टर वर्तमान में परामर्श में व्यस्त हैं (कम से कम 1 घंटा पूर्व बुकिंग आवश्यक)। आपातकालीन वॉक-इन पास हेतु सीधे अस्पताल से संपर्क करें या अगली तारीख चुनें।'
-                          : 'Doctor is in active consultation (requires min. 1 hr advance reservation). For urgent emergency walk-in access, call hospital desk directly or choose tomorrow.'}
+                          ? 'इस शिफ्ट के सभी स्लॉट भर चुके हैं या समय निकल चुका है। आप दूसरी शिफ्ट, अगला उपलब्ध दिन चुन सकते हैं या अन्य डॉक्टर देख सकते हैं।'
+                          : 'Slots for this time window are full or closed. Switch shifts, jump to the next open day, or view other doctors at this hospital.'}
                       </Text>
 
-                      <TouchableOpacity
-                        onPress={() => Linking.openURL('tel:+919811244550')}
-                        activeOpacity={0.85}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          backgroundColor: '#B45309',
-                          paddingVertical: 7,
-                          paddingHorizontal: 12,
-                          borderRadius: 8,
-                          alignSelf: 'flex-start',
-                          marginTop: 8,
-                        }}
-                      >
-                        <Phone size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
-                          {isHi ? 'अस्पताल रिसेप्शन को कॉल करें' : 'Call Hospital Desk'}
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                        {selectedShift === 'morning' ? (
+                          <TouchableOpacity
+                            onPress={() => setSelectedShift('evening')}
+                            activeOpacity={0.85}
+                            style={{
+                              backgroundColor: '#1E40AF',
+                              paddingVertical: 7,
+                              paddingHorizontal: 12,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
+                              {isHi ? 'शाम की OPD देखें →' : 'Switch to Evening OPD →'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => {
+                              const currIdx = dateOptions.findIndex((d) => d.key === selectedDateKey);
+                              const nextOpen = dateOptions.find((d, i) => i > currIdx && !d.isClosed);
+                              if (nextOpen) {
+                                setSelectedDateKey(nextOpen.key);
+                                setSelectedShift('morning');
+                              }
+                            }}
+                            activeOpacity={0.85}
+                            style={{
+                              backgroundColor: '#1E40AF',
+                              paddingVertical: 7,
+                              paddingHorizontal: 12,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
+                              {isHi ? 'अगला उपलब्ध दिन चुनें →' : 'Next Open Day →'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          onPress={onClose}
+                          activeOpacity={0.85}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: '#D97706',
+                            paddingVertical: 7,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text style={{ color: '#92400E', fontWeight: '800', fontSize: 11.5 }}>
+                            {isHi ? 'अन्य डॉक्टर देखें' : 'Other Doctors'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL('tel:+919811244550')}
+                          activeOpacity={0.85}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#B45309',
+                            paddingVertical: 7,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Phone size={12} color="#FFFFFF" />
+                          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11.5 }}>
+                            {isHi ? 'अस्पताल डेस्क' : 'Call Desk'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
 
                   {/* Fee strip */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-                    <View>
-                      <Text style={{ fontSize: 11, color: '#64748B' }}>{isHi ? 'अस्पताल शुल्क:' : 'Hospital MRP:'} <Text style={{ textDecorationLine: 'line-through' }}>₹{bookingTargetDoctor.doctor.consultation_fee}</Text></Text>
-                      <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700' }}>{isHi ? 'आदित्यम 20% छूट:' : 'Adityam 20% off:'} −₹{bookingTargetDoctor.doctor.consultation_fee - bookingTargetDoctor.doctor.discounted_fee}</Text>
-                    </View>
-                    <Text style={{ fontSize: 17, fontWeight: '900', color: '#16A34A' }}>₹{bookingTargetDoctor.doctor.discounted_fee}</Text>
-                  </View>
+                  {(() => {
+                    const mrp = Number(bookingTargetDoctor.doctor.consultation_fee || 0);
+                    const disc = Number(bookingTargetDoctor.doctor.discounted_fee || mrp);
+                    const saved = Math.max(0, mrp - disc);
+                    const pct = mrp > 0 ? Math.round((saved / mrp) * 100) : 0;
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                        <View>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>{isHi ? 'अस्पताल शुल्क:' : 'Hospital MRP:'} <Text style={{ textDecorationLine: 'line-through' }}>₹{mrp}</Text></Text>
+                          {saved > 0 ? (
+                            <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700' }}>
+                              {isHi ? `आदित्यम ${pct}% छूट:` : `Adityam ${pct}% off:`} −₹{saved}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={{ fontSize: 17, fontWeight: '900', color: '#16A34A' }}>₹{disc}</Text>
+                      </View>
+                    );
+                  })()}
                 </View>
 
                 {/* ── SYMPTOM CHIPS ── */}

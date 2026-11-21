@@ -40,6 +40,7 @@ export function DoctorListItem({
 }: DoctorListItemProps) {
   const isHi = language === 'hi';
   const avatar = getDoctorAvatar(doc);
+  const isUnavailable = (doc as any).isAvailable === false || (doc as any).is_active === false;
 
   return (
     <View
@@ -178,16 +179,24 @@ export function DoctorListItem({
             }}
           >
             <Star size={11} color="#D97706" fill="#D97706" />
-            <Text
-              style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}
-            >
-              {doc.rating}
-            </Text>
-            <Text
-              style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}
-            >
-              ({doc.total_reviews} {isHi ? 'समीक्षा' : 'reviews'})
-            </Text>
+            {Number(doc.total_reviews ?? 0) > 0 ? (
+              <>
+                <Text
+                  style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}
+                >
+                  {doc.rating}
+                </Text>
+                <Text
+                  style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}
+                >
+                  ({doc.total_reviews} {isHi ? 'समीक्षा' : 'reviews'})
+                </Text>
+              </>
+            ) : (
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E293B' }}>
+                {isHi ? 'नया' : 'New'}
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -233,27 +242,28 @@ export function DoctorListItem({
         </View>
 
         <TouchableOpacity
-          onPress={() => onBookDoctor(doc, undefined, doc.hospitalName)}
+          onPress={() => !isUnavailable && onBookDoctor(doc, undefined, doc.hospitalName)}
+          disabled={isUnavailable}
           activeOpacity={0.88}
           style={{
-            backgroundColor: '#2563EB',
+            backgroundColor: isUnavailable ? '#CBD5E1' : '#2563EB',
             paddingHorizontal: 16,
             paddingVertical: 10,
             borderRadius: 12,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 6,
-            shadowColor: '#2563EB',
+            shadowColor: isUnavailable ? 'transparent' : '#2563EB',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
+            shadowOpacity: isUnavailable ? 0 : 0.2,
             shadowRadius: 4,
-            elevation: 2,
+            elevation: isUnavailable ? 0 : 2,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-            {isHi ? 'बुक करें' : 'Book'}
+          <Text style={{ color: isUnavailable ? '#475569' : '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+            {isUnavailable ? (isHi ? 'उपलब्ध नहीं' : 'Unavailable') : (isHi ? 'बुक करें' : 'Book')}
           </Text>
-          <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />
+          {!isUnavailable && <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />}
         </TouchableOpacity>
       </View>
     </View>

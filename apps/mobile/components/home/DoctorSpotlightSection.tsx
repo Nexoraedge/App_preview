@@ -160,7 +160,9 @@ export function DoctorSpotlightSection({
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                         <Star size={11} color="#FBBF24" fill="#FBBF24" />
                         <Text style={{ color: '#FFFFFF', fontSize: 11.5, fontWeight: '700' }}>
-                          {doc.rating} ({doc.total_reviews} {isHi ? 'समीक्षाएं' : 'reviews'})
+                          {Number(doc.total_reviews ?? 0) > 0
+                            ? `${doc.rating} (${doc.total_reviews} ${isHi ? 'समीक्षाएं' : 'reviews'})`
+                            : isHi ? 'नया' : 'New'}
                         </Text>
                       </View>
 

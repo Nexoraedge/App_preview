@@ -43,6 +43,7 @@ import {
 import { HospitalsSection } from '../../components/admin/HospitalsSection';
 import { SoloDoctorsSection } from '../../components/admin/doctors/SoloDoctorsSection';
 import { PartnerEnquiriesSection } from '../../components/admin/enquiries/PartnerEnquiriesSection';
+import { VerificationRequestsSection } from '../../components/admin/enquiries/VerificationRequestsSection';
 import { PharmaciesSection } from '../../components/admin/pharmacies/PharmaciesSection';
 import { LabsSection } from '../../components/admin/labs/LabsSection';
 import { PatientsSection } from '../../components/admin/patients/PatientsSection';
@@ -59,6 +60,7 @@ import {
 import { logAdminAudit } from '../../src/services/adminAudit';
 import {
   playAdminAlertChime,
+  playPartnerOrderAlarm,
   requestDesktopNotificationPermission,
 } from '../../src/services/adminAlerts';
 
@@ -114,6 +116,7 @@ export default function AdminDashboardScreen() {
   const [networkCounts, setNetworkCounts] = useState({
     hospitals: 0,
     enquiries: 0,
+    verifications: 0,
     labs: 0,
     pharmacies: 0,
     patients: 0,
@@ -175,6 +178,7 @@ export default function AdminDashboardScreen() {
         pharmRes,
         usersRes,
         enqRes,
+        verifRes,
         hospPayoutsRes,
         labPayoutsRes,
         pharmPayoutsRes,
@@ -194,6 +198,10 @@ export default function AdminDashboardScreen() {
           .from('partner_enquiries')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'NEW'),
+        supabase
+          .from('partner_verification_requests')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['PENDING', 'UNDER_REVIEW']),
         supabase.from('hospital_payouts').select('amount, settled_at, status'),
         supabase.from('lab_payouts').select('net_payout_amount, paid_at, created_at, status'),
         supabase.from('pharmacy_payouts').select('net_payout_amount, paid_at, created_at, status'),
@@ -274,6 +282,7 @@ export default function AdminDashboardScreen() {
         ...prev,
         hospitals: hospRes.count ?? 4,
         enquiries: enqRes.error ? prev.enquiries : (enqRes.count ?? 0),
+        verifications: verifRes.error ? prev.verifications : (verifRes.count ?? 0),
         labs: labRes.count ?? 5,
         pharmacies: pharmRes.count ?? 6,
         patients: userRows.length || 1,
@@ -308,10 +317,22 @@ export default function AdminDashboardScreen() {
           (payload: any) => {
             if (payload?.eventType === 'INSERT' && soundAlertsRef.current) {
               const row = payload?.new || {};
-              playAdminAlertChime(
-                'New Booking Request',
-                `${row.patient_name || 'Patient'} (${row.service_type || 'BOOKING'}) • #${row.booking_ref || 'NEW'}`
-              );
+              const isRxUpload =
+                Boolean(row.bill_image_url) ||
+                String(row.booking_ref || '').includes('-RX-');
+              if (isRxUpload) {
+                playPartnerOrderAlarm(
+                  row.service_type === 'INVESTIGATION'
+                    ? 'New Lab Prescription Uploaded!'
+                    : 'New Pharmacy Prescription Uploaded!',
+                  `${row.patient_name || 'Patient'} uploaded Rx • #${row.booking_ref || 'NEW'}. Contact & send curated quote!`
+                );
+              } else {
+                playAdminAlertChime(
+                  'New Booking Request',
+                  `${row.patient_name || 'Patient'} (${row.service_type || 'BOOKING'}) • #${row.booking_ref || 'NEW'}`
+                );
+              }
             }
             loadDashboardData(true);
           }
@@ -328,7 +349,7 @@ export default function AdminDashboardScreen() {
       if (channel) {
         try {
           getSupabaseClient().removeChannel(channel);
-        } catch {}
+        } catch { }
       }
     };
   }, [loadDashboardData]);
@@ -555,8 +576,12 @@ export default function AdminDashboardScreen() {
       (b) => new Date(b.created_at).toDateString() === todayStr
     ).length;
 
+    const activeBookingsCount = bookings.filter(
+      (b) => b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && (b.status as string) !== 'MISSED'
+    ).length;
+
     return {
-      totalBookings: bookings.length,
+      totalBookings: activeBookingsCount,
       todayBookings,
       pendingRxCount,
       totalRevenue,
@@ -647,12 +672,16 @@ export default function AdminDashboardScreen() {
       subtitle: 'Partner hospitals, earnings, weekly payouts & /slug analytics',
     },
     'solo-doctors': {
-      title: 'Solo Doctors',
+      title: 'Doctors',
       subtitle: 'Independent practitioners, earnings, weekly payouts & /slug analytics',
     },
     enquiries: {
       title: 'Partner Enquiries',
       subtitle: 'Incoming hospital & doctor onboarding requests from website',
+    },
+    verifications: {
+      title: 'Doctor & Hospital Verifications',
+      subtitle: 'Review degrees, licenses, hospital presence & approve live deployment',
     },
     labs: {
       title: 'Labs & Scans',
@@ -700,6 +729,7 @@ export default function AdminDashboardScreen() {
           pendingRx: metrics.pendingRxCount,
           hospitals: networkCounts.hospitals,
           enquiries: networkCounts.enquiries,
+          verifications: networkCounts.verifications,
           labs: networkCounts.labs,
           pharmacies: networkCounts.pharmacies,
           patients: networkCounts.patients,
@@ -858,6 +888,12 @@ export default function AdminDashboardScreen() {
                 setNetworkCounts((prev) => (prev.enquiries === count ? prev : { ...prev, enquiries: count }))
               }
             />
+          ) : activeSection === 'verifications' ? (
+            <VerificationRequestsSection
+              onCountChange={(count) =>
+                setNetworkCounts((prev) => (prev.verifications === count ? prev : { ...prev, verifications: count }))
+              }
+            />
           ) : activeSection === 'pharmacies' ? (
             <PharmaciesSection bookings={bookings} />
           ) : activeSection === 'labs' ? (
@@ -878,7 +914,7 @@ export default function AdminDashboardScreen() {
               lastSyncedAt={lastSyncedAt}
               initialServiceFilter={serviceFilter === 'RX_ONLY' ? 'ALL' : serviceFilter}
               onRefresh={() => loadDashboardData(true)}
-              onInspectBooking={openInspector}
+              onInspectBooking={(b) => router.push(`/admin/bookings/${b.booking_ref}` as any)}
             />
           ) : activeSection === 'prescriptions' ? (
             <PrescriptionQueueSection
@@ -1013,7 +1049,7 @@ export default function AdminDashboardScreen() {
                     <TouchableOpacity
                       onPress={() => {
                         if (selectedBooking.bill_image_url) {
-                          Linking.openURL(selectedBooking.bill_image_url).catch(() => {});
+                          Linking.openURL(selectedBooking.bill_image_url).catch(() => { });
                         }
                       }}
                       style={{
@@ -1372,7 +1408,7 @@ export default function AdminDashboardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
                 {selectedBooking?.patient_phone ? (
                   <TouchableOpacity
-                    onPress={() => Linking.openURL(`tel:${selectedBooking.patient_phone}`).catch(() => {})}
+                    onPress={() => Linking.openURL(`tel:${selectedBooking.patient_phone}`).catch(() => { })}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 10,

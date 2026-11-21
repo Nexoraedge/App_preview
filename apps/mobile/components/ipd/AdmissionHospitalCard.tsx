@@ -74,14 +74,20 @@ export function AdmissionHospitalCard({
             }}
           >
             <Star size={11} color="#D97706" fill="#D97706" />
-            <Text
-              style={{ fontSize: 11, fontWeight: '700', color: '#0F172A' }}
-            >
-              {hosp.rating}
-            </Text>
-            <Text style={{ fontSize: 11, color: '#64748B' }}>
-              ({hosp.total_reviews})
-            </Text>
+            {hosp.total_reviews > 0 ? (
+              <>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F172A' }}>
+                  {hosp.rating}
+                </Text>
+                <Text style={{ fontSize: 11, color: '#64748B' }}>
+                  ({hosp.total_reviews})
+                </Text>
+              </>
+            ) : (
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF' }}>
+                {isHi ? 'नया' : 'New'}
+              </Text>
+            )}
           </View>
 
           {/* Distance Badge */}

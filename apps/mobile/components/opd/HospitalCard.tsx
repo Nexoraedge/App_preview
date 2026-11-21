@@ -26,6 +26,7 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
   const c = isHi ? opdCopy.hi : opdCopy.en;
   const branches = hospital.branches || [];
   const totalDoctors = branches.reduce((sum, b) => sum + (b.doctors?.length || 0), 0);
+  const isUnavailable = (hospital as any).is_active === false;
 
   return (
     <View
@@ -72,39 +73,61 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
         />
 
         {/* Rating Badge */}
-        {hospital.rating != null && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
+            gap: 4,
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOpacity: 0.08,
+            shadowRadius: 4,
+          }}
+        >
+          <Star size={13} color="#F59E0B" fill="#F59E0B" />
+          {Number(hospital.total_reviews ?? 0) > 0 ? (
+            <>
+              <Text style={{ color: '#0F172A', fontSize: 11, fontWeight: '800' }}>
+                {hospital.rating}
+              </Text>
+              <Text style={{ color: '#64748B', fontSize: 10 }}>
+                ({hospital.total_reviews})
+              </Text>
+            </>
+          ) : (
+            <Text style={{ color: '#0F172A', fontSize: 11, fontWeight: '800' }}>
+              {isHi ? 'नया' : 'New'}
+            </Text>
+          )}
+        </View>
+
+        {/* Unavailable / Partner Privilege label */}
+        {isUnavailable ? (
           <View
             style={{
               position: 'absolute',
               top: 10,
-              right: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderRadius: 16,
+              left: 10,
+              backgroundColor: '#FEE2E2',
+              borderWidth: 1,
+              borderColor: '#FCA5A5',
+              borderRadius: 14,
               paddingHorizontal: 9,
-              paddingVertical: 5,
-              gap: 4,
-              elevation: 2,
-              shadowColor: '#000',
-              shadowOpacity: 0.08,
-              shadowRadius: 4,
+              paddingVertical: 4,
             }}
           >
-            <Star size={13} color="#F59E0B" fill="#F59E0B" />
-            <Text style={{ color: '#0F172A', fontSize: 11, fontWeight: '800' }}>
-              {hospital.rating}
+            <Text style={{ color: '#B91C1C', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.3 }}>
+              {isHi ? 'अभी उपलब्ध नहीं' : 'Currently Unavailable'}
             </Text>
-            {hospital.total_reviews != null && (
-              <Text style={{ color: '#64748B', fontSize: 10 }}>
-                ({hospital.total_reviews})
-              </Text>
-            )}
           </View>
-        )}
-
-        {/* Partner Privilege label */}
-        {hospital.featured && (
+        ) : hospital.featured ? (
           <View
             style={{
               position: 'absolute',
@@ -122,7 +145,7 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
               {c.partnerPrivilege}
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Distance Pill */}
         <View
@@ -141,7 +164,7 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
         >
           <MapPin size={11} color="#93C5FD" />
           <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
-            {hospital.distance_km != null ? `${hospital.distance_km} km` : 'Nearby'}
+            {hospital.distance_km != null ? `${hospital.distance_km} km` : (isHi ? 'लोकेशन चुनें' : 'Location needed')}
           </Text>
         </View>
 
@@ -228,7 +251,9 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
             letterSpacing: -0.3,
           }}
         >
-          {translateHospitalName(hospital.name, isHi)}
+          {isHi && (hospital as any).name_hi
+            ? (hospital as any).name_hi
+            : translateHospitalName(hospital.name, isHi)}
         </Text>
 
         <Text
@@ -240,7 +265,9 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
             marginTop: 2,
           }}
         >
-          {translateAddress(hospital.address, isHi)}
+          {isHi && (hospital as any).address_hi
+            ? (hospital as any).address_hi
+            : translateAddress(hospital.address, isHi)}
         </Text>
 
         {/* Specialties Chips Row */}
@@ -312,26 +339,27 @@ export function HospitalCard({ hospital, isHi, onPress, width }: HospitalCardPro
 
         {/* Action Button */}
         <TouchableOpacity
-          onPress={() => onPress(hospital)}
+          onPress={() => !isUnavailable && onPress(hospital)}
+          disabled={isUnavailable}
           activeOpacity={0.85}
           style={{
             height: 40,
             borderRadius: 12,
-            backgroundColor: '#2563EB',
+            backgroundColor: isUnavailable ? '#CBD5E1' : '#2563EB',
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
             gap: 6,
             marginTop: 12,
-            shadowColor: '#2563EB',
+            shadowColor: isUnavailable ? 'transparent' : '#2563EB',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.18,
+            shadowOpacity: isUnavailable ? 0 : 0.18,
             shadowRadius: 4,
-            elevation: 2,
+            elevation: isUnavailable ? 0 : 2,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
-            {c.viewDoctorsCta}
+          <Text style={{ color: isUnavailable ? '#475569' : '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+            {isUnavailable ? (isHi ? 'अभी उपलब्ध नहीं' : 'Currently Unavailable') : c.viewDoctorsCta}
           </Text>
           <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.4} />
         </TouchableOpacity>

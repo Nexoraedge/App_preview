@@ -57,8 +57,11 @@ import {
   Bed,
   CreditCard,
   Lock,
+  Star,
 } from 'lucide-react-native';
-import { getSupabaseClient } from '@adityam/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { getSupabaseClient, uploadPrescriptionSlip } from '@adityam/supabase';
 import type { Booking, ServiceType, BookingStatus } from '@adityam/types';
 import {
   fetchAllBookings,
@@ -88,6 +91,8 @@ export interface EnrichedAppointment {
   hospitalNameHi: string;
   hospitalAddress: string;
   hospitalAddressHi: string;
+  hospitalId?: string;
+  branchId?: string;
   patientName: string;
   patientPhone: string;
   slotDate: string;
@@ -128,6 +133,155 @@ export default function AppointmentsScreen() {
   const [ticketModalVisible, setTicketModalVisible] = useState(false);
   const [payingAppointment, setPayingAppointment] = useState<EnrichedAppointment | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Post-completion review state
+  const [reviewedRefs, setReviewedRefs] = useState<Record<string, number>>({});
+  const [reviewTarget, setReviewTarget] = useState<EnrichedAppointment | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [dismissedReviewRefs, setDismissedReviewRefs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    AsyncStorage.getItem('@adityam_reviewed_refs_v1')
+      .then((raw) => {
+        if (raw) setReviewedRefs(JSON.parse(raw));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (reviewTarget) return;
+    const unreviewed = appointments.find(
+      (a) =>
+        a.status === 'COMPLETED' &&
+        a.serviceType === 'OPD_CONCIERGE' &&
+        !reviewedRefs[a.bookingRef] &&
+        !dismissedReviewRefs[a.bookingRef]
+    );
+    if (unreviewed) {
+      setReviewRating(5);
+      setReviewComment('');
+      setReviewTarget(unreviewed);
+    }
+  }, [appointments, reviewedRefs, dismissedReviewRefs, reviewTarget]);
+
+  const handleSubmitReview = async () => {
+    if (!reviewTarget) return;
+    setSubmittingReview(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: bRow } = await supabase
+        .from('bookings')
+        .select('doctor_id, hospital_id')
+        .eq('booking_ref', reviewTarget.bookingRef)
+        .maybeSingle();
+
+      let doctorId: string | null = (bRow as any)?.doctor_id || null;
+      const hospitalId: string | null = (bRow as any)?.hospital_id || reviewTarget.hospitalId || null;
+
+      if (!doctorId && reviewTarget.doctorName) {
+        let docQ = supabase.from('doctors').select('id').ilike('name', reviewTarget.doctorName);
+        if (hospitalId) docQ = docQ.eq('hospital_id', hospitalId);
+        const { data: docMatch } = await docQ.limit(1).maybeSingle();
+        doctorId = (docMatch as any)?.id || null;
+      }
+
+      const { error: revErr } = await supabase.from('reviews').insert({
+        booking_ref: reviewTarget.bookingRef,
+        user_id: user?.id || null,
+        doctor_id: doctorId,
+        hospital_id: hospitalId,
+        rating: reviewRating,
+        comment: reviewComment.trim() || null,
+        service_type: 'OPD',
+      });
+
+      // Recompute & sync doctor rating
+      if (doctorId) {
+        let updatedFromReviews = false;
+        if (!revErr) {
+          const { data: docRevs } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('doctor_id', doctorId);
+          if (docRevs && docRevs.length > 0) {
+            const avg = Number(
+              (docRevs.reduce((s: number, r: any) => s + Number(r.rating || 0), 0) / docRevs.length).toFixed(1)
+            );
+            await supabase
+              .from('doctors')
+              .update({ rating: avg, total_reviews: docRevs.length })
+              .eq('id', doctorId);
+            updatedFromReviews = true;
+          }
+        }
+        if (!updatedFromReviews) {
+          const { data: curDoc } = await supabase
+            .from('doctors')
+            .select('rating, total_reviews')
+            .eq('id', doctorId)
+            .maybeSingle();
+          const prevCount = Number((curDoc as any)?.total_reviews ?? 0);
+          const prevRating = prevCount > 0 ? Number((curDoc as any)?.rating ?? 0) : 0;
+          const nextCount = prevCount + 1;
+          const nextAvg = Number((((prevRating * prevCount) + reviewRating) / nextCount).toFixed(1));
+          await supabase
+            .from('doctors')
+            .update({ rating: nextAvg, total_reviews: nextCount })
+            .eq('id', doctorId);
+        }
+      }
+
+      // Roll up all doctor/hospital reviews into hospital rating
+      if (hospitalId) {
+        let updatedHospFromReviews = false;
+        if (!revErr) {
+          const { data: hospRevs } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('hospital_id', hospitalId);
+          if (hospRevs && hospRevs.length > 0) {
+            const avg = Number(
+              (hospRevs.reduce((s: number, r: any) => s + Number(r.rating || 0), 0) / hospRevs.length).toFixed(1)
+            );
+            await supabase
+              .from('hospitals')
+              .update({ rating: avg, total_reviews: hospRevs.length })
+              .eq('id', hospitalId);
+            updatedHospFromReviews = true;
+          }
+        }
+        if (!updatedHospFromReviews) {
+          const { data: curHosp } = await supabase
+            .from('hospitals')
+            .select('rating, total_reviews')
+            .eq('id', hospitalId)
+            .maybeSingle();
+          const prevCount = Number((curHosp as any)?.total_reviews ?? 0);
+          const prevRating = prevCount > 0 ? Number((curHosp as any)?.rating ?? 0) : 0;
+          const nextCount = prevCount + 1;
+          const nextAvg = Number((((prevRating * prevCount) + reviewRating) / nextCount).toFixed(1));
+          await supabase
+            .from('hospitals')
+            .update({ rating: nextAvg, total_reviews: nextCount })
+            .eq('id', hospitalId);
+        }
+      }
+    } catch {
+      // Persist locally even if reviews table is not yet created
+    } finally {
+      const next = { ...reviewedRefs, [reviewTarget.bookingRef]: reviewRating };
+      setReviewedRefs(next);
+      await AsyncStorage.setItem('@adityam_reviewed_refs_v1', JSON.stringify(next)).catch(() => {});
+      setSubmittingReview(false);
+      setReviewTarget(null);
+      Alert.alert(
+        isHi ? 'समीक्षा के लिए धन्यवाद!' : 'Thank You for Your Review!',
+        isHi ? 'आपकी रेटिंग डॉक्टर और अस्पताल प्रोफ़ाइल पर अपडेट कर दी गई है।' : 'Your rating has been saved and reflected on the doctor & hospital profile.'
+      );
+    }
+  };
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -206,11 +360,13 @@ export default function AppointmentsScreen() {
                   ? '100% NABL Accredited Diagnostics'
                   : b.service_type === 'IPD_ENQUIRY'
                     ? 'NABH / JCI Partner Facility'
-                    : 'Verified Specialist • 5.0 ★',
+                    : 'Verified Specialist',
             hospitalName: b.hospital_name || 'Adityam Partner Network',
             hospitalNameHi: b.hospital_name || 'आदित्यम पार्टनर नेटवर्क',
             hospitalAddress: b.branch_name || 'Hospital Campus Desk',
             hospitalAddressHi: b.branch_name || 'अस्पताल परिसर डेस्क',
+            hospitalId: b.hospital_id || undefined,
+            branchId: b.branch_id || undefined,
             patientName: b.patient_name || user?.full_name || 'Patient',
             patientPhone: b.patient_phone || (user?.phone && !user.phone.startsWith('+9100') && !user.phone.startsWith('+910') && user.phone !== '+91 99999 99999' ? user.phone : ''),
             slotDate: slot.slotDate,
@@ -365,12 +521,80 @@ export default function AppointmentsScreen() {
   };
 
   // Directions
-  const handleOpenMaps = (apt: EnrichedAppointment) => {
-    const query = encodeURIComponent(`${apt.hospitalName}, ${apt.hospitalAddress}`);
-    const url =
-      Platform.OS === 'ios'
-        ? `http://maps.apple.com/?q=${query}`
-        : `https://www.google.com/maps/search/?api=1&query=${query}`;
+  const handleOpenMaps = async (apt: EnrichedAppointment) => {
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let fullAddress = '';
+
+    try {
+      const sb = getSupabaseClient();
+      if (sb) {
+        if (apt.branchId) {
+          const { data: br } = await sb
+            .from('hospital_branches')
+            .select('latitude, longitude, address, area, city')
+            .eq('id', apt.branchId)
+            .maybeSingle();
+          if (br) {
+            if (typeof br.latitude === 'number' && typeof br.longitude === 'number' && (br.latitude !== 0 || br.longitude !== 0)) {
+              lat = br.latitude;
+              lng = br.longitude;
+            }
+            fullAddress = [br.address, br.area, br.city].filter(Boolean).join(', ');
+          }
+        } else if (apt.hospitalId && apt.hospitalAddress) {
+          const { data: br } = await sb
+            .from('hospital_branches')
+            .select('latitude, longitude, address, area, city')
+            .eq('hospital_id', apt.hospitalId)
+            .ilike('name', apt.hospitalAddress)
+            .maybeSingle();
+          if (br) {
+            if (typeof br.latitude === 'number' && typeof br.longitude === 'number' && (br.latitude !== 0 || br.longitude !== 0)) {
+              lat = br.latitude;
+              lng = br.longitude;
+            }
+            fullAddress = [br.address, br.area, br.city].filter(Boolean).join(', ');
+          }
+        }
+
+        if ((lat === null || lng === null || !fullAddress) && apt.hospitalId) {
+          const { data: hosp } = await sb
+            .from('hospitals')
+            .select('latitude, longitude, address, city')
+            .eq('id', apt.hospitalId)
+            .maybeSingle();
+          if (hosp) {
+            if (lat === null && typeof hosp.latitude === 'number' && typeof hosp.longitude === 'number' && (hosp.latitude !== 0 || hosp.longitude !== 0)) {
+              lat = hosp.latitude;
+              lng = hosp.longitude;
+            }
+            if (!fullAddress) {
+              fullAddress = [hosp.address, hosp.city].filter(Boolean).join(', ');
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback to text query below
+    }
+
+    let url = '';
+    if (lat !== null && lng !== null) {
+      url =
+        Platform.OS === 'ios'
+          ? `http://maps.apple.com/?daddr=${lat},${lng}`
+          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    } else {
+      const destination = encodeURIComponent(
+        fullAddress || `${apt.hospitalName}, ${apt.hospitalAddress}, Jaipur`
+      );
+      url =
+        Platform.OS === 'ios'
+          ? `http://maps.apple.com/?daddr=${destination}`
+          : `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    }
+
     Linking.openURL(url).catch(() => {
       Alert.alert('Directions', 'Unable to open maps on this device.');
     });
@@ -1362,6 +1586,95 @@ export default function AppointmentsScreen() {
                       </View>
                     )}
 
+                    {/* 4-Step Live Lab & Scan Tracking Timeline */}
+                    {apt.serviceType === 'INVESTIGATION' && apt.status !== 'CANCELLED' && (
+                      <View
+                        style={{
+                          marginTop: 10,
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 12,
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          gap: 6,
+                        }}
+                      >
+                        {(() => {
+                          const rawStatus = String(apt.status || '').toUpperCase();
+                          const etaMatch = String(apt.notes || '').match(/Report ETA:\s*([^|.]+)/i);
+                          const etaLabel = etaMatch?.[1]?.trim() || '1–2 days';
+                          const stepIdx =
+                            rawStatus === 'COMPLETED' || Boolean(apt.prescriptionUrl)
+                              ? 4
+                              : rawStatus === 'PROCESSING'
+                                ? 3
+                                : rawStatus === 'SAMPLE_COLLECTED' || rawStatus === 'IN_PROGRESS'
+                                  ? 2
+                                  : 1;
+                          const steps = [
+                            { n: 1, label: isHi ? 'बुक किया गया' : 'Booked' },
+                            { n: 2, label: isHi ? 'सैंपल लिया गया' : 'Sample / Visited' },
+                            { n: 3, label: isHi ? `जांच जारी (${etaLabel})` : `Processing (${etaLabel})` },
+                            { n: 4, label: isHi ? 'रिपोर्ट ऑनलाइन तैयार' : 'Report Ready' },
+                          ];
+                          return (
+                            <>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                {steps.map((s) => {
+                                  const done = stepIdx >= s.n;
+                                  return (
+                                    <View key={s.n} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+                                      <View
+                                        style={{
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: 9,
+                                          backgroundColor: done ? '#059669' : '#CBD5E1',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                      >
+                                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF' }}>
+                                          {done ? '✓' : s.n}
+                                        </Text>
+                                      </View>
+                                      <Text
+                                        numberOfLines={2}
+                                        style={{
+                                          fontSize: 9.5,
+                                          textAlign: 'center',
+                                          fontWeight: done ? '700' : '500',
+                                          color: done ? '#065F46' : '#64748B',
+                                        }}
+                                      >
+                                        {s.label}
+                                      </Text>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                              {stepIdx === 4 && apt.prescriptionUrl ? (
+                                <TouchableOpacity
+                                  onPress={() => Linking.openURL(apt.prescriptionUrl!)}
+                                  style={{
+                                    marginTop: 4,
+                                    backgroundColor: '#059669',
+                                    borderRadius: 8,
+                                    paddingVertical: 7,
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                                    {isHi ? 'ऑनलाइन रिपोर्ट देखें / डाउनलोड करें' : 'View / Download Online Report'}
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
+                            </>
+                          );
+                        })()}
+                      </View>
+                    )}
+
                     {/* ACTION BUTTONS ROW */}
                     <View
                       style={{
@@ -1555,6 +1868,56 @@ export default function AppointmentsScreen() {
                                     : isHi ? 'पर्चा डाउनलोड' : 'Prescription'}
                             </Text>
                           </TouchableOpacity>
+
+                          {/* Rate Visit / Reviewed Badge for Completed OPD */}
+                          {apt.status === 'COMPLETED' && apt.serviceType === 'OPD_CONCIERGE' && (
+                            reviewedRefs[apt.bookingRef] ? (
+                              <View
+                                style={{
+                                  backgroundColor: '#FEF7E6',
+                                  borderWidth: 1,
+                                  borderColor: '#FDE68A',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 8,
+                                  borderRadius: 10,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                }}
+                              >
+                                <Star size={12} color="#D97706" fill="#D97706" />
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E' }}>
+                                  {reviewedRefs[apt.bookingRef]}/5
+                                </Text>
+                              </View>
+                            ) : (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setReviewRating(5);
+                                  setReviewComment('');
+                                  setReviewTarget(apt);
+                                }}
+                                activeOpacity={0.85}
+                                style={{
+                                  flex: 1,
+                                  backgroundColor: '#FEF7E6',
+                                  borderWidth: 1,
+                                  borderColor: '#FDE68A',
+                                  paddingVertical: 8,
+                                  borderRadius: 10,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 5,
+                                }}
+                              >
+                                <Star size={13} color="#D97706" fill="#D97706" />
+                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#92400E' }}>
+                                  {isHi ? 'रेटिंग दें' : 'Rate Visit'}
+                                </Text>
+                              </TouchableOpacity>
+                            )
+                          )}
 
                           {/* Book Again */}
                           <TouchableOpacity
@@ -1763,6 +2126,7 @@ export default function AppointmentsScreen() {
                       doctorName={isHi && selectedAppointment.doctorNameHi ? selectedAppointment.doctorNameHi : selectedAppointment.doctorName}
                       hospitalName={isHi && selectedAppointment.hospitalNameHi ? selectedAppointment.hospitalNameHi : selectedAppointment.hospitalName}
                       slotTime={`${selectedAppointment.slotDate} • ${selectedAppointment.slotTime}`}
+                      verificationCode={selectedAppointment.verificationCode}
                       size={140}
                     />
                   )}
@@ -1904,7 +2268,7 @@ export default function AppointmentsScreen() {
               </View>
 
               {/* Uploaded Prescription Image inside Modal */}
-              {selectedAppointment?.prescriptionUrl && (
+              {selectedAppointment?.prescriptionUrl ? (
                 <View
                   style={{
                     marginTop: 16,
@@ -1945,7 +2309,49 @@ export default function AppointmentsScreen() {
                     resizeMode="contain"
                   />
                 </View>
-              )}
+              ) : selectedAppointment?.serviceType === 'OPD_CONCIERGE' ? (
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.75 });
+                      if (res.canceled || !res.assets?.[0]?.uri || !selectedAppointment) return;
+                      const url = await uploadPrescriptionSlip(
+                        res.assets[0].uri,
+                        `${selectedAppointment.bookingRef}_patient_rx.jpg`
+                      );
+                      const supabase = getSupabaseClient();
+                      await supabase
+                        .from('bookings')
+                        .update({ bill_image_url: url, updated_at: new Date().toISOString() })
+                        .eq('booking_ref', selectedAppointment.bookingRef);
+                      const updated = { ...selectedAppointment, prescriptionUrl: url };
+                      setSelectedAppointment(updated);
+                      setAppointments((prev) =>
+                        prev.map((a) => (a.bookingRef === updated.bookingRef ? updated : a))
+                      );
+                    } catch {}
+                  }}
+                  activeOpacity={0.85}
+                  style={{
+                    marginTop: 16,
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    padding: 13,
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    borderStyle: 'dashed',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <FileText size={16} color="#2563EB" />
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#2563EB' }}>
+                    {isHi ? 'डॉक्टर का पर्चा अपलोड / सहेजें' : 'Upload / Save Doctor Prescription'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
 
               {/* Pre-visit Guidance */}
               <View
@@ -2055,6 +2461,130 @@ export default function AppointmentsScreen() {
           onPaymentSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* Post-Visit Rating & Review Modal */}
+      <Modal
+        visible={Boolean(reviewTarget)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (reviewTarget) {
+            setDismissedReviewRefs((prev) => ({ ...prev, [reviewTarget.bookingRef]: true }));
+          }
+          setReviewTarget(null);
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 18,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 20,
+              padding: 20,
+              gap: 14,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 17, fontWeight: '900', color: '#0F172A' }}>
+                {isHi ? 'अपनी विज़िट को रेट करें' : 'Rate Your Consultation'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (reviewTarget) {
+                    setDismissedReviewRefs((prev) => ({ ...prev, [reviewTarget.bookingRef]: true }));
+                  }
+                  setReviewTarget(null);
+                }}
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {reviewTarget ? (
+              <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>
+                {reviewTarget.doctorName} · {reviewTarget.hospitalName}
+              </Text>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, paddingVertical: 6 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setReviewRating(star)} activeOpacity={0.8}>
+                  <Star
+                    size={34}
+                    color="#D97706"
+                    fill={star <= reviewRating ? '#D97706' : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              placeholder={isHi ? 'डॉक्टर व अस्पताल का अनुभव लिखें (वैकल्पिक)...' : 'Share your experience with doctor & clinic (optional)...'}
+              placeholderTextColor="#94A3B8"
+              multiline
+              numberOfLines={3}
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: 13,
+                color: '#0F172A',
+                minHeight: 76,
+                textAlignVertical: 'top',
+              }}
+            />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (reviewTarget) {
+                    setDismissedReviewRefs((prev) => ({ ...prev, [reviewTarget.bookingRef]: true }));
+                  }
+                  setReviewTarget(null);
+                }}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: '#F1F5F9',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>
+                  {isHi ? 'बाद में' : 'Later'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => void handleSubmitReview()}
+                disabled={submittingReview}
+                style={{
+                  paddingHorizontal: 18,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: '#2563EB',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                  {submittingReview ? (isHi ? 'सहेजा जा रहा है...' : 'Submitting...') : isHi ? 'समीक्षा सबमिट करें' : 'Submit Review'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

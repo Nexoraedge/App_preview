@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import {
   AlertTriangle,
   ArrowUpRight,
+  BedDouble,
   Camera,
   CheckCircle2,
   ClipboardList,
@@ -25,17 +26,21 @@ import {
   Download,
   ExternalLink,
   FileImage,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   Maximize2,
+  Menu,
   MessageCircle,
   Minimize2,
   PackageCheck,
   Phone,
+  Pill,
   QrCode,
   RefreshCw,
   Search,
   Settings,
+  Stethoscope,
   Store,
   Truck,
   Volume2,
@@ -46,6 +51,9 @@ import {
 import { getSupabaseClient } from '@adityam/supabase';
 import type { Booking } from '@adityam/types';
 import { usePartnerAuth } from './PartnerAuthGate';
+import { PartnerIpdDesk } from './ipd/PartnerIpdDesk';
+import { PartnerLabsDesk } from './labs/PartnerLabsDesk';
+import { getPartnerOpenMenus, setPartnerOpenMenus } from '../../src/services/partnerNavState';
 import { logAdminAudit } from '../../src/services/adminAudit';
 import {
   playAdminAlertChime,
@@ -53,6 +61,9 @@ import {
   playPatientBillChime,
   requestDesktopNotificationPermission,
 } from '../../src/services/adminAlerts';
+import { PARTNER_MODULE_META, type PartnerModule } from '../../src/services/partnerModules';
+import { OpdPartnerModule } from './OpdPartnerModule';
+import { OpdCatalogManager } from './OpdCatalogManager';
 
 const THEME = {
   bg: '#FAF8F2',
@@ -100,7 +111,7 @@ const DEFAULT_WEEK_SCHEDULE: Record<DayKey, DayScheduleRow> = {
   sat: { open: true, start: '08:00', end: '14:00', hasBreak: true, start2: '16:30', end2: '22:00' },
   sun: { open: true, start: '09:00', end: '21:00', hasBreak: false, start2: '17:00', end2: '21:00' },
 };
-type PartnerTab = 'dashboard' | 'orders' | 'scanner' | 'payouts' | 'settings';
+type PartnerTab = 'dashboard' | 'orders' | 'opd' | 'opd_doctors' | 'opd_hospital' | 'labs' | 'ipd' | 'scanner' | 'payouts' | 'settings';
 type OrderFilter = 'ACTIVE' | 'NEEDS_QUOTE' | 'PAID_DELIVER' | 'UNPAID' | 'COMPLETED' | 'LOST' | 'ALL';
 type OrderDateFilter = 'ALL' | 'TODAY' | '7D' | 'THIS_MONTH' | 'LAST_MONTH' | 'CUSTOM';
 
@@ -193,11 +204,28 @@ export function PharmacyPartnerPortal({
   const { partnerUser, signOutPartner } = usePartnerAuth();
 
   const [activeTab, setActiveTab] = useState<PartnerTab>(initialTab || 'dashboard');
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => getPartnerOpenMenus());
+  const [moduleCounts, setModuleCounts] = useState<{ labs: number; ipd: number }>({
+    labs: 0,
+    ipd: 0,
+  });
   const [pharmacies, setPharmacies] = useState<PharmacyInfo[]>([]);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(
     partnerUser?.partnerEntityId || null
   );
   const [orders, setOrders] = useState<BookingWithPartner[]>([]);
+  const [opdSummary, setOpdSummary] = useState<{ upcoming: number; visitedToday: number; gross: number; latest: any[] }>({
+    upcoming: 0,
+    visitedToday: 0,
+    gross: 0,
+    latest: [],
+  });
   const [payouts, setPayouts] = useState<PharmacyPayoutRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('ACTIVE');
@@ -410,6 +438,60 @@ export function PharmacyPartnerPortal({
 
       setOrders(scopedOrders);
       setPayouts((payoutsRes.data || []) as PharmacyPayoutRow[]);
+
+      if (partnerUser?.enabledModules?.includes('OPD')) {
+        let opdQuery = supabase
+          .from('bookings')
+          .select('*')
+          .in('service_type', ['OPD_CONCIERGE', 'OPD'])
+          .order('created_at', { ascending: false })
+          .limit(100);
+        const hospScope =
+          partnerUser?.partnerHospitalId ||
+          (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null);
+        if (hospScope) {
+          opdQuery = opdQuery.eq('hospital_id', hospScope);
+        }
+        const { data: opdRows } = await opdQuery;
+        const rows = opdRows || [];
+        const todayStr = new Date().toDateString();
+        let upcoming = 0;
+        let visitedToday = 0;
+        let gross = 0;
+        for (const r of rows) {
+          if (r.status !== 'COMPLETED' && r.status !== 'CANCELLED' && r.status !== 'MISSED') {
+            upcoming += 1;
+          }
+          if (r.status === 'COMPLETED') {
+            gross += Number(r.final_payable ?? r.doctor_fee ?? 0);
+            if (r.checked_in_at && new Date(r.checked_in_at).toDateString() === todayStr) {
+              visitedToday += 1;
+            }
+          }
+        }
+        setOpdSummary({
+          upcoming,
+          visitedToday,
+          gross,
+          latest: rows.filter((r: any) => r.status !== 'COMPLETED' && r.status !== 'CANCELLED').slice(0, 3),
+        });
+      }
+
+      const { data: extraCountRows } = await supabase
+        .from('bookings')
+        .select('service_type, status')
+        .in('service_type', ['INVESTIGATION', 'LAB_TEST', 'IPD_ENQUIRY'])
+        .limit(250);
+      let labsPending = 0;
+      let ipdPending = 0;
+      for (const r of (extraCountRows as any[]) || []) {
+        const st = String(r.status || '').toUpperCase();
+        if (['COMPLETED', 'CANCELLED', 'MISSED', 'REJECTED', 'DISCHARGED'].includes(st)) continue;
+        const svc = String(r.service_type || '').toUpperCase();
+        if (svc.includes('IPD')) ipdPending += 1;
+        else labsPending += 1;
+      }
+      setModuleCounts({ labs: labsPending, ipd: ipdPending });
     } catch (err) {
       console.warn('[PharmacyPartnerPortal] load error:', err);
     } finally {
@@ -748,9 +830,34 @@ export function PharmacyPartnerPortal({
 
   const handleNavTabPress = (tabId: PartnerTab) => {
     setSelectedOrder(null);
+    if (tabId === 'opd') {
+      router.replace('/partner/opd' as any);
+      return;
+    }
+    if (tabId === 'opd_doctors') {
+      router.replace('/partner/opd/doctors' as any);
+      return;
+    }
+    if (tabId === 'opd_hospital') {
+      router.replace('/partner/opd/hospital' as any);
+      return;
+    }
+    const slugMap: Partial<Record<PartnerTab, string>> = {
+      dashboard: '/partner',
+      orders: '/partner/pharmacy/orders',
+      settings: '/partner/pharmacy/settings',
+      labs: '/partner/labs',
+      scanner: '/partner/scanner',
+      payouts: '/partner/payouts',
+    };
+    const targetSlug = slugMap[tabId] || '/partner';
     setActiveTab(tabId);
     if (initialOrderRef) {
-      router.replace('/partner' as any);
+      router.replace(targetSlug as any);
+    } else if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history?.replaceState) {
+      window.history.replaceState(null, '', targetSlug);
+    } else {
+      router.replace(targetSlug as any);
     }
   };
 
@@ -1048,22 +1155,82 @@ export function PharmacyPartnerPortal({
     } catch {}
   };
 
-  const navItems: { id: PartnerTab; label: string; icon: any; badge?: number }[] = [
+  const enabledModules: PartnerModule[] = partnerUser?.enabledModules?.length
+    ? partnerUser.enabledModules
+    : ['PHARMACY'];
+
+  const navItems: { id: PartnerTab; label: string; icon: any; badge?: number; children?: { id: PartnerTab; label: string; badge?: number }[] }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ClipboardList, badge: stats.activeCount },
+    ...(enabledModules.includes('PHARMACY')
+      ? [
+          {
+            id: 'orders' as PartnerTab,
+            label: enabledModules.length > 1 ? 'Pharmacy' : 'Orders',
+            icon: Pill,
+            badge: stats.activeCount || undefined,
+            children: [
+              { id: 'orders' as PartnerTab, label: 'Orders Queue', badge: stats.activeCount || undefined },
+              { id: 'settings' as PartnerTab, label: 'Store & Delivery' },
+            ],
+          },
+        ]
+      : []),
+    ...(enabledModules.includes('OPD')
+      ? [
+          {
+            id: 'opd' as PartnerTab,
+            label: 'OPD',
+            icon: Stethoscope,
+            badge: opdSummary.upcoming || undefined,
+            children: [
+              { id: 'opd' as PartnerTab, label: 'OPD Queue', badge: opdSummary.upcoming || undefined },
+              { id: 'opd_doctors' as PartnerTab, label: 'Doctors & Timings' },
+              { id: 'opd_hospital' as PartnerTab, label: 'Hospital & Branches' },
+            ],
+          },
+        ]
+      : []),
+    ...(enabledModules.includes('LABS')
+      ? [{ id: 'labs' as PartnerTab, label: 'Labs & Tests', icon: FlaskConical, badge: moduleCounts.labs || undefined }]
+      : []),
+    ...(enabledModules.includes('IPD')
+      ? [{ id: 'ipd' as PartnerTab, label: 'IPD Desk', icon: BedDouble, badge: moduleCounts.ipd || undefined }]
+      : []),
     { id: 'scanner', label: 'Scan QR', icon: QrCode },
     { id: 'payouts', label: 'Payouts', icon: Wallet },
-    { id: 'settings', label: 'Store', icon: Settings },
   ];
 
   const pageTitleMap: Record<PartnerTab, { title: string; subtitle: string }> = {
     dashboard: {
-      title: 'Pharmacy Dashboard',
-      subtitle: 'Live prescription triage, today’s dispenses & net earnings',
+      title: enabledModules.length > 1 ? 'Partner Command Dashboard' : 'Pharmacy Dashboard',
+      subtitle:
+        enabledModules.length > 1
+          ? `Active Modules: ${enabledModules.map((m) => PARTNER_MODULE_META[m].shortLabel).join(' · ')}`
+          : 'Live prescription triage, today’s dispenses & net earnings',
     },
     orders: {
       title: 'Prescription & Medicine Orders',
       subtitle: 'Quote bills, call patients, inspect Rx slips & verify pickup',
+    },
+    opd: {
+      title: 'OPD Appointments & Token Queue',
+      subtitle: 'Doctor slots, patient check-ins & consultation prescriptions',
+    },
+    opd_doctors: {
+      title: 'OPD Doctors & Sitting Timings',
+      subtitle: 'Add or remove doctors, manage sitting hours, slot capacity & availability',
+    },
+    opd_hospital: {
+      title: 'Hospital Profile, Facilities & Branches',
+      subtitle: 'Add hospitals, toggle branches ON/OFF, manage facilities & 24x7 hours',
+    },
+    labs: {
+      title: 'Labs & Diagnostic Tests',
+      subtitle: 'Home sample collection, center visits & report uploads',
+    },
+    ipd: {
+      title: 'IPD & Surgery Desk',
+      subtitle: 'Cashless TPA coordination, bed availability & admissions',
     },
     scanner: {
       title: 'QR & Code Verification Desk',
@@ -1114,7 +1281,7 @@ export function PharmacyPartnerPortal({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14.5, fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>
-                  {currentPharmacy?.name || 'Partner Desk'}
+                  Partner Desk
                 </Text>
                 <Text style={{ fontSize: 11, color: '#A7D7C0' }}>
                   Adityam Partner Portal
@@ -1124,43 +1291,120 @@ export function PharmacyPartnerPortal({
 
             <View style={{ gap: 4 }}>
               {navItems.map((tab) => {
-                const active = activeTab === tab.id;
+                const hasChildren = Boolean(tab.children?.length);
+                const menuExpanded = Boolean(openMenus[tab.id]);
+                const isGroupActive = hasChildren
+                  ? tab.children!.some((c) => c.id === activeTab)
+                  : activeTab === tab.id;
                 const Icon = tab.icon;
                 return (
-                  <TouchableOpacity
-                    key={tab.id}
-                    onPress={() => handleNavTabPress(tab.id)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                      backgroundColor: active ? 'rgba(255,255,255,0.14)' : 'transparent',
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Icon size={17} color={active ? '#FFFFFF' : '#9DC0B1'} />
-                      <Text style={{ fontSize: 13.5, fontWeight: active ? '800' : '600', color: active ? '#FFFFFF' : '#C6E2D4' }}>
-                        {tab.label}
-                      </Text>
-                    </View>
-                    {tab.badge ? (
-                      <View
-                        style={{
-                          backgroundColor: '#F3DBA8',
-                          paddingHorizontal: 7,
-                          paddingVertical: 1,
-                          borderRadius: 99,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.greenDark }}>
-                          {tab.badge}
+                  <View key={tab.id} style={{ gap: 3 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (hasChildren) {
+                          setOpenMenus((prev) => {
+                            const next = { ...prev, [tab.id]: !prev[tab.id] };
+                            setPartnerOpenMenus(next);
+                            return next;
+                          });
+                        } else {
+                          handleNavTabPress(tab.id);
+                        }
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: isGroupActive && !hasChildren ? 'rgba(255,255,255,0.14)' : 'transparent',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Icon size={17} color={isGroupActive ? '#FFFFFF' : '#9DC0B1'} />
+                        <Text style={{ fontSize: 13.5, fontWeight: isGroupActive ? '800' : '600', color: isGroupActive ? '#FFFFFF' : '#C6E2D4' }}>
+                          {tab.label}
                         </Text>
                       </View>
-                    ) : null}
-                  </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {tab.badge ? (
+                          <View
+                            style={{
+                              backgroundColor: '#F3DBA8',
+                              paddingHorizontal: 7,
+                              paddingVertical: 1,
+                              borderRadius: 99,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.greenDark }}>
+                              {tab.badge}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {hasChildren && (
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#9DC0B1' }}>
+                            {menuExpanded ? '▾' : '▸'}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {hasChildren && menuExpanded && (
+                      <View
+                        style={{
+                          marginLeft: 18,
+                          paddingLeft: 10,
+                          borderLeftWidth: 1,
+                          borderLeftColor: 'rgba(255,255,255,0.14)',
+                          gap: 2,
+                        }}
+                      >
+                        {tab.children!.map((sub) => {
+                          const subActive = activeTab === sub.id;
+                          return (
+                            <TouchableOpacity
+                              key={sub.id}
+                              onPress={() => handleNavTabPress(sub.id)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: subActive ? 'rgba(167,243,208,0.18)' : 'transparent',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12.5,
+                                  fontWeight: subActive ? '800' : '600',
+                                  color: subActive ? '#FFFFFF' : '#B5D6C7',
+                                }}
+                              >
+                                • {sub.label}
+                              </Text>
+                              {sub.badge ? (
+                                <View
+                                  style={{
+                                    backgroundColor: '#F3DBA8',
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 1,
+                                    borderRadius: 99,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.greenDark }}>
+                                    {sub.badge}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 );
               })}
             </View>
@@ -1202,7 +1446,7 @@ export function PharmacyPartnerPortal({
                   {partnerUser?.fullName}
                 </Text>
                 <Text style={{ fontSize: 10.5, color: '#9DC0B1' }}>
-                  {partnerUser?.role === 'admin' || partnerUser?.role === 'super_admin' ? 'ADMIN PREVIEW' : 'PHARMACY PARTNER'}
+                  {partnerUser?.role === 'admin' || partnerUser?.role === 'super_admin' ? 'ADMIN PREVIEW' : 'PARTNER PORTAL'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1240,18 +1484,19 @@ export function PharmacyPartnerPortal({
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
               {!isDesktop && (
-                <View
+                <TouchableOpacity
+                  onPress={() => setMobileDrawerOpen(true)}
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     borderRadius: 10,
-                    backgroundColor: 'rgba(255,255,255,0.14)',
+                    backgroundColor: 'rgba(255,255,255,0.16)',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Store size={18} color="#A7D7C0" />
-                </View>
+                  <Menu size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               )}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
@@ -2556,6 +2801,80 @@ export function PharmacyPartnerPortal({
                 </TouchableOpacity>
               </View>
 
+              {/* OPD Live Overview Card (shown when OPD module is enabled) */}
+              {enabledModules.includes('OPD') && (
+                <View
+                  style={{
+                    backgroundColor: THEME.surface,
+                    borderRadius: 16,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                    gap: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: THEME.ink }}>
+                        OPD Appointments Overview
+                      </Text>
+                      <Text style={{ fontSize: 12, color: THEME.muted }}>
+                        {opdSummary.upcoming} upcoming · {opdSummary.visitedToday} visited today · {formatInr(opdSummary.gross)} completed
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setActiveTab('opd')}
+                      style={{
+                        backgroundColor: '#EFF6FF',
+                        borderWidth: 1,
+                        borderColor: '#BFDBFE',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 9,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4ED8' }}>
+                        Open OPD Queue →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {opdSummary.latest.length > 0 && (
+                    <View style={{ gap: 6 }}>
+                      {opdSummary.latest.map((opd) => (
+                        <TouchableOpacity
+                          key={opd.id || opd.booking_ref}
+                          onPress={() => setActiveTab('opd')}
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            paddingVertical: 9,
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: THEME.ink }}>
+                              #{opd.booking_ref} · {opd.patient_name}
+                            </Text>
+                            <Text style={{ fontSize: 11.5, color: THEME.muted }}>
+                              {opd.doctor_name} · {opd.slot_time}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 12.5, fontWeight: '800', color: THEME.greenDark }}>
+                            {formatInr(Number(opd.final_payable ?? opd.doctor_fee ?? 0))}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* 2-Column Responsive Workspace */}
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
                 {/* Urgent Quote Queue */}
@@ -2751,7 +3070,61 @@ export function PharmacyPartnerPortal({
               </View>
             </View>
           ) : activeTab === 'orders' ? (
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 14 }}>
+              {/* Pharmacy Stats Strip */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {[
+                  {
+                    label: 'NEEDS QUOTE',
+                    value: String(stats.needsQuoteCount),
+                    sub: 'Awaiting Rx bill quote',
+                    dark: false,
+                  },
+                  {
+                    label: 'READY / DELIVERY',
+                    value: String(stats.readyCount),
+                    sub: 'Confirmed & in progress',
+                    dark: false,
+                  },
+                  {
+                    label: 'DISPENSED TODAY',
+                    value: String(stats.dispensedToday),
+                    sub: 'Completed counter / delivery',
+                    dark: true,
+                  },
+                  {
+                    label: 'PHARMACY GROSS',
+                    value: `₹${stats.totalGross.toLocaleString('en-IN')}`,
+                    sub: `${currentPharmacy?.app_discount_pct ?? 20}% App Offer · ${currentPharmacy?.is_active !== false ? 'Store Open' : 'Closed'}`,
+                    dark: false,
+                  },
+                ].map((kpi) => (
+                  <View
+                    key={kpi.label}
+                    style={{
+                      flex: 1,
+                      minWidth: 165,
+                      backgroundColor: kpi.dark ? THEME.greenDark : THEME.surface,
+                      borderRadius: 14,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: kpi.dark ? THEME.greenDark : THEME.border,
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: kpi.dark ? '#A7D7C0' : THEME.muted }}>
+                      {kpi.label}
+                    </Text>
+                    <Text style={{ fontSize: 22, fontWeight: '900', color: kpi.dark ? '#FFFFFF' : THEME.ink }}>
+                      {kpi.value}
+                    </Text>
+                    <Text style={{ fontSize: 11.5, color: kpi.dark ? '#C6E2D4' : THEME.muted }}>
+                      {kpi.sub}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
               {/* Search + Date Dropdown + Status Dropdown */}
               <View
                 style={{
@@ -3681,6 +4054,40 @@ export function PharmacyPartnerPortal({
                 ))
               )}
             </View>
+          ) : activeTab === 'opd' ? (
+            <OpdPartnerModule
+              hospitalId={partnerUser?.partnerHospitalId || (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)}
+              actorId={partnerUser?.id}
+              actorName={partnerUser?.fullName}
+              actorRole={partnerUser?.role}
+              soundEnabled={soundAlertsRef.current}
+            />
+          ) : activeTab === 'opd_doctors' ? (
+            <OpdCatalogManager
+              mode="doctors"
+              hospitalId={partnerUser?.partnerHospitalId || (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)}
+              actorId={partnerUser?.id}
+            />
+          ) : activeTab === 'opd_hospital' ? (
+            <OpdCatalogManager
+              mode="hospital"
+              hospitalId={partnerUser?.partnerHospitalId || (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)}
+              actorId={partnerUser?.id}
+            />
+          ) : activeTab === 'ipd' ? (
+            <PartnerIpdDesk
+              hospitalId={
+                partnerUser?.partnerHospitalId ||
+                (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)
+              }
+            />
+          ) : activeTab === 'labs' ? (
+            <PartnerLabsDesk
+              labCentreId={
+                partnerUser?.partnerLabId ||
+                (partnerUser?.partnerType === 'lab' ? partnerUser?.partnerEntityId : null)
+              }
+            />
           ) : (
             /* Store Profile & Delivery Settings Tab */
             <View
@@ -4189,39 +4596,206 @@ export function PharmacyPartnerPortal({
         </ScrollView>
       </View>
 
-      {/* Mobile / Tablet Bottom Tab Bar */}
+      {/* Mobile / Tablet Slide-Over Burger Sidebar Drawer */}
       {!isDesktop && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: THEME.surface,
-            borderTopWidth: 1,
-            borderTopColor: THEME.border,
-            flexDirection: 'row',
-            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-            paddingTop: 8,
-          }}
+        <Modal
+          visible={mobileDrawerOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMobileDrawerOpen(false)}
         >
-          {navItems.map((tab) => {
-            const active = activeTab === tab.id;
-            const Icon = tab.icon;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() => handleNavTabPress(tab.id)}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 }}
-              >
-                <Icon size={19} color={active ? THEME.green : THEME.muted} />
-                <Text style={{ fontSize: 10.5, fontWeight: active ? '800' : '600', color: active ? THEME.green : THEME.muted }}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: 'rgba(15, 23, 42, 0.55)' }}>
+            <View
+              style={{
+                width: 272,
+                backgroundColor: THEME.greenDark,
+                paddingTop: Platform.OS === 'ios' ? 48 : 24,
+                paddingBottom: 24,
+                paddingHorizontal: 14,
+                justifyContent: 'space-between',
+                height: '100%',
+              }}
+            >
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    paddingHorizontal: 8,
+                    paddingBottom: 18,
+                    borderBottomWidth: 1,
+                    borderBottomColor: 'rgba(255,255,255,0.08)',
+                    marginBottom: 14,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Store size={19} color="#A7F3D0" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' }}>
+                        {currentPharmacy?.name || 'Partner Portal'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontWeight: '600' }}>
+                        Adityam Partner Portal
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setMobileDrawerOpen(false)}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <X size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 6 }}>
+                  {navItems.map((item) => {
+                    const hasChildren = Boolean(item.children && item.children.length > 0);
+                    const isChildActive = hasChildren && item.children?.some((child) => child.id === activeTab);
+                    const active = activeTab === item.id || Boolean(isChildActive);
+                    const menuExpanded = Boolean(openMenus[item.id]);
+                    const Icon = item.icon;
+                    return (
+                      <View key={item.id}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (hasChildren) {
+                              setOpenMenus((prev) => {
+                                const next = { ...prev, [item.id]: !prev[item.id] };
+                                setPartnerOpenMenus(next);
+                                return next;
+                              });
+                            } else {
+                              handleNavTabPress(item.id);
+                              setMobileDrawerOpen(false);
+                            }
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 10,
+                            paddingVertical: 11,
+                            paddingHorizontal: 12,
+                            borderRadius: 10,
+                            backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+                          }}
+                        >
+                          <Icon size={18} color={active ? '#A7F3D0' : 'rgba(255,255,255,0.72)'} />
+                          <Text
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: active ? '800' : '600',
+                              color: active ? '#FFFFFF' : 'rgba(255,255,255,0.76)',
+                              flex: 1,
+                            }}
+                          >
+                            {item.label}
+                          </Text>
+                          {item.badge ? (
+                            <View style={{ backgroundColor: '#F3DBA8', paddingHorizontal: 7, paddingVertical: 1, borderRadius: 99 }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: THEME.greenDark }}>{item.badge}</Text>
+                            </View>
+                          ) : null}
+                          {hasChildren ? (
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.72)' }}>
+                              {menuExpanded ? '▾' : '▸'}
+                            </Text>
+                          ) : null}
+                        </TouchableOpacity>
+
+                        {hasChildren && menuExpanded && (
+                          <View style={{ marginTop: 4, marginLeft: 18, paddingLeft: 10, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.14)', gap: 4 }}>
+                            {item.children?.map((child) => {
+                              const childActive = activeTab === child.id;
+                              return (
+                                <TouchableOpacity
+                                  key={child.id}
+                                  onPress={() => {
+                                    handleNavTabPress(child.id);
+                                    setMobileDrawerOpen(false);
+                                  }}
+                                  style={{
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 10,
+                                    borderRadius: 8,
+                                    backgroundColor: childActive ? 'rgba(167,243,208,0.16)' : 'transparent',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12.5,
+                                      fontWeight: childActive ? '800' : '600',
+                                      color: childActive ? '#A7F3D0' : 'rgba(255,255,255,0.72)',
+                                    }}
+                                  >
+                                    {child.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 14, gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' }}>
+                      {partnerUser?.fullName || partnerUser?.email || 'Partner Staff'}
+                    </Text>
+                    <Text style={{ fontSize: 10.5, color: '#A7F3D0', fontWeight: '700', textTransform: 'uppercase' }}>
+                      {partnerUser?.role?.replace(/_/g, ' ') || 'PARTNER'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setMobileDrawerOpen(false);
+                      void signOutPartner();
+                    }}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <LogOut size={16} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => setMobileDrawerOpen(false)}
+            />
+          </View>
+        </Modal>
       )}
 
       {/* Send / Edit Quote Modal */}

@@ -44,7 +44,7 @@ export default function OpdConciergeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { language } = useLanguage();
-  const { coords, activeAddress, currentLocationName } = useLocation();
+  const { coords, activeAddress, currentLocationName, detectCurrentLocation, openLocationPicker } = useLocation();
   const isHi = language === 'hi';
   const c = isHi ? opdCopy.hi : opdCopy.en;
   const insets = useSafeAreaInsets();
@@ -107,32 +107,19 @@ export default function OpdConciergeScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
 
-  // TanStack Query for PostGIS Nearby Hospitals
-  const activeLat = useMemo(() => {
-    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
-    const isJp = locText.includes('jaipur') || String(activeAddress?.pincode || '').startsWith('302');
-    if (isJp) {
-      const lat = Number(activeAddress?.latitude);
-      if (lat >= 26.0 && lat <= 28.0) return lat;
-      return 26.9205;
-    }
+  // Real coordinates ONLY (Active Saved Address > LocationContext GPS; never hardcode demo city coords)
+  const activeLat = useMemo<number | null>(() => {
     if (activeAddress?.latitude) return Number(activeAddress.latitude);
     if (coords?.latitude) return Number(coords.latitude);
-    return 28.5244;
-  }, [activeAddress, coords, currentLocationName, user?.city]);
+    return null;
+  }, [activeAddress?.latitude, coords?.latitude]);
 
-  const activeLng = useMemo(() => {
-    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
-    const isJp = locText.includes('jaipur') || String(activeAddress?.pincode || '').startsWith('302');
-    if (isJp) {
-      const lng = Number(activeAddress?.longitude);
-      if (lng >= 75.0 && lng <= 77.0) return lng;
-      return 75.8450;
-    }
+  const activeLng = useMemo<number | null>(() => {
     if (activeAddress?.longitude) return Number(activeAddress.longitude);
     if (coords?.longitude) return Number(coords.longitude);
-    return 77.2167;
-  }, [activeAddress, coords, currentLocationName, user?.city]);
+    return null;
+  }, [activeAddress?.longitude, coords?.longitude]);
+
   const { data: hospitals = [], isLoading, refetch } = useQuery({
     queryKey: ['nearby-hospitals', selectedSpecialty, activeLat, activeLng],
     queryFn: () =>
@@ -141,6 +128,8 @@ export default function OpdConciergeScreen() {
         activeLng,
         selectedSpecialty === 'All' ? undefined : selectedSpecialty
       ),
+    staleTime: 15_000,
+    refetchInterval: 20_000,
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -153,48 +142,44 @@ export default function OpdConciergeScreen() {
     }
   }, [refetch]);
 
-  // Flattened doctors across all hospitals and branches
+  // Flattened doctors across all hospitals and branches (closest branch first)
   const allDoctors = useMemo<FlattenedDoctor[]>(() => {
     const list: FlattenedDoctor[] = [];
-    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
-    const isJp = locText.includes('jaipur');
+    const hasSearch = searchQuery.trim().length > 0;
 
-    const sourceHospitals = isJp
-      ? hospitals.filter((h) => h.city.toLowerCase().includes('jaipur') || (h.distance_km ?? 999) <= 45)
-      : hospitals;
+    hospitals.forEach((h: any) => {
+      const hospActive = h.is_active !== false;
+      if (!hasSearch && !hospActive) return;
 
-    const targetHospitals = sourceHospitals.length > 0 ? sourceHospitals : hospitals;
+      (h.branches || []).forEach((b: any) => {
+        const branchActive = b.is_active !== false;
+        if (!hasSearch && !branchActive) return;
 
-    targetHospitals.forEach((h) => {
-      (h.branches || []).forEach((b) => {
-        (b.doctors || []).forEach((d) => {
+        (b.doctors || []).forEach((d: any) => {
+          const docActive = d.is_active !== false;
+          if (!hasSearch && !docActive) return;
+
           list.push({
             ...d,
             hospitalId: h.id,
             hospitalName: h.name,
             hospitalDiscount: h.discount_percentage,
-            hospitalFeatured: !!h.featured,
+            hospitalFeatured: Boolean(h.featured || h.is_featured),
             branchId: b.id,
             branchName: b.name,
-            distanceKm: b.distance_km ?? h.distance_km ?? 5.0,
-          });
+            distanceKm: typeof b.distance_km === 'number' ? b.distance_km : h.distance_km ?? 999,
+            isAvailable: hospActive && branchActive && docActive,
+          } as any);
         });
       });
     });
     return list;
-  }, [hospitals, activeAddress, currentLocationName, user?.city]);
+  }, [hospitals, searchQuery]);
 
   // Filtered & Sorted Hospitals
   const filteredHospitals = useMemo(() => {
-    let list = [...hospitals];
-
-    const locText = `${activeAddress?.city || ''} ${activeAddress?.landmark_street || ''} ${currentLocationName || ''} ${user?.city || ''}`.toLowerCase();
-    if (locText.includes('jaipur')) {
-      const jaipurList = list.filter((h) => h.city.toLowerCase().includes('jaipur') || (h.distance_km ?? 999) <= 45);
-      if (jaipurList.length > 0) {
-        list = jaipurList;
-      }
-    }
+    const hasSearch = searchQuery.trim().length > 0;
+    let list = hospitals.filter((h: any) => hasSearch || h.is_active !== false);
 
     if (selectedSpecialty !== 'All') {
       const target = selectedSpecialty.toLowerCase();
@@ -203,27 +188,36 @@ export default function OpdConciergeScreen() {
       );
     }
 
-    if (searchQuery.trim()) {
+    if (hasSearch) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((h) => {
         const nameMatch = h.name.toLowerCase().includes(q);
-        const addressMatch = h.address.toLowerCase().includes(q);
-        const cityMatch = h.city.toLowerCase().includes(q);
-        const specialtyMatch = h.specialties.some((s) => s.toLowerCase().includes(q));
+        const addressMatch = (h.address || '').toLowerCase().includes(q);
+        const cityMatch = (h.city || '').toLowerCase().includes(q);
+        const specialtyMatch = (h.specialties || []).some((s) => s.toLowerCase().includes(q));
         const branchMatch = h.branches?.some(
           (b) =>
             b.name.toLowerCase().includes(q) ||
-            b.area.toLowerCase().includes(q) ||
-            b.doctors.some((d) => d.name.toLowerCase().includes(q))
+            (b.area || '').toLowerCase().includes(q) ||
+            (b.doctors || []).some((d) => d.name.toLowerCase().includes(q))
         );
         return nameMatch || addressMatch || cityMatch || specialtyMatch || branchMatch;
       });
     }
 
     if (sortBy === 'nearest') {
-      list.sort((a, b) => (a.distance_km ?? 99) - (b.distance_km ?? 99));
+      list.sort((a: any, b: any) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
     } else if (sortBy === 'topRated') {
-      list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+      // Cooperative / Featured hospitals first (by priority_rank asc), then rating desc
+      list.sort((a: any, b: any) => {
+        const aFeat = a.featured || a.is_featured ? 1 : 0;
+        const bFeat = b.featured || b.is_featured ? 1 : 0;
+        if (bFeat !== aFeat) return bFeat - aFeat;
+        const aRank = Number(a.priority_rank ?? 100);
+        const bRank = Number(b.priority_rank ?? 100);
+        if (aFeat && bFeat && aRank !== bRank) return aRank - bRank;
+        return (b.rating ?? 0) - (a.rating ?? 0);
+      });
     } else if (sortBy === 'today') {
       list.sort((a, b) => {
         const aHasToday = a.branches?.some((br) =>
@@ -483,6 +477,56 @@ export default function OpdConciergeScreen() {
               </View>
             </View>
 
+            {(!activeLat || !activeLng) && (
+              <View
+                style={{
+                  marginBottom: 14,
+                  backgroundColor: '#EFF6FF',
+                  borderRadius: 14,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: '#BFDBFE',
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E40AF', lineHeight: 17 }}>
+                  {isHi
+                    ? '📍 नज़दीकी अस्पताल और सटीक दूरी देखने के लिए अपनी लोकेशन चुनें।'
+                    : '📍 Set your location or enable GPS to see exact distance to the nearest hospital branch.'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  <TouchableOpacity
+                    onPress={() => detectCurrentLocation()}
+                    style={{
+                      backgroundColor: '#2563EB',
+                      paddingHorizontal: 11,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#FFFFFF' }}>
+                      {isHi ? 'GPS लोकेशन चुनें' : 'Use GPS Location'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => openLocationPicker()}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 11,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#93C5FD',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4ED8' }}>
+                      {isHi ? 'पता चुनें' : 'Select Address'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {isLoading || screenLoading ? (
               <View>
                 <HospitalCardSkeleton />
@@ -511,24 +555,57 @@ export default function OpdConciergeScreen() {
                   <Building2 size={28} color="#94A3B8" />
                 </View>
                 <Text
-                  style={{ fontSize: 16, fontWeight: '700', color: '#182F3B' }}
+                  style={{ fontSize: 16, fontWeight: '700', color: '#182F3B', textAlign: 'center' }}
                 >
-                  {c.noHospitalsFound}
+                  {hospitals.length === 0
+                    ? isHi
+                      ? 'अभी आपके क्षेत्र में कोई अस्पताल लाइव नहीं है'
+                      : 'No Hospitals Live in Your Area Yet'
+                    : c.noHospitalsFound}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    maxWidth: 300,
+                    lineHeight: 18,
+                  }}
+                >
+                  {hospitals.length === 0
+                    ? isHi
+                      ? 'हम आपके शहर में सत्यापित अस्पताल जोड़ रहे हैं। कृपया दूसरा स्थान चुनें या कुछ समय बाद देखें।'
+                      : 'We are onboarding verified partner hospitals here. Try another location or check back shortly.'
+                    : isHi
+                      ? 'सभी अस्पताल देखने के लिए फ़िल्टर रीसेट करें।'
+                      : 'Reset your search or specialty filter to see all available hospitals.'}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => setSelectedSpecialty('All')}
+                  onPress={() => {
+                    if (hospitals.length === 0) {
+                      openLocationPicker();
+                    } else {
+                      setSearchQuery('');
+                      setSelectedSpecialty('All');
+                    }
+                  }}
                   style={{
                     marginTop: 14,
                     backgroundColor: '#2563EB',
                     paddingHorizontal: 16,
-                    paddingVertical: 8,
+                    paddingVertical: 9,
                     borderRadius: 12,
                   }}
                 >
                   <Text
                     style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}
                   >
-                    {c.resetFilters}
+                    {hospitals.length === 0
+                      ? isHi
+                        ? 'लोकेशन बदलें'
+                        : 'Change Location'
+                      : c.resetFilters}
                   </Text>
                 </TouchableOpacity>
               </View>

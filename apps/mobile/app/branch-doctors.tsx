@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
+  ActivityIndicator,
+  Linking,
   View,
   Text,
   ScrollView,
@@ -34,11 +36,14 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronRight,
+  Stethoscope,
 } from 'lucide-react-native';
-import { fetchNearbyHospitals, getSupabaseClient, SEED_HOSPITALS } from '@adityam/supabase';
+import { getSupabaseClient } from '@adityam/supabase';
 import type { Hospital, HospitalBranch, Doctor, Booking } from '@adityam/types';
 import { useAuth } from '../src/context/AuthContext';
 import { useLanguage } from '../src/context/LanguageContext';
+import { useLocation } from '../src/context/LocationContext';
+import { calculateDistanceKm } from '../src/lib/supabase';
 import { BookingSlotModal } from '../components/opd/BookingSlotModal';
 import { saveNewBooking } from '../src/services/bookingStorage';
 import { triggerBrowserNotification } from '../src/services/notificationService';
@@ -78,6 +83,7 @@ export default function BranchDoctorsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { activeAddress } = useLocation();
   const { t, language } = useLanguage();
   const isHi = language === 'hi';
   const { width } = useWindowDimensions();
@@ -90,16 +96,130 @@ export default function BranchDoctorsScreen() {
     specialty?: string;
   }>();
 
-  // Find Hospital and Branch
-  const hospital: Hospital | undefined = useMemo(() => {
-    return SEED_HOSPITALS.find((h) => h.id === params.hospitalId) || SEED_HOSPITALS[0];
-  }, [params.hospitalId]);
+  // Live Hospital, Branches & Doctors from Supabase (no mock/seed fallback)
+  const [hospital, setHospital] = useState<Hospital | undefined>(undefined);
+  const [isLoadingHospital, setIsLoadingHospital] = useState(true);
+  const [activeBranch, setActiveBranch] = useState<HospitalBranch | undefined>(undefined);
+
+  useEffect(() => {
+    let active = true;
+    const loadLiveHospital = async () => {
+      if (!params.hospitalId) {
+        if (active) {
+          setHospital(undefined);
+          setActiveBranch(undefined);
+          setIsLoadingHospital(false);
+        }
+        return;
+      }
+      setIsLoadingHospital(true);
+      try {
+        const supabase = getSupabaseClient();
+        const [hospRes, branchRes, docsRes] = await Promise.all([
+          supabase.from('hospitals').select('*').eq('id', params.hospitalId).maybeSingle(),
+          supabase
+            .from('hospital_branches')
+            .select('*')
+            .eq('hospital_id', params.hospitalId)
+            .order('is_main_branch', { ascending: false }),
+          supabase
+            .from('doctors')
+            .select('*')
+            .eq('hospital_id', params.hospitalId)
+            .eq('is_active', true)
+            .order('name', { ascending: true }),
+        ]);
+
+        if (!active) return;
+        const h = hospRes.data as (Hospital & { is_active?: boolean }) | null;
+        if (!h || h.is_active === false) {
+          setHospital(undefined);
+          setActiveBranch(undefined);
+          return;
+        }
+
+        const rawBranches = ((branchRes.data || []) as (HospitalBranch & { is_active?: boolean })[]).filter(
+          (br) => br.is_active !== false
+        );
+        const rawDocs = (docsRes.data || []) as Doctor[];
+        const fallbackBranchId = rawBranches[0]?.id;
+
+        const hLat = Number((h as any).latitude);
+        const hLng = Number((h as any).longitude);
+        const hasUserCoords = Boolean(activeAddress?.latitude && activeAddress?.longitude);
+
+        const hydratedBranches: HospitalBranch[] = await Promise.all(
+          rawBranches.map(async (br) => {
+            let brLat = Number(br.latitude);
+            let brLng = Number(br.longitude);
+            const sameAsMain =
+              !br.is_main_branch &&
+              Number.isFinite(hLat) &&
+              Number.isFinite(hLng) &&
+              Math.abs(brLat - hLat) < 0.0001 &&
+              Math.abs(brLng - hLng) < 0.0001 &&
+              Boolean(br.address) &&
+              br.address !== h.address;
+
+            if (!Number.isFinite(brLat) || !Number.isFinite(brLng) || brLat === 0 || brLng === 0 || sameAsMain) {
+              if (br.is_main_branch && Number.isFinite(hLat) && Number.isFinite(hLng) && hLat !== 0) {
+                brLat = hLat;
+                brLng = hLng;
+              } else {
+                try {
+                  const q = [br.area, br.city || h.city || 'Jaipur', 'India'].filter(Boolean).join(', ');
+                  const geoRes = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`
+                  );
+                  const geoData = await geoRes.json();
+                  if (Array.isArray(geoData) && geoData[0]?.lat && geoData[0]?.lon) {
+                    brLat = Number(geoData[0].lat);
+                    brLng = Number(geoData[0].lon);
+                  }
+                } catch {}
+              }
+            }
+
+            const hasBrCoords = Number.isFinite(brLat) && Number.isFinite(brLng) && brLat !== 0 && brLng !== 0;
+            const computedDist =
+              hasUserCoords && hasBrCoords
+                ? Number(calculateDistanceKm(activeAddress!.latitude!, activeAddress!.longitude!, brLat, brLng).toFixed(1))
+                : Number(br.distance_km ?? 0);
+            return {
+              ...br,
+              latitude: hasBrCoords ? brLat : br.latitude,
+              longitude: hasBrCoords ? brLng : br.longitude,
+              distance_km: computedDist,
+              doctors: rawDocs.filter((d) => (d.branch_id || fallbackBranchId) === br.id),
+            };
+          })
+        );
+        hydratedBranches.sort((a, b) => (a.distance_km || 999) - (b.distance_km || 999));
+
+        const hydratedHospital: Hospital = {
+          ...h,
+          branches: hydratedBranches,
+        };
+        setHospital(hydratedHospital);
+        const picked =
+          hydratedBranches.find((b) => b.id === params.branchId) || hydratedBranches[0];
+        setActiveBranch(picked);
+      } catch {
+        if (active) {
+          setHospital(undefined);
+          setActiveBranch(undefined);
+        }
+      } finally {
+        if (active) setIsLoadingHospital(false);
+      }
+    };
+    void loadLiveHospital();
+    return () => {
+      active = false;
+    };
+  }, [params.hospitalId, params.branchId, activeAddress?.latitude, activeAddress?.longitude]);
 
   const branches = hospital?.branches || [];
-  const initialBranch =
-    branches.find((b) => b.id === params.branchId) || branches[0];
-
-  const [activeBranch, setActiveBranch] = useState<HospitalBranch | undefined>(initialBranch);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>(
     params.specialty && params.specialty !== 'All' ? params.specialty : 'All'
   );
@@ -333,6 +453,7 @@ export default function BranchDoctorsScreen() {
       ? rawSlot
       : `Today, ${fmtDate} · ${rawSlot}`;
 
+    const otpCode = String(Math.floor(1000 + Math.random() * 9000));
     const newBooking: Booking = {
       id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
@@ -350,14 +471,17 @@ export default function BranchDoctorsScreen() {
       branch_name: activeBranch?.name,
       doctor_id: bookingTargetDoctor.doctor.id,
       doctor_name: bookingTargetDoctor.doctor.name,
-      doctor_fee: bookingTargetDoctor.doctor.discounted_fee,
+      doctor_fee: bookingTargetDoctor.doctor.consultation_fee,
+      discount_amount: Math.max(0, bookingTargetDoctor.doctor.consultation_fee - bookingTargetDoctor.doctor.discounted_fee),
+      final_payable: bookingTargetDoctor.doctor.discounted_fee,
+      verification_code: otpCode,
       slot_time: effectiveSlot,
       specialty_requested: bookingTargetDoctor.doctor.specialty,
       status: 'PAID',
       call_status: 'connected',
-      notes: `${reason ? `Reason / Symptoms: ${reason}. ` : ''}Paid online via ${paymentMethod || 'UPI'} (${txnId || 'RZP-SUCCESS'}). Direct OPD consult booked for ${bookingTargetDoctor.doctor.name} (${bookingTargetDoctor.doctor.specialty}) at ${hospital.name} - ${activeBranch?.name}. Priority QR pass issued.`,
+      notes: `${reason ? `Reason / Symptoms: ${reason}. ` : ''}Paid online via ${paymentMethod || 'UPI'} (${txnId || 'RZP-SUCCESS'}). Direct OPD consult booked for ${bookingTargetDoctor.doctor.name} (${bookingTargetDoctor.doctor.specialty}) at ${hospital.name} - ${activeBranch?.name}.`,
       created_at: new Date().toISOString(),
-    };
+    } as Booking;
 
     await saveNewBooking(newBooking);
 
@@ -370,6 +494,43 @@ export default function BranchDoctorsScreen() {
     setIsSubmitting(false);
     setConfirmedBooking(newBooking);
   };
+
+  if (isLoadingHospital) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+        <ActivityIndicator size="large" color="#1E40AF" />
+        <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#475569' }}>
+          Loading hospital & specialists...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!hospital) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 }}>
+        <Building2 size={36} color="#64748B" />
+        <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>
+          Hospital Currently Unavailable
+        </Text>
+        <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', maxWidth: 320 }}>
+          This hospital is either paused or no longer active in our network.
+        </Text>
+        <TouchableOpacity
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/opd'))}
+          style={{
+            marginTop: 4,
+            backgroundColor: '#1E40AF',
+            paddingHorizontal: 18,
+            paddingVertical: 10,
+            borderRadius: 10,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>← Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
@@ -420,7 +581,9 @@ export default function BranchDoctorsScreen() {
 
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }} numberOfLines={2}>
-                {translateHospitalName(hospital?.name || '', language === 'hi')}
+                {isHi && (hospital as any)?.name_hi
+                  ? (hospital as any).name_hi
+                  : translateHospitalName(hospital?.name || '', isHi)}
               </Text>
               <Text style={{ color: '#BFDBFE', fontSize: 12, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
                 {hospital?.featured
@@ -433,7 +596,9 @@ export default function BranchDoctorsScreen() {
             <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Star size={11} color="#CF8A40" fill="#CF8A40" />
               <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '900' }}>
-                {hospital?.rating}
+                {Number((hospital as any)?.total_reviews ?? 0) > 0
+                  ? `${hospital?.rating}`
+                  : (isHi ? 'नया' : 'New')}
               </Text>
             </View>
           </View>
@@ -493,7 +658,7 @@ export default function BranchDoctorsScreen() {
             </Text>
             <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' }}>
               <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
-                {activeBranch?.distance_km
+                {activeBranch?.distance_km != null && activeBranch.distance_km >= 0
                   ? `${activeBranch.distance_km} ${language === 'hi' ? 'किमी' : 'km'}`
                   : language === 'hi'
                     ? 'नजदीक'
@@ -601,17 +766,21 @@ export default function BranchDoctorsScreen() {
             {filteredDoctors.length === 0 ? (
               <View style={{ backgroundColor: '#FFFFFF', padding: 32, borderRadius: 24, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', marginVertical: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
                 <Award size={36} color="#94A3B8" />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B', marginTop: 8 }}>
-                  No specialists in this department
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#182F3B', marginTop: 8, textAlign: 'center' }}>
+                  {isHi ? 'इस विभाग में कोई विशेषज्ञ उपलब्ध नहीं है' : 'No specialists in this department'}
                 </Text>
                 <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
-                  Please switch to "All" or select another category squircle above.
+                  {isHi
+                    ? 'कृपया ऊपर "सभी" चुनें या दूसरी श्रेणी देखें।'
+                    : 'Please switch to "All" or select another category squircle above.'}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setSelectedSpecialty('All')}
                   style={{ marginTop: 16, backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 }}
                 >
-                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Show All Specialists</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                    {isHi ? 'सभी विशेषज्ञ देखें' : 'Show All Specialists'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -700,10 +869,14 @@ export default function BranchDoctorsScreen() {
                                           }}
                                           numberOfLines={1}
                                         >
-                                          {translateDoctorName(doc.name, language === 'hi')}
+                                          {isHi && (doc as any).name_hi
+                                            ? (doc as any).name_hi
+                                            : translateDoctorName(doc.name, isHi)}
                                         </Text>
                                         <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
-                                          {translateSpecialty(doc.specialty, language === 'hi')} • {doc.experience_years} {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
+                                          {isHi && (doc as any).specialty_hi
+                                            ? (doc as any).specialty_hi
+                                            : translateSpecialty(doc.specialty, isHi)} • {doc.experience_years} {isHi ? 'वर्ष अनुभव' : 'yrs exp'}
                                         </Text>
                                       </View>
 
@@ -732,7 +905,9 @@ export default function BranchDoctorsScreen() {
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                       <Star size={11} color="#FBBF24" fill="#FBBF24" />
                                       <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-                                        {doc.rating} ({doc.total_reviews})
+                                        {Number(doc.total_reviews ?? 0) > 0
+                                          ? `${doc.rating} (${doc.total_reviews})`
+                                          : (language === 'hi' ? 'नया' : 'New')}
                                       </Text>
                                     </View>
 
@@ -879,6 +1054,65 @@ export default function BranchDoctorsScreen() {
                 </View>
 
                 {/* Uncluttered Modern Clinical Doctor Cards */}
+                {regularDoctors.length === 0 ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 20,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      padding: 20,
+                      gap: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15.5, fontWeight: '800', color: '#0F172A' }}>
+                      {isHi ? 'अस्पताल खुला है · कोई डॉक्टर उपलब्ध नहीं' : 'Hospital is Open · No Doctors Listed for This Selection'}
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
+                      {isHi
+                        ? 'इस शाखा या विशेषज्ञता में अभी कोई डॉक्टर स्लॉट उपलब्ध नहीं है। आप सीधे अस्पताल रिसेप्शन पर कॉल कर सकते हैं या अन्य शाखा देख सकते हैं।'
+                        : 'No doctor slots are currently listed for this branch or specialty. You can call hospital reception directly for walk-in/emergency OPD or switch branches.'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
+                      {hospital.contact_number ? (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(`tel:${hospital.contact_number}`)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: '#2563EB',
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                          }}
+                        >
+                          <PhoneCall size={14} color="#FFFFFF" />
+                          <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+                            {isHi ? 'अस्पताल रिसेप्शन कॉल करें' : 'Call Hospital Reception'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {branches.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() => setBranchDropdownVisible(true)}
+                          style={{
+                            backgroundColor: '#EFF6FF',
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE',
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                          }}
+                        >
+                          <Text style={{ color: '#1E40AF', fontSize: 12.5, fontWeight: '800' }}>
+                            {isHi ? 'अन्य शाखा देखें' : 'Check Other Branches'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : (
                 <View
                   style={{
                     flexDirection: isTablet ? 'row' : 'column',
@@ -922,16 +1156,27 @@ export default function BranchDoctorsScreen() {
                               backgroundColor: '#EFF6FF',
                               borderWidth: 1,
                               borderColor: '#E2E8F0',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                             }}
                           >
-                            <Image
-                              source={avatar}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                              }}
-                              resizeMode="cover"
-                            />
+                            {doctor.avatar_url ? (
+                              <Image
+                                source={avatar}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                }}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={{ alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                <Stethoscope size={26} color="#2563EB" />
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B' }}>
+                                  {isHi ? 'फोटो नहीं' : 'No Photo'}
+                                </Text>
+                              </View>
+                            )}
                           </View>
 
                           <View style={{ flex: 1 }}>
@@ -946,7 +1191,9 @@ export default function BranchDoctorsScreen() {
                                   marginRight: 4,
                                 }}
                               >
-                                {translateDoctorName(doctor.name, language === 'hi')}
+                                {isHi && (doctor as any).name_hi
+                                  ? (doctor as any).name_hi
+                                  : translateDoctorName(doctor.name, isHi)}
                               </Text>
 
                               <TouchableOpacity
@@ -980,7 +1227,9 @@ export default function BranchDoctorsScreen() {
                                 marginTop: 2,
                               }}
                             >
-                              {translateSpecialty(doctor.specialty, language === 'hi')} • {doctor.experience_years} {language === 'hi' ? 'वर्ष अनुभव' : 'yrs exp'}
+                              {isHi && (doctor as any).specialty_hi
+                                ? (doctor as any).specialty_hi
+                                : translateSpecialty(doctor.specialty, isHi)} • {doctor.experience_years} {isHi ? 'वर्ष अनुभव' : 'yrs exp'}
                             </Text>
 
                             {/* Single Qualification Line */}
@@ -997,15 +1246,24 @@ export default function BranchDoctorsScreen() {
                             </Text>
 
                             {/* Star Rating Line */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                              <Star size={11} color="#D97706" fill="#D97706" />
-                              <Text style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}>
-                                {doctor.rating}
-                              </Text>
-                              <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>
-                                ({doctor.total_reviews} {language === 'hi' ? 'समीक्षा' : 'reviews'})
-                              </Text>
-                            </View>
+                            {Number(doctor.total_reviews ?? 0) > 0 ? (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                <Star size={11} color="#D97706" fill="#D97706" />
+                                <Text style={{ fontSize: 12, fontWeight: '900', color: '#1E293B' }}>
+                                  {doctor.rating}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>
+                                  ({doctor.total_reviews} {language === 'hi' ? 'समीक्षा' : 'reviews'})
+                                </Text>
+                              </View>
+                            ) : (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-start', backgroundColor: '#EFF6FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                                <Star size={10} color="#2563EB" fill="#2563EB" />
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF' }}>
+                                  {language === 'hi' ? 'नया डॉक्टर' : 'New'}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         </View>
 
@@ -1033,43 +1291,67 @@ export default function BranchDoctorsScreen() {
                                   : `Pay in app ₹${doctor.discounted_fee}`}
                               </Text>
                             </Text>
-                            {hospital?.discount_percentage ? (
-                              <Text style={{ fontSize: 10.5, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
-                                {language === 'hi'
-                                  ? `${hospital.discount_percentage}% छूट • इन-ऐप दर`
-                                  : `Save ${hospital.discount_percentage}% with in-app pay`}
-                              </Text>
-                            ) : null}
+                            {(() => {
+                              const docDisc =
+                                doctor.consultation_fee > 0 &&
+                                doctor.discounted_fee > 0 &&
+                                doctor.discounted_fee < doctor.consultation_fee
+                                  ? Math.round(((doctor.consultation_fee - doctor.discounted_fee) / doctor.consultation_fee) * 100)
+                                  : ((doctor as any).discount_percentage ?? hospital?.discount_percentage);
+                              return docDisc ? (
+                                <Text style={{ fontSize: 10.5, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
+                                  {isHi ? `${docDisc}% छूट • इन-ऐप दर` : `Save ${docDisc}% with in-app pay`}
+                                </Text>
+                              ) : null;
+                            })()}
                           </View>
 
-                          <TouchableOpacity
-                            onPress={() => handleInitiateDoctorBooking(doctor)}
-                            activeOpacity={0.88}
-                            style={{
-                              backgroundColor: '#2563EB',
-                              paddingHorizontal: 16,
-                              paddingVertical: 10,
-                              borderRadius: 12,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 6,
-                              shadowColor: '#2563EB',
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.2,
-                              shadowRadius: 4,
-                              elevation: 2,
-                            }}
-                          >
-                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
-                              {language === 'hi' ? 'बुक करें' : 'Book'}
-                            </Text>
-                            <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />
-                          </TouchableOpacity>
+                          {((doctor as any).is_available === false) ? (
+                            <View
+                              style={{
+                                backgroundColor: '#F1F5F9',
+                                borderWidth: 1,
+                                borderColor: '#CBD5E1',
+                                paddingHorizontal: 14,
+                                paddingVertical: 10,
+                                borderRadius: 12,
+                              }}
+                            >
+                              <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '800' }}>
+                                {isHi ? 'अभी उपलब्ध नहीं' : 'Unavailable'}
+                              </Text>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              onPress={() => handleInitiateDoctorBooking(doctor)}
+                              activeOpacity={0.88}
+                              style={{
+                                backgroundColor: '#2563EB',
+                                paddingHorizontal: 16,
+                                paddingVertical: 10,
+                                borderRadius: 12,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                shadowColor: '#2563EB',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 4,
+                                elevation: 2,
+                              }}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                                {isHi ? 'बुक करें' : 'Book'}
+                              </Text>
+                              <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.5} />
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
                     );
                   })}
                 </View>
+                )}
               </>
             )}
           </View>
@@ -1236,6 +1518,7 @@ export default function BranchDoctorsScreen() {
                         setActiveBranch(b);
                         setSelectedSpecialty('All');
                         setBranchDropdownVisible(false);
+                        router.setParams({ branchId: b.id });
                       }}
                       activeOpacity={0.8}
                       style={{
@@ -1267,7 +1550,7 @@ export default function BranchDoctorsScreen() {
                           {translateAddress(b.address, language === 'hi')}
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                          {b.distance_km && (
+                          {b.distance_km != null && (
                             <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
                               <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>
                                 {b.distance_km} {language === 'hi' ? 'किमी दूर' : 'km away'}

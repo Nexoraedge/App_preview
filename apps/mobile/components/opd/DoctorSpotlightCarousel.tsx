@@ -229,8 +229,9 @@ export function DoctorSpotlightCarousel({
                             fontWeight: '700',
                           }}
                         >
-                          {doc.rating} ({doc.total_reviews}{' '}
-                          {isHi ? 'समीक्षाएं' : 'reviews'})
+                          {Number(doc.total_reviews ?? 0) > 0
+                            ? `${doc.rating} (${doc.total_reviews} ${isHi ? 'समीक्षाएं' : 'reviews'})`
+                            : isHi ? 'नया' : 'New'}
                         </Text>
                       </View>
 

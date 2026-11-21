@@ -1,0 +1,30 @@
+export const INDIA_STATE_CITIES: Record<string, string[]> = {
+  Rajasthan: [
+    'Jaipur',
+    'Jodhpur',
+    'Udaipur',
+    'Kota',
+    'Ajmer',
+    'Bikaner',
+    'Alwar',
+    'Sikar',
+    'Bhilwara',
+    'Pali',
+    'Bharatpur',
+    'Sri Ganganagar',
+  ],
+  Delhi: ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi', 'Dwarka', 'Rohini'],
+  Haryana: ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Karnal', 'Hisar', 'Rohtak'],
+  'Uttar Pradesh': ['Noida', 'Greater Noida', 'Ghaziabad', 'Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Prayagraj', 'Meerut'],
+  Maharashtra: ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane', 'Navi Mumbai', 'Aurangabad'],
+  Gujarat: ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Gandhinagar', 'Bhavnagar'],
+  Karnataka: ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
+  'Madhya Pradesh': ['Indore', 'Bhopal', 'Gwalior', 'Jabalpur', 'Ujjain'],
+  Punjab: ['Chandigarh', 'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Mohali'],
+  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem'],
+  Telangana: ['Hyderabad', 'Warangal', 'Nizamabad'],
+  'West Bengal': ['Kolkata', 'Siliguri', 'Howrah', 'Durgapur'],
+  Bihar: ['Patna', 'Gaya', 'Muzaffarpur', 'Bhagalpur'],
+};
+
+export const INDIA_STATES = Object.keys(INDIA_STATE_CITIES).sort();

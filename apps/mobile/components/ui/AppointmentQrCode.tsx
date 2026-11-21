@@ -11,6 +11,7 @@ interface AppointmentQrCodeProps {
   doctorName: string;
   hospitalName: string;
   slotTime: string;
+  verificationCode?: string;
   size?: number;
 }
 
@@ -21,13 +22,15 @@ export function AppointmentQrCode({
   doctorName,
   hospitalName,
   slotTime,
+  verificationCode,
   size = 140,
 }: AppointmentQrCodeProps) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Structured payload for instant hospital reception scanner decoding
-  const qrPayload = `https://adityam.health/pass?ref=${encodeURIComponent(bookingRef)}&tok=${tokenNumber}&pat=${encodeURIComponent(patientName)}&doc=${encodeURIComponent(doctorName)}&hosp=${encodeURIComponent(hospitalName)}&time=${encodeURIComponent(slotTime)}`;
+  const otpParam = verificationCode ? `&otp=${encodeURIComponent(verificationCode)}` : '';
+  const qrPayload = `https://adityam.health/pass?ref=${encodeURIComponent(bookingRef)}&tok=${tokenNumber}&pat=${encodeURIComponent(patientName)}&doc=${encodeURIComponent(doctorName)}&hosp=${encodeURIComponent(hospitalName)}&time=${encodeURIComponent(slotTime)}${otpParam}`;
 
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(size * 2)}x${Math.round(size * 2)}&margin=2&color=0F172A&data=${encodeURIComponent(qrPayload)}`;
 
