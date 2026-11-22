@@ -62,6 +62,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { getSupabaseClient, uploadPrescriptionSlip } from '@adityam/supabase';
+import { triggerBrowserNotification } from '../src/services/notificationService';
 import type { Booking, ServiceType, BookingStatus } from '@adityam/types';
 import {
   fetchAllBookings,
@@ -155,7 +156,7 @@ export default function AppointmentsScreen() {
     const unreviewed = appointments.find(
       (a) =>
         a.status === 'COMPLETED' &&
-        a.serviceType === 'OPD_CONCIERGE' &&
+        (a.serviceType === 'OPD_CONCIERGE' || a.serviceType === 'INVESTIGATION') &&
         !reviewedRefs[a.bookingRef] &&
         !dismissedReviewRefs[a.bookingRef]
     );
@@ -173,12 +174,13 @@ export default function AppointmentsScreen() {
       const supabase = getSupabaseClient();
       const { data: bRow } = await supabase
         .from('bookings')
-        .select('doctor_id, hospital_id')
+        .select('doctor_id, hospital_id, lab_centre_id, service_type')
         .eq('booking_ref', reviewTarget.bookingRef)
         .maybeSingle();
 
       let doctorId: string | null = (bRow as any)?.doctor_id || null;
       const hospitalId: string | null = (bRow as any)?.hospital_id || reviewTarget.hospitalId || null;
+      const labCentreId: string | null = (bRow as any)?.lab_centre_id || null;
 
       if (!doctorId && reviewTarget.doctorName) {
         let docQ = supabase.from('doctors').select('id').ilike('name', reviewTarget.doctorName);
@@ -194,8 +196,23 @@ export default function AppointmentsScreen() {
         hospital_id: hospitalId,
         rating: reviewRating,
         comment: reviewComment.trim() || null,
-        service_type: 'OPD',
+        service_type: (bRow as any)?.service_type || reviewTarget.serviceType || 'OPD',
       });
+
+      if (labCentreId) {
+        const { data: curLab } = await supabase
+          .from('lab_centres')
+          .select('rating, reviews')
+          .eq('id', labCentreId)
+          .maybeSingle();
+        if (curLab) {
+          const prevCount = Number((curLab as any).reviews ?? 0);
+          const prevRating = prevCount > 0 ? Number((curLab as any).rating ?? 0) : 0;
+          const nextCount = prevCount + 1;
+          const nextAvg = Number((((prevRating * prevCount) + reviewRating) / nextCount).toFixed(1));
+          await supabase.from('lab_centres').update({ rating: nextAvg, reviews: nextCount }).eq('id', labCentreId);
+        }
+      }
 
       // Recompute & sync doctor rating
       if (doctorId) {
@@ -377,7 +394,10 @@ export default function AppointmentsScreen() {
               b.service_type === 'PHARMACY_SCAN_PAY'
                 ? 'Pharmacy Dispatch Desk'
                 : b.service_type === 'INVESTIGATION'
-                  ? 'Sample Collection Bay'
+                  ? (String(b.hospital_name || '').toLowerCase().includes('home collection') ||
+                    String(b.notes || '').toLowerCase().includes('home sample collection')
+                      ? 'Home Sample Pickup'
+                      : 'Sample Collection Bay')
                   : b.service_type === 'IPD_ENQUIRY'
                     ? 'Inpatient Desk Room 101'
                     : 'OPD Desk Room 101',
@@ -385,7 +405,7 @@ export default function AppointmentsScreen() {
             billAmount: Number(b.bill_amount || 0),
             discountAmount: Number(b.discount_amount || 0),
             paymentStatus: (b.status === 'CANCELLED' ? 'CANCELLED' : 'PAID') as any,
-            prescriptionUrl: b.bill_image_url || undefined,
+            prescriptionUrl: (b as any).prescription_url || b.bill_image_url || undefined,
             verificationCode: (b as any).verification_code || undefined,
             assignedAgent: b.assigned_agent || undefined,
             isUpcoming: isUpc,
@@ -418,7 +438,26 @@ export default function AppointmentsScreen() {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'bookings' },
-          () => {
+          (payload: any) => {
+            if (payload?.eventType === 'UPDATE') {
+              const row = payload?.new || {};
+              const old = payload?.old || {};
+              const svc = String(row.service_type || '').toUpperCase();
+              if (svc === 'INVESTIGATION' || svc === 'LAB_TEST') {
+                const st = String(row.status || '').toUpperCase();
+                if (st !== String(old.status || '').toUpperCase()) {
+                  if (st === 'SAMPLE_COLLECTED') {
+                    triggerBrowserNotification('Sample Collected ✓', `Your sample for #${row.booking_ref} has been verified & collected.`);
+                  } else if (st === 'PROCESSING') {
+                    triggerBrowserNotification('Lab Testing Started', `Your sample for #${row.booking_ref} is now under analysis.`);
+                  } else if (st === 'COMPLETED') {
+                    triggerBrowserNotification('Lab Report Ready Online!', `Your report for #${row.booking_ref} is ready to view & download.`);
+                  }
+                } else if (row.assigned_agent && row.assigned_agent !== old.assigned_agent) {
+                  triggerBrowserNotification('Phlebotomist Assigned', `${row.assigned_agent} has been assigned for #${row.booking_ref}.`);
+                }
+              }
+            }
             loadBookings();
           }
         )
@@ -1453,17 +1492,25 @@ export default function AppointmentsScreen() {
                           <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#1E40AF' }}>
                               {apt.assignedAgent
-                                ? isHi
-                                  ? `समन्वयक नियुक्त: ${apt.assignedAgent}`
-                                  : `Assigned Coordinator: ${apt.assignedAgent}`
+                                ? apt.serviceType === 'INVESTIGATION' && apt.doctorFee > 0
+                                  ? isHi
+                                    ? `फ्लेबोटोमिस्ट नियुक्त: ${apt.assignedAgent}`
+                                    : `Assigned Phlebotomist: ${apt.assignedAgent}`
+                                  : isHi
+                                    ? `समन्वयक नियुक्त: ${apt.assignedAgent}`
+                                    : `Assigned Coordinator: ${apt.assignedAgent}`
                                 : isHi
                                   ? 'केयर कोऑर्डिनेटर पर्चा जांच रहे हैं'
                                   : 'Care Coordinator Reviewing Request'}
                             </Text>
                             <Text style={{ fontSize: 10.5, color: '#1D4ED8', marginTop: 1 }}>
-                              {isHi
-                                ? 'हमारे स्वास्थ्य एजेंट जल्द ही अंतिम बिल व समय की पुष्टि हेतु कॉल करेंगे।'
-                                : 'Our care desk agent will connect with you shortly to confirm details & bill.'}
+                              {apt.serviceType === 'INVESTIGATION' && apt.doctorFee > 0 && apt.assignedAgent
+                                ? isHi
+                                  ? 'फ्लेबोटोमिस्ट तय समय पर आपके पते पर आएंगे। सैंपल देते समय 4-अंकों का OTP साझा करें।'
+                                  : 'Phlebotomist will visit your address in the scheduled slot. Share your 4-digit OTP at collection.'
+                                : isHi
+                                  ? 'हमारे स्वास्थ्य एजेंट जल्द ही अंतिम बिल व समय की पुष्टि हेतु कॉल करेंगे।'
+                                  : 'Our care desk agent will connect with you shortly to confirm details & bill.'}
                             </Text>
                           </View>
                         </View>
@@ -1690,26 +1737,32 @@ export default function AppointmentsScreen() {
                     >
                       {isUpcoming ? (
                         <>
-                          {/* Get Directions */}
-                          <TouchableOpacity
-                            onPress={() => handleOpenMaps(apt)}
-                            activeOpacity={0.8}
-                            style={{
-                              flex: 1,
-                              backgroundColor: '#F1F5F9',
-                              paddingVertical: 8,
-                              borderRadius: 10,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 5,
-                            }}
-                          >
-                            <MapPin size={13} color="#334155" />
-                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#334155' }}>
-                              {isHi ? 'दिशा-निर्देश' : 'Directions'}
-                            </Text>
-                          </TouchableOpacity>
+                          {/* Get Directions (hide for Home Sample Collection) */}
+                          {!(
+                            apt.serviceType === 'INVESTIGATION' &&
+                            (apt.hospitalName.toLowerCase().includes('home collection') ||
+                              apt.roomNumber === 'Home Sample Pickup')
+                          ) && (
+                            <TouchableOpacity
+                              onPress={() => handleOpenMaps(apt)}
+                              activeOpacity={0.8}
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#F1F5F9',
+                                paddingVertical: 8,
+                                borderRadius: 10,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 5,
+                              }}
+                            >
+                              <MapPin size={13} color="#334155" />
+                              <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#334155' }}>
+                                {isHi ? 'दिशा-निर्देश' : 'Directions'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
 
                           {/* Call Hospital */}
                           <TouchableOpacity
@@ -2166,7 +2219,13 @@ export default function AppointmentsScreen() {
                       </Text>
                     </View>
                   )}
-                  {selectedAppointment?.verificationCode && (
+                  {selectedAppointment?.verificationCode &&
+                    !(
+                      selectedAppointment.serviceType === 'INVESTIGATION' &&
+                      ['SAMPLE_COLLECTED', 'PROCESSING', 'COMPLETED'].includes(
+                        String(selectedAppointment.status || '').toUpperCase()
+                      )
+                    ) && (
                     <View
                       style={{
                         marginTop: 8,
@@ -2180,7 +2239,9 @@ export default function AppointmentsScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1E40AF', letterSpacing: 0.5 }}>
-                        {isHi ? 'डिलीवरी / पिकअप सत्यापन कोड' : 'DELIVERY / PICKUP VERIFICATION PIN'}
+                        {selectedAppointment.serviceType === 'INVESTIGATION'
+                          ? isHi ? 'सैंपल कलेक्शन सत्यापन OTP' : 'SAMPLE COLLECTION VERIFICATION OTP'
+                          : isHi ? 'डिलीवरी / पिकअप सत्यापन कोड' : 'DELIVERY / PICKUP VERIFICATION PIN'}
                       </Text>
                       <Text style={{ fontSize: 22, fontWeight: '900', color: '#1D4ED8', letterSpacing: 5, marginTop: 2 }}>
                         {selectedAppointment.verificationCode}
@@ -2260,7 +2321,9 @@ export default function AppointmentsScreen() {
                       ? (isHi ? 'कैशलेस टीपीए समन्वय (निशुल्क)' : 'Cashless TPA Coordination (Free)')
                       : selectedAppointment?.doctorFee === 0
                         ? (isHi ? 'पर्चा समीक्षाधीन (एजेंट कॉल करेगा)' : 'Under Review (Agent Connecting)')
-                        : selectedAppointment?.status === 'PAID' || selectedAppointment?.status === 'COMPLETED'
+                        : selectedAppointment?.paymentStatus === 'PAID' ||
+                          selectedAppointment?.status === 'PAID' ||
+                          selectedAppointment?.status === 'COMPLETED'
                           ? `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान पूर्ण' : 'Paid'})`
                           : `${inr(selectedAppointment?.doctorFee || 0)} (${isHi ? 'भुगतान शेष' : 'Payment Due'})`}
                   </Text>

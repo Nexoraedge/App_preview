@@ -111,7 +111,7 @@ const DEFAULT_WEEK_SCHEDULE: Record<DayKey, DayScheduleRow> = {
   sat: { open: true, start: '08:00', end: '14:00', hasBreak: true, start2: '16:30', end2: '22:00' },
   sun: { open: true, start: '09:00', end: '21:00', hasBreak: false, start2: '17:00', end2: '21:00' },
 };
-type PartnerTab = 'dashboard' | 'orders' | 'opd' | 'opd_doctors' | 'opd_hospital' | 'labs' | 'ipd' | 'scanner' | 'payouts' | 'settings';
+type PartnerTab = 'dashboard' | 'orders' | 'opd' | 'opd_doctors' | 'opd_hospital' | 'labs' | 'labs_services' | 'ipd' | 'scanner' | 'payouts' | 'settings';
 type OrderFilter = 'ACTIVE' | 'NEEDS_QUOTE' | 'PAID_DELIVER' | 'UNPAID' | 'COMPLETED' | 'LOST' | 'ALL';
 type OrderDateFilter = 'ALL' | 'TODAY' | '7D' | 'THIS_MONTH' | 'LAST_MONTH' | 'CUSTOM';
 
@@ -479,17 +479,27 @@ export function PharmacyPartnerPortal({
 
       const { data: extraCountRows } = await supabase
         .from('bookings')
-        .select('service_type, status')
+        .select('service_type, status, booking_ref, hospital_name, hospital_id')
         .in('service_type', ['INVESTIGATION', 'LAB_TEST', 'IPD_ENQUIRY'])
         .limit(250);
       let labsPending = 0;
       let ipdPending = 0;
+      const myHospId =
+        partnerUser?.partnerHospitalId ||
+        (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null);
       for (const r of (extraCountRows as any[]) || []) {
         const st = String(r.status || '').toUpperCase();
         if (['COMPLETED', 'CANCELLED', 'MISSED', 'REJECTED', 'DISCHARGED'].includes(st)) continue;
         const svc = String(r.service_type || '').toUpperCase();
-        if (svc.includes('IPD')) ipdPending += 1;
-        else labsPending += 1;
+        const hospLower = String(r.hospital_name || '').toLowerCase();
+        const refUpper = String(r.booking_ref || '').toUpperCase();
+        if (svc.includes('IPD')) {
+          if (!myHospId || r.hospital_id === myHospId) ipdPending += 1;
+        } else {
+          const isAdityam = hospLower.includes('adityam') || refUpper.includes('LAB-RX');
+          const matchesPartner = Boolean(myHospId) && r.hospital_id === myHospId;
+          if (!isAdityam && matchesPartner) labsPending += 1;
+        }
       }
       setModuleCounts({ labs: labsPending, ipd: ipdPending });
     } catch (err) {
@@ -847,6 +857,7 @@ export function PharmacyPartnerPortal({
       orders: '/partner/pharmacy/orders',
       settings: '/partner/pharmacy/settings',
       labs: '/partner/labs',
+      labs_services: '/partner/labs/services',
       scanner: '/partner/scanner',
       payouts: '/partner/payouts',
     };
@@ -1191,7 +1202,18 @@ export function PharmacyPartnerPortal({
         ]
       : []),
     ...(enabledModules.includes('LABS')
-      ? [{ id: 'labs' as PartnerTab, label: 'Labs & Tests', icon: FlaskConical, badge: moduleCounts.labs || undefined }]
+      ? [
+          {
+            id: 'labs' as PartnerTab,
+            label: 'Labs & Tests',
+            icon: FlaskConical,
+            badge: moduleCounts.labs || undefined,
+            children: [
+              { id: 'labs' as PartnerTab, label: 'Walk-in Queue', badge: moduleCounts.labs || undefined },
+              { id: 'labs_services' as PartnerTab, label: 'Services & Timings' },
+            ],
+          },
+        ]
       : []),
     ...(enabledModules.includes('IPD')
       ? [{ id: 'ipd' as PartnerTab, label: 'IPD Desk', icon: BedDouble, badge: moduleCounts.ipd || undefined }]
@@ -1226,7 +1248,11 @@ export function PharmacyPartnerPortal({
     },
     labs: {
       title: 'Labs & Diagnostic Tests',
-      subtitle: 'Home sample collection, center visits & report uploads',
+      subtitle: 'In-hospital walk-in queue, 4-digit OTP check-ins & report uploads',
+    },
+    labs_services: {
+      title: 'Lab Services, Timings & Pricing',
+      subtitle: 'Manage hospital diagnostic wing hours, capabilities & test catalog',
     },
     ipd: {
       title: 'IPD & Surgery Desk',
@@ -4081,11 +4107,16 @@ export function PharmacyPartnerPortal({
                 (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)
               }
             />
-          ) : activeTab === 'labs' ? (
+          ) : activeTab === 'labs' || activeTab === 'labs_services' ? (
             <PartnerLabsDesk
+              initialTab={activeTab === 'labs_services' ? 'services' : 'queue'}
               labCentreId={
                 partnerUser?.partnerLabId ||
                 (partnerUser?.partnerType === 'lab' ? partnerUser?.partnerEntityId : null)
+              }
+              hospitalId={
+                partnerUser?.partnerHospitalId ||
+                (partnerUser?.partnerType === 'hospital' ? partnerUser?.partnerEntityId : null)
               }
             />
           ) : (

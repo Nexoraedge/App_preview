@@ -67,8 +67,10 @@ export function LabsSection({ bookings }: LabsSectionProps) {
       const lowerName = centre.name.toLowerCase();
       const matching = bookings.filter(
         (b) =>
-          b.service_type === 'INVESTIGATION' &&
-          (b.hospital_id === centre.id || (b.hospital_name || '').toLowerCase() === lowerName)
+          (b.service_type === 'INVESTIGATION' || (b.service_type as string) === 'LAB_TEST') &&
+          (b.hospital_id === centre.id ||
+            (Boolean(centre.hospital_id) && b.hospital_id === centre.hospital_id) ||
+            (b.hospital_name || '').toLowerCase() === lowerName)
       );
 
       let confirmedCount = 0;
@@ -84,9 +86,9 @@ export function LabsSection({ bookings }: LabsSectionProps) {
       for (const b of matching) {
         if (b.status === 'MISSED') missedCount += 1;
         else if (b.status === 'CANCELLED') cancelledCount += 1;
-        else if (['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED'].includes(b.status)) confirmedCount += 1;
+        else if (['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED', 'SAMPLE_COLLECTED', 'PROCESSING'].includes(b.status)) confirmedCount += 1;
 
-        const amt = b.final_payable || b.bill_amount || 0;
+        const amt = Number(b.final_payable || b.bill_amount || b.doctor_fee || 0);
         const disc = b.discount_amount || 0;
         if (b.status !== 'CANCELLED' && b.status !== 'MISSED') {
           grossEarnings += amt;
@@ -133,6 +135,23 @@ export function LabsSection({ bookings }: LabsSectionProps) {
       };
     });
   }, [centres, hospitals, bookings, payouts]);
+
+  const adityamOwnSummary = useMemo(() => {
+    const adityamRows = bookings.filter(
+      (b) =>
+        (b.service_type === 'INVESTIGATION' || (b.service_type as string) === 'LAB_TEST') &&
+        (String(b.hospital_name || '').toLowerCase().includes('adityam') ||
+          String(b.booking_ref || '').toUpperCase().includes('LAB-RX')) &&
+        b.status !== 'CANCELLED' &&
+        b.status !== 'MISSED'
+    );
+    const totalSales = adityamRows.reduce(
+      (s, b) => s + Number(b.final_payable || b.bill_amount || b.doctor_fee || 0),
+      0
+    );
+    const activeCount = adityamRows.filter((b) => b.status !== 'COMPLETED').length;
+    return { total: adityamRows.length, activeCount, totalSales };
+  }, [bookings]);
 
   const kpis = useMemo(() => {
     const total = labStatsList.length;
@@ -269,6 +288,57 @@ export function LabsSection({ bookings }: LabsSectionProps) {
             Home blood sample collection
           </Text>
         </View>
+      </View>
+
+      {/* Adityam Own Home Collection & Diagnostics Banner */}
+      <View
+        style={{
+          backgroundColor: THEME.surface,
+          borderRadius: 14,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: THEME.greenBorder,
+          flexDirection: isDesktop ? 'row' : 'column',
+          alignItems: isDesktop ? 'center' : 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              backgroundColor: THEME.greenSoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <FlaskConical size={19} color={THEME.greenPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: THEME.ink }}>
+              Adityam Niramayaa · Own Home Collection & Diagnostics
+            </Text>
+            <Text style={{ fontSize: 12, color: THEME.muted }}>
+              {adityamOwnSummary.activeCount} active pickups · {adityamOwnSummary.total} total orders · {formatInr(adityamOwnSummary.totalSales)} sales
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/admin/labs/adityam-niramayaa' as any)}
+          style={{
+            backgroundColor: THEME.greenDark,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
+            borderRadius: 9,
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+            Manage Leads & Stats →
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search, Filter & Add Bar */}

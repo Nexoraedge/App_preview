@@ -365,15 +365,17 @@ export function LabDetailView({
     const lowerName = centre.name.toLowerCase();
     return bookings.filter(
       (b) =>
-        b.service_type === 'INVESTIGATION' &&
-        (b.hospital_id === centre.id || (b.hospital_name || '').toLowerCase() === lowerName)
+        (b.service_type === 'INVESTIGATION' || (b.service_type as string) === 'LAB_TEST') &&
+        (b.hospital_id === centre.id ||
+          (Boolean(centre.hospital_id) && b.hospital_id === centre.hospital_id) ||
+          (b.hospital_name || '').toLowerCase() === lowerName)
     );
-  }, [bookings, centre.id, centre.name]);
+  }, [bookings, centre.id, centre.hospital_id, centre.name]);
 
   const filteredBookings = useMemo(() => {
     return labBookings.filter((b) => {
       if (ledgerStatus === 'CONFIRMED') {
-        return ['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED'].includes(b.status);
+        return ['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED', 'SAMPLE_COLLECTED', 'PROCESSING'].includes(b.status);
       }
       if (ledgerStatus !== 'ALL') return b.status === ledgerStatus;
       return true;
@@ -1263,7 +1265,7 @@ export function LabDetailView({
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ fontSize: 13.5, fontWeight: '800', color: THEME.greenPrimary }}>
-                          {formatInr(b.final_payable || b.bill_amount || 0)}
+                          {formatInr(b.final_payable || b.bill_amount || b.doctor_fee || 0)}
                         </Text>
                         <Text style={{ fontSize: 10.5, fontWeight: '700', color: THEME.muted }}>{b.status}</Text>
                       </View>

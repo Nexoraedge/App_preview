@@ -75,8 +75,10 @@ export default function LabSlugScreen() {
     const lowerName = centre.name.toLowerCase();
     const matching = bookings.filter(
       (b) =>
-        b.service_type === 'INVESTIGATION' &&
-        (b.hospital_id === centre.id || (b.hospital_name || '').toLowerCase() === lowerName)
+        (b.service_type === 'INVESTIGATION' || (b.service_type as string) === 'LAB_TEST') &&
+        (b.hospital_id === centre.id ||
+          (Boolean(centre.hospital_id) && b.hospital_id === centre.hospital_id) ||
+          (b.hospital_name || '').toLowerCase() === lowerName)
     );
 
     let confirmedCount = 0;
@@ -92,9 +94,9 @@ export default function LabSlugScreen() {
     for (const b of matching) {
       if (b.status === 'MISSED') missedCount += 1;
       else if (b.status === 'CANCELLED') cancelledCount += 1;
-      else if (['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED'].includes(b.status)) confirmedCount += 1;
+      else if (['CONFIRMED', 'PAID', 'COMPLETED', 'SERVED', 'SAMPLE_COLLECTED', 'PROCESSING'].includes(b.status)) confirmedCount += 1;
 
-      const amt = b.final_payable || b.bill_amount || 0;
+      const amt = Number(b.final_payable || b.bill_amount || b.doctor_fee || 0);
       const disc = b.discount_amount || 0;
       if (b.status !== 'CANCELLED' && b.status !== 'MISSED') {
         grossEarnings += amt;

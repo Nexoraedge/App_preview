@@ -51,6 +51,7 @@ export type PartnerShellRouteKey =
   | 'opd_doctors'
   | 'opd_hospital'
   | 'labs'
+  | 'labs_services'
   | 'ipd'
   | 'scanner'
   | 'payouts'
@@ -110,7 +111,7 @@ export function PartnerShell({
       const supabase = getSupabaseClient();
       const { data } = await supabase
         .from('bookings')
-        .select('service_type, status, hospital_id, pharmacy_id, lab_centre_id')
+        .select('service_type, status, booking_ref, hospital_name, hospital_id, pharmacy_id')
         .limit(300);
       const rows = data || [];
       let pharmacy = 0;
@@ -121,12 +122,17 @@ export function PartnerShell({
         const st = String(r.status || '').toUpperCase();
         if (['COMPLETED', 'CANCELLED', 'MISSED', 'REJECTED', 'DISCHARGED'].includes(st)) continue;
         const svc = String(r.service_type || '').toUpperCase();
+        const hospLower = String(r.hospital_name || '').toLowerCase();
+        const refUpper = String(r.booking_ref || '').toUpperCase();
         if (svc.includes('PHARMACY')) {
           if (!partnerUser?.partnerPharmacyId || !r.pharmacy_id || r.pharmacy_id === partnerUser.partnerPharmacyId) pharmacy += 1;
         } else if (svc.includes('OPD')) {
           if (!partnerUser?.partnerHospitalId || !r.hospital_id || r.hospital_id === partnerUser.partnerHospitalId) opd += 1;
-        } else if (svc.includes('LAB')) {
-          if (!partnerUser?.partnerLabId || !r.lab_centre_id || r.lab_centre_id === partnerUser.partnerLabId) labs += 1;
+        } else if (svc.includes('LAB') || svc === 'INVESTIGATION') {
+          const isAdityam = hospLower.includes('adityam') || refUpper.includes('LAB-RX');
+          const matchesPartner =
+            Boolean(partnerUser?.partnerHospitalId) && r.hospital_id === partnerUser?.partnerHospitalId;
+          if (!isAdityam && matchesPartner) labs += 1;
         } else if (svc.includes('IPD') || svc.includes('SURGERY')) {
           if (!partnerUser?.partnerHospitalId || !r.hospital_id || r.hospital_id === partnerUser.partnerHospitalId) ipd += 1;
         }
@@ -229,6 +235,10 @@ export function PartnerShell({
             href: '/partner/labs',
             icon: FlaskConical,
             badge: counts.labs || undefined,
+            children: [
+              { id: 'labs' as const, label: '• Walk-in Queue', href: '/partner/labs', badge: counts.labs || undefined },
+              { id: 'labs_services' as const, label: '• Services & Timings', href: '/partner/labs/services' },
+            ],
           },
         ]
       : []),

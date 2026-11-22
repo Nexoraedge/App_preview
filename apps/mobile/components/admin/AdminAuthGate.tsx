@@ -42,7 +42,7 @@ const IDLE_LOCK_MS = 30 * 60 * 1000; // 30 minutes
 export function getAllowedSectionsForRole(role?: string | null): string[] {
   const r = String(role || '').toLowerCase();
   if (r === 'call_center_agent') {
-    return ['bookings', 'prescriptions', 'enquiries'];
+    return ['bookings', 'prescriptions', 'enquiries', 'labs'];
   }
   if (r === 'finance') {
     return ['finance', 'hospitals', 'solo-doctors', 'labs', 'pharmacies', 'bookings', 'audit'];
@@ -184,11 +184,17 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Check if user has a verified TOTP factor requiring AAL2
+        // Check if user has a verified TOTP factor requiring AAL2 (bounded by 3s timeout so Safari locks never hang)
         let mfaEnabled = false;
         try {
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const { data: factors } = await supabase.auth.mfa.listFactors();
+          const mfaCheck = Promise.all([
+            supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+            supabase.auth.mfa.listFactors(),
+          ]);
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('MFA check timeout')), 3000)
+          );
+          const [{ data: aal }, { data: factors }] = await Promise.race([mfaCheck, timeout]);
           const verifiedTotp = (factors?.totp || []).find((f) => f.status === 'verified');
           mfaEnabled = Boolean(verifiedTotp);
           if (verifiedTotp && aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
@@ -233,6 +239,9 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
 
   const checkSession = useCallback(async () => {
     setIsChecking(true);
+    const safetyTimer = setTimeout(() => {
+      setIsChecking(false);
+    }, 8000);
     try {
       const supabase = getSupabaseClient();
       const { data } = await supabase.auth.getSession();
@@ -255,6 +264,7 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       setAuthError(err?.message || 'Unable to connect to authentication service.');
     } finally {
+      clearTimeout(safetyTimer);
       setIsChecking(false);
     }
   }, [resolveAdminRole]);
@@ -263,24 +273,27 @@ export function AdminAuthGate({ children }: { children: React.ReactNode }) {
     checkSession();
     const supabase = getSupabaseClient();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        setSessionUserId(null);
-        setSessionEmail(null);
-        setAdminUser(null);
-        setUnauthorizedRole(null);
-        setMfaFactorId(null);
-        setIsChecking(false);
-      } else {
-        setSessionUserId(session.user.id);
-        setSessionEmail(session.user.email || null);
-        const metaName =
-          session.user.user_metadata?.full_name ||
-          session.user.user_metadata?.name ||
-          undefined;
-        resolveAdminRole(session.user.id, session.user.email, metaName).finally(() =>
-          setIsChecking(false)
-        );
-      }
+      // Defer async Supabase calls outside onAuthStateChange to avoid Safari navigator.locks deadlock
+      setTimeout(() => {
+        if (!session?.user) {
+          setSessionUserId(null);
+          setSessionEmail(null);
+          setAdminUser(null);
+          setUnauthorizedRole(null);
+          setMfaFactorId(null);
+          setIsChecking(false);
+        } else {
+          setSessionUserId(session.user.id);
+          setSessionEmail(session.user.email || null);
+          const metaName =
+            session.user.user_metadata?.full_name ||
+            session.user.user_metadata?.name ||
+            undefined;
+          resolveAdminRole(session.user.id, session.user.email, metaName).finally(() =>
+            setIsChecking(false)
+          );
+        }
+      }, 0);
     });
     return () => {
       listener?.subscription?.unsubscribe();

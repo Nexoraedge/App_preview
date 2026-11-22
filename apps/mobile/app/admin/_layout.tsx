@@ -79,6 +79,13 @@ export default function AdminLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="labs/adityam-niramayaa"
+        options={{
+          title: 'Adityam Niramayaa Leads & Stats | Adityam Admin',
+          headerShown: false,
+        }}
+      />
       </Stack>
     </AdminAuthGate>
   );

@@ -98,16 +98,32 @@ export default function LabsScreen() {
   const [cartHydrated, setCartHydrated] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('@adityam_lab_cart_v1')
-      .then((raw) => {
-        if (raw) {
-          const parsed = JSON.parse(raw);
+    Promise.all([
+      AsyncStorage.getItem('@adityam_lab_cart_v1'),
+      AsyncStorage.getItem('@adityam_lab_prefs_v1'),
+    ])
+      .then(([rawCart, rawPrefs]) => {
+        if (rawCart) {
+          const parsed = JSON.parse(rawCart);
           if (parsed && typeof parsed === 'object') {
             setCarts({
               lab: Array.isArray(parsed.lab) ? parsed.lab : [],
               scan: Array.isArray(parsed.scan) ? parsed.scan : [],
               package: Array.isArray(parsed.package) ? parsed.package : [],
             });
+          }
+        }
+        if (rawPrefs) {
+          const prefs = JSON.parse(rawPrefs);
+          if (prefs && typeof prefs === 'object') {
+            if (prefs.segment) setSegment(prefs.segment);
+            if (prefs.flt) {
+              setFlt({
+                home: Boolean(prefs.flt.home),
+                sameDay: Boolean(prefs.flt.sameDay),
+                noFast: Boolean(prefs.flt.noFast),
+              });
+            }
           }
         }
       })
@@ -119,6 +135,11 @@ export default function LabsScreen() {
     if (!cartHydrated) return;
     AsyncStorage.setItem('@adityam_lab_cart_v1', JSON.stringify(carts)).catch(() => {});
   }, [carts, cartHydrated]);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
+    AsyncStorage.setItem('@adityam_lab_prefs_v1', JSON.stringify({ segment, flt })).catch(() => {});
+  }, [segment, flt, cartHydrated]);
 
   const liveItems: Item[] = useMemo(() => {
     if (dbItems && dbItems.length > 0) {
@@ -191,6 +212,7 @@ export default function LabsScreen() {
       nextSlotHi: c.next_slot_hi || c.next_slot || 'आज, शाम 5:00 बजे',
       offers: (Array.isArray(c.offers) && c.offers.length > 0 ? c.offers : ['lab']) as Segment[],
       factor: Number(c.price_factor ?? 1),
+      hospitalId: c.hospital_id || undefined,
       exclude: Array.isArray(c.exclude_items) ? c.exclude_items : undefined,
       prices: priceByCentre[c.id],
     }));
@@ -236,27 +258,47 @@ export default function LabsScreen() {
 
   const userCity = activeAddress?.city || currentLocationName || user?.city || 'Jaipur';
 
-  const options = useMemo(
-    () =>
-      centresFor(
-        cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean),
-        userCoords,
-        userCity,
-        liveCentres,
-        flt.home
-      ),
-    [cartIds, itemMap, userCoords, userCity, liveCentres, flt.home]
-  );
+  const options = useMemo(() => {
+    const selectedItems = cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean);
+    const base = centresFor(
+      selectedItems,
+      userCoords,
+      userCity,
+      dbCentres !== undefined ? liveCentres : null,
+      flt.home
+    );
+    const hasScan = selectedItems.some((it) => it.segment === 'scan');
+    if (flt.home && selectedItems.length > 0 && !hasScan) {
+      const adityamTotal = selectedItems.reduce((sum, it) => sum + fromPrice(it), 0);
+      const adityamCentre: Centre = {
+        id: 'adityam-home-collection',
+        name: isHi ? 'आदित्यम निरामया · होम कलेक्शन' : 'Adityam Niramayaa · Home Collection',
+        area: isHi ? 'आपके घर से सैंपल पिकअप' : `Doorstep Phlebotomist · ${userCity}`,
+        areaHi: 'आपके घर से सैंपल पिकअप',
+        city: userCity,
+        distanceKm: 0,
+        rating: 5.0,
+        reviews: 0,
+        home: true,
+        nextSlot: isHi ? 'आज, सुबह 7:00 - रात 8:00' : 'Today, 7:00 AM - 8:00 PM',
+        offers: ['lab', 'package'],
+        factor: 1,
+      };
+      return [{ centre: adityamCentre, total: adityamTotal }, ...base];
+    }
+    return base;
+  }, [cartIds, itemMap, userCoords, userCity, dbCentres, liveCentres, flt.home, isHi]);
+
   const partialOptions = useMemo(
     () =>
       partialCentresFor(
         cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean),
         userCoords,
         userCity,
-        liveCentres,
+        dbCentres !== undefined ? liveCentres : null,
         flt.home
       ),
-    [cartIds, itemMap, userCoords, userCity, liveCentres, flt.home]
+    [cartIds, itemMap, userCoords, userCity, dbCentres, liveCentres, flt.home]
   );
   const cheapestTotal = options.length
     ? Math.min(...options.map((o) => o.total))
@@ -291,12 +333,13 @@ export default function LabsScreen() {
   }, [carts, totalEstimatedPrice, isHi]);
 
   const sorted = useMemo(() => {
-    const arr = [...options];
+    const adityamOpt = options.find((o) => o.centre.id === 'adityam-home-collection');
+    const rest = options.filter((o) => o.centre.id !== 'adityam-home-collection');
     if (sort === 'near')
-      arr.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
-    if (sort === 'cheap') arr.sort((a, b) => a.total - b.total);
-    if (sort === 'rated') arr.sort((a, b) => b.centre.rating - a.centre.rating);
-    return arr;
+      rest.sort((a, b) => a.centre.distanceKm - b.centre.distanceKm);
+    if (sort === 'cheap') rest.sort((a, b) => a.total - b.total);
+    if (sort === 'rated') rest.sort((a, b) => b.centre.rating - a.centre.rating);
+    return adityamOpt ? [adityamOpt, ...rest] : rest;
   }, [options, sort]);
 
   const list = useMemo(() => {
@@ -333,7 +376,24 @@ export default function LabsScreen() {
     setFlt({ home: false, sameDay: false, noFast: false });
   };
 
+  const isDirectHomeFlow =
+    flt.home &&
+    cartIds.length > 0 &&
+    !cartIds.some((id) => (itemMap[id] || ITEM_BY_ID[id])?.segment === 'scan');
+
   const openCentres = () => {
+    if (isDirectHomeFlow) {
+      const adityamOpt = options.find((o) => o.centre.id === 'adityam-home-collection') || options[0];
+      if (adityamOpt) {
+        setPendingBookingData({
+          totalAmount: adityamOpt.total,
+          centre: adityamOpt.centre,
+          items: cartIds.map((id) => itemMap[id] || ITEM_BY_ID[id]).filter(Boolean),
+        });
+        setLabBookingModalVisible(true);
+        return;
+      }
+    }
     setPick(null);
     setCentreSheet(true);
   };
@@ -366,6 +426,7 @@ export default function LabsScreen() {
     setIsSubmittingLab(true);
     const { totalAmount, centre } = pendingBookingData;
     const bookingRef = `AN-LAB-${Math.floor(1000 + Math.random() * 9000)}`;
+    const sampleOtp = String(Math.floor(1000 + Math.random() * 9000));
     const testNames = cartIds.map((id) => itemMap[id]?.name || id).join(', ');
 
     const newBooking: Booking = {
@@ -379,6 +440,7 @@ export default function LabsScreen() {
       user_id: user?.id || '00000000-0000-0000-0000-000000000001',
       patient_name: patientName,
       patient_phone: patientPhone,
+      hospital_id: centre.id !== 'adityam-home-collection' ? ((centre as any).hospitalId || undefined) : undefined,
       hospital_name: centre.name || 'Diagnostic Partner Lab',
       branch_name: centre.area || currentLocationName || '',
       doctor_name: `${cartIds.length || 1} Tests Panel: ${testNames.slice(0, 45)}`,
@@ -387,6 +449,7 @@ export default function LabsScreen() {
       specialty_requested: segment === 'scan' ? 'Diagnostic Radiology' : 'Pathology Panel',
       status: 'PAID',
       call_status: 'connected',
+      qr_data: JSON.stringify({ ref: bookingRef, otp: sampleOtp, type: 'LAB' }),
       notes: `Mode: ${
         collectionMode === 'HOME_COLLECTION'
           ? `Home Sample Collection at ${collectionAddress}`
@@ -394,6 +457,7 @@ export default function LabsScreen() {
       }. Tests: ${testNames}. Paid online via ${paymentMethod} (${txnId}).`,
       created_at: new Date().toISOString(),
     };
+    (newBooking as any).verification_code = sampleOtp;
 
     try {
       await saveNewBooking(newBooking);
@@ -689,6 +753,13 @@ export default function LabsScreen() {
         cartCount={cartIds.length}
         subtitle={cartSummarySubtitle}
         onPressChooseCentre={openCentres}
+        ctaLabel={
+          isDirectHomeFlow
+            ? isHi
+              ? 'पता चुनें और भुगतान करें'
+              : 'Select Address & Pay'
+            : undefined
+        }
         isHi={isHi}
         bottomInset={insets.bottom}
       />

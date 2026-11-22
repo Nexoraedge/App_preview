@@ -76,7 +76,8 @@ export function LabBookingModal({
   const isHi = language === 'hi';
   const { user } = useAuth();
   const { members } = useFamily();
-  const { activeAddress, currentLocationName } = useLocation();
+  const { activeAddress, currentLocationName, savedAddresses, selectAddress, openLocationPicker } = useLocation();
+  const [addressDropdownOpen, setAddressDropdownOpen] = useState(false);
 
   // Mode: Home Sample Collection vs Diagnostic Centre Walk-in (Home collection active within 25 km radius)
   const hasScanItems = selectedItems.some((i) => i.segment === 'scan');
@@ -361,6 +362,27 @@ export function LabBookingModal({
                         ? 'लैब रिसेप्शन या फ्लेबोटोमिस्ट को यह QR कोड दिखाएं'
                         : 'Show this QR pass at lab reception or to the home phlebotomist'}
                     </Text>
+                    {(confirmedBooking as any).verification_code ? (
+                      <View
+                        style={{
+                          marginTop: 10,
+                          backgroundColor: '#EFF6FF',
+                          borderWidth: 1.5,
+                          borderColor: '#2563EB',
+                          borderRadius: 12,
+                          paddingHorizontal: 18,
+                          paddingVertical: 8,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#1E40AF', letterSpacing: 0.5 }}>
+                          {isHi ? 'सैंपल कलेक्शन सत्यापन OTP' : 'SAMPLE COLLECTION VERIFICATION OTP'}
+                        </Text>
+                        <Text style={{ fontSize: 22, fontWeight: '900', color: '#1D4ED8', letterSpacing: 6, marginTop: 2 }}>
+                          {(confirmedBooking as any).verification_code}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   {/* Action */}
@@ -466,83 +488,142 @@ export function LabBookingModal({
 
                   {canDoHome && (
                     <View style={{ marginTop: 14 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
-                        {isHi ? 'सैंपल कलेक्शन का तरीका:' : 'Collection Mode:'}
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 10 }}>
-                        {/* Home Collection Option */}
-                        <TouchableOpacity
-                          onPress={() => setCollectionMode('HOME_COLLECTION')}
-                          activeOpacity={0.8}
-                          style={{
-                            flex: 1,
-                            padding: 12,
-                            borderRadius: 14,
-                            borderWidth: 1.5,
-                            backgroundColor: collectionMode === 'HOME_COLLECTION' ? '#EFF6FF' : '#FFFFFF',
-                            borderColor: collectionMode === 'HOME_COLLECTION' ? '#2563EB' : '#E2E8F0',
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <HomeIcon size={16} color={collectionMode === 'HOME_COLLECTION' ? '#2563EB' : '#64748B'} />
-                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: collectionMode === 'HOME_COLLECTION' ? '#1E40AF' : '#0F172A' }}>
-                              {isHi ? 'घर पर सैंपल' : 'Home Collection'}
-                            </Text>
-                          </View>
-                          <Text style={{ fontSize: 10.5, color: '#16A34A', fontWeight: '800', marginTop: 4 }}>
-                            {isHi ? 'मुफ़्त विज़िट (₹0)' : 'FREE Phlebotomist'}
+                      {selectedCentre?.id !== 'adityam-home-collection' && (
+                        <>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
+                            {isHi ? 'सैंपल कलेक्शन का तरीका:' : 'Collection Mode:'}
                           </Text>
-                        </TouchableOpacity>
+                          <View style={{ flexDirection: 'row', gap: 10 }}>
+                            {/* Home Collection Option */}
+                            <TouchableOpacity
+                              onPress={() => setCollectionMode('HOME_COLLECTION')}
+                              activeOpacity={0.8}
+                              style={{
+                                flex: 1,
+                                padding: 12,
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                backgroundColor: collectionMode === 'HOME_COLLECTION' ? '#EFF6FF' : '#FFFFFF',
+                                borderColor: collectionMode === 'HOME_COLLECTION' ? '#2563EB' : '#E2E8F0',
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <HomeIcon size={16} color={collectionMode === 'HOME_COLLECTION' ? '#2563EB' : '#64748B'} />
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: collectionMode === 'HOME_COLLECTION' ? '#1E40AF' : '#0F172A' }}>
+                                  {isHi ? 'घर पर सैंपल' : 'Home Collection'}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 10.5, color: '#16A34A', fontWeight: '800', marginTop: 4 }}>
+                                {isHi ? 'मुफ़्त विज़िट (₹0)' : 'FREE Phlebotomist'}
+                              </Text>
+                            </TouchableOpacity>
 
-                        {/* Centre Walk-in Option */}
-                        <TouchableOpacity
-                          onPress={() => setCollectionMode('CENTRE_VISIT')}
-                          activeOpacity={0.8}
-                          style={{
-                            flex: 1,
-                            padding: 12,
-                            borderRadius: 14,
-                            borderWidth: 1.5,
-                            backgroundColor: collectionMode === 'CENTRE_VISIT' ? '#EFF6FF' : '#FFFFFF',
-                            borderColor: collectionMode === 'CENTRE_VISIT' ? '#2563EB' : '#E2E8F0',
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Building2 size={16} color={collectionMode === 'CENTRE_VISIT' ? '#2563EB' : '#64748B'} />
-                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: collectionMode === 'CENTRE_VISIT' ? '#1E40AF' : '#0F172A' }}>
-                              {isHi ? 'सेंटर पर जाएं' : 'Visit Centre'}
-                            </Text>
+                            {/* Centre Walk-in Option */}
+                            <TouchableOpacity
+                              onPress={() => setCollectionMode('CENTRE_VISIT')}
+                              activeOpacity={0.8}
+                              style={{
+                                flex: 1,
+                                padding: 12,
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                backgroundColor: collectionMode === 'CENTRE_VISIT' ? '#EFF6FF' : '#FFFFFF',
+                                borderColor: collectionMode === 'CENTRE_VISIT' ? '#2563EB' : '#E2E8F0',
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Building2 size={16} color={collectionMode === 'CENTRE_VISIT' ? '#2563EB' : '#64748B'} />
+                                <Text style={{ fontSize: 12.5, fontWeight: '800', color: collectionMode === 'CENTRE_VISIT' ? '#1E40AF' : '#0F172A' }}>
+                                  {isHi ? 'सेंटर पर जाएं' : 'Visit Centre'}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '700', marginTop: 4 }}>
+                                {selectedCentre.distanceKm} km · Fast-track
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                          <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '700', marginTop: 4 }}>
-                            {selectedCentre.distanceKm} km · Fast-track
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                        </>
+                      )}
 
-                      {/* Address preview if Home Collection */}
+                      {/* Address selector dropdown if Home Collection */}
                       {collectionMode === 'HOME_COLLECTION' && (
-                        <View
-                          style={{
-                            backgroundColor: '#F8FAFC',
-                            borderRadius: 12,
-                            padding: 10,
-                            marginTop: 8,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 8,
-                            borderWidth: 1,
-                            borderColor: '#E2E8F0',
-                          }}
-                        >
-                          <MapPin size={14} color="#2563EB" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase', fontWeight: '700' }}>
-                              {isHi ? 'सैंपल पिकअप पता:' : 'Sample Collection Address:'}
-                            </Text>
-                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#0F172A', marginTop: 1 }} numberOfLines={1}>
-                              {resolvedAddress}
-                            </Text>
+                        <View style={{ marginTop: 8, gap: 6 }}>
+                          <View
+                            style={{
+                              backgroundColor: '#F8FAFC',
+                              borderRadius: 12,
+                              padding: 10,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 8,
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                            }}
+                          >
+                            <MapPin size={14} color="#2563EB" />
+                            <TouchableOpacity
+                              onPress={() => setAddressDropdownOpen((v) => !v)}
+                              style={{ flex: 1 }}
+                            >
+                              <Text style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase', fontWeight: '700' }}>
+                                {isHi ? 'सैंपल पिकअप पता:' : 'Sample Collection Address:'}
+                              </Text>
+                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#0F172A', marginTop: 1 }} numberOfLines={1}>
+                                {resolvedAddress} {savedAddresses.length > 0 ? (addressDropdownOpen ? '▲' : '▼') : ''}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={openLocationPicker}
+                              style={{
+                                backgroundColor: '#EFF6FF',
+                                borderWidth: 1,
+                                borderColor: '#BFDBFE',
+                                paddingHorizontal: 9,
+                                paddingVertical: 5,
+                                borderRadius: 8,
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4ED8' }}>
+                                {isHi ? '+ नया पता' : '+ Add Address'}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
+
+                          {addressDropdownOpen && savedAddresses.length > 0 && (
+                            <View
+                              style={{
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                                padding: 6,
+                                gap: 4,
+                              }}
+                            >
+                              {savedAddresses.map((addr) => {
+                                const isSel = activeAddress?.id === addr.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={addr.id}
+                                    onPress={() => {
+                                      selectAddress(addr.id);
+                                      setAddressDropdownOpen(false);
+                                    }}
+                                    style={{
+                                      paddingHorizontal: 10,
+                                      paddingVertical: 8,
+                                      borderRadius: 8,
+                                      backgroundColor: isSel ? '#EFF6FF' : 'transparent',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: isSel ? '#1D4ED8' : '#0F172A' }}>
+                                      {addr.label}: {addr.landmark_street}, {addr.city} - {addr.pincode}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>

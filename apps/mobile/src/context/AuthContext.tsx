@@ -100,7 +100,9 @@ const syncAuthUserToDatabase = async (sessionUser: any, client: any, existingUse
   const isStaffPortalPath =
     Platform.OS === 'web' &&
     typeof window !== 'undefined' &&
-    (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/partner'));
+    (window.location.pathname.startsWith('/admin') ||
+      window.location.pathname.startsWith('/partner') ||
+      window.location.pathname.startsWith('/adityam-labs'));
   if (appMode !== 'admin' && appMode !== 'partner' && !isStaffPortalPath) {
     const existingRole = String(dbUser?.role || 'patient').toLowerCase();
     if (existingRole !== 'patient') {

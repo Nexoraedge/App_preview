@@ -10,6 +10,7 @@ interface LabCartStickyBarProps {
   cartCount: number;
   subtitle: string;
   onPressChooseCentre: () => void;
+  ctaLabel?: string;
   isHi: boolean;
   bottomInset: number;
 }
@@ -18,6 +19,7 @@ export function LabCartStickyBar({
   cartCount,
   subtitle,
   onPressChooseCentre,
+  ctaLabel,
   isHi,
   bottomInset,
 }: LabCartStickyBarProps) {
@@ -89,7 +91,7 @@ export function LabCartStickyBar({
               fontSize: 14,
             }}
           >
-            {isHi ? 'केंद्र चुनें' : 'Choose centre'}
+            {ctaLabel || (isHi ? 'केंद्र चुनें' : 'Choose centre')}
           </Text>
           <ChevronRight size={16} color={C.brandDark} strokeWidth={3} />
         </View>

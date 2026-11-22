@@ -586,7 +586,7 @@ export const centresFor = (
   homeOnly?: boolean
 ): { centre: Centre; total: number }[] => {
   if (!items.length) return [];
-  const sourceCentres = customCentres && customCentres.length > 0 ? customCentres : CENTRES;
+  const sourceCentres = customCentres !== undefined && customCentres !== null ? customCentres : CENTRES;
   const out: { centre: Centre; total: number }[] = [];
 
   const isJaipurUser = (city || '').toLowerCase().includes('jaipur') ||
@@ -642,7 +642,7 @@ export const partialCentresFor = (
   homeOnly?: boolean
 ): PartialCentreOption[] => {
   if (items.length <= 1) return [];
-  const sourceCentres = customCentres && customCentres.length > 0 ? customCentres : CENTRES;
+  const sourceCentres = customCentres !== undefined && customCentres !== null ? customCentres : CENTRES;
   const out: PartialCentreOption[] = [];
   for (const rawCentre of sourceCentres) {
     if (homeOnly && !rawCentre.home) continue;
